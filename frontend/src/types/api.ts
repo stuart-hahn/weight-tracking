@@ -38,6 +38,16 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UpdateUserRequest {
+  age?: number;
+  sex?: 'male' | 'female';
+  height_cm?: number;
+  current_weight_kg?: number;
+  target_body_fat_percent?: number;
+  activity_level?: ActivityLevel | null;
+  lean_mass_kg?: number | null;
+}
+
 export interface DailyEntryResponse {
   id: string;
   user_id: string;
@@ -57,14 +67,25 @@ export interface CreateEntryRequest {
   hip_cm?: number | null;
 }
 
+export interface WeeklySummaryResponse {
+  weight_change_kg: number | null;
+  on_track: boolean | null;
+  message: string;
+}
+
 export interface ProgressResponse {
   user_id: string;
+  start_weight_kg: number;
   current_weight_kg: number;
   goal_weight_kg: number;
   target_body_fat_percent: number;
   entries_count: number;
   latest_entry_date: string | null;
   weight_trend_kg_per_week: number | null;
+  progress_percent: number | null;
+  recommended_calories_min: number | null;
+  recommended_calories_max: number | null;
+  weekly_summary: WeeklySummaryResponse;
 }
 
 export interface ApiError {

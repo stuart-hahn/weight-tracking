@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { UserCreateInput, DailyEntryCreateInput } from '../types/index.js';
+import type { UserCreateInput, UserUpdateInput, DailyEntryCreateInput } from '../types/index.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +29,33 @@ export function validateCreateUser(
   if (typeof target_body_fat_percent !== 'number' || target_body_fat_percent <= 0 || target_body_fat_percent >= 100) errors.push('target_body_fat_percent must be between 0 and 100');
   if (body.activity_level != null && !['sedentary', 'light', 'moderate', 'very_active'].includes(body.activity_level)) errors.push('Invalid activity_level');
   if (body.lean_mass_kg != null && (typeof body.lean_mass_kg !== 'number' || body.lean_mass_kg <= 0 || body.lean_mass_kg > 500)) errors.push('Invalid lean_mass_kg');
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateUpdateUser(
+  req: Request<{ id: string }, unknown, UserUpdateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.age !== undefined) {
+    if (typeof body.age !== 'number' || body.age < 10 || body.age > 120) errors.push('Age must be between 10 and 120');
+  }
+  if (body.sex !== undefined && body.sex !== 'male' && body.sex !== 'female') errors.push('Sex must be "male" or "female"');
+  if (body.height_cm !== undefined && (typeof body.height_cm !== 'number' || body.height_cm <= 0 || body.height_cm > 300)) errors.push('Valid height_cm required');
+  if (body.current_weight_kg !== undefined && (typeof body.current_weight_kg !== 'number' || body.current_weight_kg <= 0 || body.current_weight_kg > 500)) errors.push('Valid current_weight_kg required');
+  if (body.target_body_fat_percent !== undefined && (typeof body.target_body_fat_percent !== 'number' || body.target_body_fat_percent <= 0 || body.target_body_fat_percent >= 100)) errors.push('target_body_fat_percent must be between 0 and 100');
+  if (body.activity_level !== undefined && body.activity_level != null && !['sedentary', 'light', 'moderate', 'very_active'].includes(body.activity_level)) errors.push('Invalid activity_level');
+  if (body.lean_mass_kg !== undefined && body.lean_mass_kg != null && (typeof body.lean_mass_kg !== 'number' || body.lean_mass_kg <= 0 || body.lean_mass_kg > 500)) errors.push('Invalid lean_mass_kg');
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

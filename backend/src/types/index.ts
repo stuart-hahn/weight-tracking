@@ -76,16 +76,27 @@ export interface DailyEntryCreateInput {
   hip_cm?: number | null;
 }
 
-/** Progress metrics (Phase 2 will add full calculations) */
+/** Weekly summary for progress */
+export interface WeeklySummary {
+  weight_change_kg: number | null;
+  on_track: boolean | null;
+  message: string;
+}
+
+/** Progress metrics with computed goal, trend, calories, and weekly summary */
 export interface ProgressMetrics {
   user_id: string;
+  start_weight_kg: number;
   current_weight_kg: number;
   goal_weight_kg: number;
   target_body_fat_percent: number;
   entries_count: number;
   latest_entry_date: string | null;
-  /** Placeholder for trend data in Phase 2 */
   weight_trend_kg_per_week: number | null;
+  progress_percent: number | null;
+  recommended_calories_min: number | null;
+  recommended_calories_max: number | null;
+  weekly_summary: WeeklySummary;
 }
 
 export interface OptionalMetrics {

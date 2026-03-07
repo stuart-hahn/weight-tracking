@@ -120,14 +120,17 @@ npm run db:reset
 
 ---
 
-## API (unchanged)
+## API
 
 - `POST /api/users` – create user (returns `user` + `token`)
 - `GET /api/users/:id` – get profile (Bearer token)
-- `PATCH /api/users/:id` – update profile (stub)
+- `PATCH /api/users/:id` – update profile (optional fields: age, sex, height_cm, current_weight_kg, target_body_fat_percent, activity_level, lean_mass_kg)
+- `POST /api/auth/login` – log in (email, password; returns `user` + `token`)
 - `POST /api/users/:id/entries` – log daily entry
 - `GET /api/users/:id/entries` – list entries
-- `GET /api/users/:id/progress` – progress metrics (stub)
+- `GET /api/users/:id/progress` – progress metrics (computed goal, current from latest entry, trend, % toward goal)
+
+**Weight semantics:** In progress, "current weight" = latest entry's weight when the user has entries, otherwise the profile (starting) weight. Profile "current weight" is the reference/starting value and is editable via PATCH.
 
 ---
 
@@ -162,3 +165,7 @@ cd frontend && npm run build
 ```
 
 Strict TypeScript is enabled in both projects. The backend remains API-first and compatible with the existing React frontend; optional metrics stay collapsible and API contracts are unchanged.
+
+## Production deployment
+
+See **[docs/DEPLOY.md](docs/DEPLOY.md)** for production environment variables, build and run steps, SQLite backup notes, and optional Docker usage.

@@ -8,6 +8,8 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "prisma generate && tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
@@ -35,6 +37,7 @@
     "@types/node": "^20.10.0",
     "prisma": "^7.4.2",
     "tsx": "^4.6.2",
-    "typescript": "^5.3.2"
+    "typescript": "^5.3.2",
+    "vitest": "^2.0.0"
   }
 }

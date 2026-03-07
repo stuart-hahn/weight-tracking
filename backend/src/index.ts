@@ -5,6 +5,7 @@ import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import entriesRouter from './routes/entries.js';
 import progressRouter from './routes/progress.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -20,6 +21,8 @@ app.use('/api/users', usersRouter);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Body Fat Tracker API listening on http://localhost:${PORT}`);

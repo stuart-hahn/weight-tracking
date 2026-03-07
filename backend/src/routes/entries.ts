@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express';
+import { Router, type Response, type NextFunction } from 'express';
 import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
@@ -8,7 +8,7 @@ import type { DailyEntryCreateInput } from '../types/index.js';
 const router = Router({ mergeParams: true });
 
 /** POST /api/users/:id/entries - Log daily entry (protected) */
-router.post('/', requireAuth, validateCreateEntry, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', requireAuth, validateCreateEntry, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const userId = req.params.id;
   if (req.userId !== userId) {
     res.status(403).json({ error: 'Forbidden' });
@@ -39,10 +39,12 @@ router.post('/', requireAuth, validateCreateEntry, async (req: AuthRequest, res:
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      res.status(409).json({ error: 'Entry already exists for this date' });
+      const e = new Error('Entry already exists for this date') as Error & { statusCode: number };
+      e.statusCode = 409;
+      next(e);
       return;
     }
-    res.status(500).json({ error: 'Failed to create entry' });
+    next(err);
   }
 });
 

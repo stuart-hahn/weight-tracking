@@ -1,0 +1,208 @@
+import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { getUser, updateUser } from '../api/client';
+import type { UserProfile, UpdateUserRequest, ActivityLevel } from '../types/api';
+
+interface SettingsPageProps {
+  userId: string;
+  onError: (msg: string | null) => void;
+  onSuccess: (msg: string | null) => void;
+}
+
+export default function SettingsPage({ userId, onError, onSuccess }: SettingsPageProps) {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [age, setAge] = useState('');
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [heightCm, setHeightCm] = useState('');
+  const [currentWeightKg, setCurrentWeightKg] = useState('');
+  const [targetBodyFatPercent, setTargetBodyFatPercent] = useState('');
+  const [activityLevel, setActivityLevel] = useState<string>('');
+  const [leanMassKg, setLeanMassKg] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getUser(userId)
+      .then((p) => {
+        if (!cancelled) {
+          setProfile(p);
+          setAge(String(p.age));
+          setSex(p.sex);
+          setHeightCm(String(p.height_cm));
+          setCurrentWeightKg(String(p.current_weight_kg));
+          setTargetBodyFatPercent(String(p.target_body_fat_percent));
+          setActivityLevel(p.activity_level ?? '');
+          setLeanMassKg(p.lean_mass_kg != null ? String(p.lean_mass_kg) : '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) onError('Failed to load profile');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [userId, onError]);
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!profile) return;
+      onError(null);
+      onSuccess(null);
+      const body: UpdateUserRequest = {};
+      const ageNum = Number(age);
+      if (!Number.isNaN(ageNum) && ageNum >= 10 && ageNum <= 120) body.age = ageNum;
+      body.sex = sex;
+      const heightNum = Number(heightCm);
+      if (!Number.isNaN(heightNum) && heightNum > 0 && heightNum <= 300) body.height_cm = heightNum;
+      const weightNum = Number(currentWeightKg);
+      if (!Number.isNaN(weightNum) && weightNum > 0 && weightNum <= 500) body.current_weight_kg = weightNum;
+      const targetNum = Number(targetBodyFatPercent);
+      if (!Number.isNaN(targetNum) && targetNum > 0 && targetNum < 100) body.target_body_fat_percent = targetNum;
+      if (['sedentary', 'light', 'moderate', 'very_active'].includes(activityLevel)) {
+        body.activity_level = activityLevel as ActivityLevel;
+      } else {
+        body.activity_level = null;
+      }
+      const leanNum = leanMassKg.trim() === '' ? null : Number(leanMassKg);
+      if (leanNum !== null && !Number.isNaN(leanNum) && leanNum > 0 && leanNum <= 500) {
+        body.lean_mass_kg = leanNum;
+      } else {
+        body.lean_mass_kg = null;
+      }
+      if (Object.keys(body).length === 0) {
+        onSuccess('No changes to save.');
+        return;
+      }
+      setSaving(true);
+      try {
+        const updated = await updateUser(userId, body);
+        setProfile(updated);
+        onSuccess('Profile updated.');
+      } catch (err) {
+        onError(err instanceof Error ? err.message : 'Failed to update profile');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, onError, onSuccess]
+  );
+
+  if (loading) {
+    return (
+      <section className="app__card" aria-label="Settings">
+        <h2 className="app__card-title">Settings</h2>
+        <p className="progress-text">Loading…</p>
+      </section>
+    );
+  }
+
+  if (!profile) return null;
+
+  return (
+    <section className="app__card" aria-label="Settings">
+      <h2 className="app__card-title">Settings</h2>
+      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        {profile.email}
+      </p>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-age">Age</label>
+          <input
+            id="settings-age"
+            type="number"
+            className="form-input"
+            min={10}
+            max={120}
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-sex">Sex</label>
+          <select
+            id="settings-sex"
+            className="form-input"
+            value={sex}
+            onChange={(e) => setSex(e.target.value as 'male' | 'female')}
+          >
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-height">Height (cm)</label>
+          <input
+            id="settings-height"
+            type="number"
+            className="form-input"
+            min={1}
+            max={300}
+            step={0.1}
+            value={heightCm}
+            onChange={(e) => setHeightCm(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-weight">Current weight (kg)</label>
+          <input
+            id="settings-weight"
+            type="number"
+            className="form-input"
+            min={1}
+            max={500}
+            step={0.1}
+            value={currentWeightKg}
+            onChange={(e) => setCurrentWeightKg(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-target-bf">Target body fat (%)</label>
+          <input
+            id="settings-target-bf"
+            type="number"
+            className="form-input"
+            min={1}
+            max={99}
+            step={0.5}
+            value={targetBodyFatPercent}
+            onChange={(e) => setTargetBodyFatPercent(e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-activity">Activity level</label>
+          <select
+            id="settings-activity"
+            className="form-input"
+            value={activityLevel}
+            onChange={(e) => setActivityLevel(e.target.value)}
+          >
+            <option value="">—</option>
+            <option value="sedentary">Sedentary</option>
+            <option value="light">Light</option>
+            <option value="moderate">Moderate</option>
+            <option value="very_active">Very active</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-lean">Lean mass (kg, optional)</label>
+          <input
+            id="settings-lean"
+            type="number"
+            className="form-input"
+            min={1}
+            max={500}
+            step={0.1}
+            placeholder="Leave blank to estimate"
+            value={leanMassKg}
+            onChange={(e) => setLeanMassKg(e.target.value)}
+          />
+        </div>
+        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </form>
+    </section>
+  );
+}

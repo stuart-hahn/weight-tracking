@@ -1,28 +1,26 @@
 import { useState, useCallback, FormEvent, useEffect } from 'react';
 import { getProgress } from '../api/client';
-import type { CreateEntryRequest } from '../types/api';
+import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 
 interface DailyLogFormProps {
   onSubmit: (body: CreateEntryRequest) => void;
   userId: string;
+  /** Increment to refetch progress (e.g. after saving an entry) */
+  refreshTrigger?: number;
 }
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function DailyLogForm({ onSubmit, userId }: DailyLogFormProps) {
+export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: DailyLogFormProps) {
   const [date, setDate] = useState(todayISO);
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
   const [optionalOpen, setOptionalOpen] = useState(false);
   const [waistCm, setWaistCm] = useState('');
   const [hipCm, setHipCm] = useState('');
-  const [progress, setProgress] = useState<{
-    current_weight_kg: number;
-    goal_weight_kg: number;
-    entries_count: number;
-  } | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +30,7 @@ export default function DailyLogForm({ onSubmit, userId }: DailyLogFormProps) {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   const handleSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
@@ -59,7 +57,7 @@ export default function DailyLogForm({ onSubmit, userId }: DailyLogFormProps) {
   );
 
   const progressPercent =
-    progress ? Math.min(100, progress.entries_count * 5) : 0;
+    progress?.progress_percent != null ? progress.progress_percent : 0;
 
   return (
     <>
@@ -69,6 +67,9 @@ export default function DailyLogForm({ onSubmit, userId }: DailyLogFormProps) {
           <p className="progress-text">
             Current: {progress.current_weight_kg} kg · Goal: {progress.goal_weight_kg} kg ·{' '}
             {progress.entries_count} entries
+            {progress.weight_trend_kg_per_week != null && (
+              <> · {progress.weight_trend_kg_per_week >= 0 ? '+' : ''}{progress.weight_trend_kg_per_week.toFixed(2)} kg/week</>
+            )}
           </p>
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
             <div
@@ -76,6 +77,16 @@ export default function DailyLogForm({ onSubmit, userId }: DailyLogFormProps) {
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+          {(progress.recommended_calories_min != null && progress.recommended_calories_max != null) && (
+            <p className="progress-text" style={{ marginTop: '0.75rem' }}>
+              Aim for {progress.recommended_calories_min}–{progress.recommended_calories_max} kcal/day
+            </p>
+          )}
+          {progress.weekly_summary && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              {progress.weekly_summary.message}
+            </p>
+          )}
         </section>
       )}
 

@@ -2,6 +2,7 @@ import type {
   CreateUserRequest,
   CreateUserResponse,
   LoginRequest,
+  UpdateUserRequest,
   UserProfile,
   CreateEntryRequest,
   DailyEntryResponse,
@@ -50,6 +51,17 @@ export async function getUser(id: string): Promise<UserProfile> {
   const res = await fetch(`${API_BASE}/users/${id}`, { headers: getAuthHeaders() });
   const data = (await res.json()) as UserProfile | ApiError;
   if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to fetch user');
+  return data as UserProfile;
+}
+
+export async function updateUser(userId: string, body: UpdateUserRequest): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/users/${userId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as UserProfile | ApiError;
+  if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to update profile');
   return data as UserProfile;
 }
 

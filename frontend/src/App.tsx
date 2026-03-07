@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { createUser, login, createEntry, getUser, setToken, hasToken, clearToken } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
-import LoginForm from './components/LoginForm';
-import SignupForm from './components/SignupForm';
-import DailyLogForm from './components/DailyLogForm';
+import LandingPage from './pages/LandingPage';
+import LogPage from './pages/LogPage';
+import ProgressPage from './pages/ProgressPage';
+import SettingsPage from './pages/SettingsPage';
+import Nav from './components/Nav';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -28,6 +31,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [progressRefreshTrigger, setProgressRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!hasToken() || !userId) {
@@ -87,6 +91,7 @@ export default function App() {
     try {
       await createEntry(userId, body);
       setSuccess('Entry saved.');
+      setProgressRefreshTrigger((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save entry');
     }
@@ -103,61 +108,84 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="app__header">
-        <h1 className="app__title">Body Fat Tracker</h1>
-        <p className="app__subtitle">Track weight & progress toward your goal</p>
-      </header>
+    <BrowserRouter>
+      <div className="app">
+        <header className="app__header">
+          <h1 className="app__title">Body Fat Tracker</h1>
+          <p className="app__subtitle">Track weight & progress toward your goal</p>
+        </header>
 
-      <main className="app__main">
-        {error && <div className="app__error" role="alert">{error}</div>}
-        {success && <div className="app__success" role="status">{success}</div>}
+        <main className="app__main">
+          {error && <div className="app__error" role="alert">{error}</div>}
+          {success && <div className="app__success" role="status">{success}</div>}
 
-        {!userId ? (
-          <div className="app__card">
-            <div className="auth-tabs" role="tablist" aria-label="Log in or create account">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === 'login'}
-                aria-controls="auth-panel"
-                id="tab-login"
-                className={`auth-tabs__tab ${authMode === 'login' ? 'auth-tabs__tab--active' : ''}`}
-                onClick={() => { setAuthMode('login'); setError(null); setSuccess(null); }}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === 'signup'}
-                aria-controls="auth-panel"
-                id="tab-signup"
-                className={`auth-tabs__tab ${authMode === 'signup' ? 'auth-tabs__tab--active' : ''}`}
-                onClick={() => { setAuthMode('signup'); setError(null); setSuccess(null); }}
-              >
-                Create account
-              </button>
-            </div>
-            <div id="auth-panel" role="tabpanel" aria-labelledby={authMode === 'login' ? 'tab-login' : 'tab-signup'}>
-              {authMode === 'login' ? (
-                <LoginForm onSubmit={handleLogin} />
-              ) : (
-                <SignupForm onSubmit={handleSignup} />
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            <DailyLogForm onSubmit={handleEntrySubmit} userId={userId} />
-            <div className="app__logout">
-              <button type="button" className="btn btn--secondary" onClick={handleLogout}>
-                Sign out
-              </button>
-            </div>
-          </>
-        )}
-      </main>
-    </div>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                userId ? (
+                  <Navigate to="/log" replace />
+                ) : (
+                  <LandingPage
+                    authMode={authMode}
+                    onAuthModeChange={(mode) => { setAuthMode(mode); setError(null); setSuccess(null); }}
+                    onLogin={handleLogin}
+                    onSignup={handleSignup}
+                  />
+                )
+              }
+            />
+            <Route
+              path="/log"
+              element={
+                userId ? (
+                  <>
+                    <Nav onLogout={handleLogout} />
+                    <LogPage
+                      userId={userId}
+                      refreshTrigger={progressRefreshTrigger}
+                      onSubmit={handleEntrySubmit}
+                    />
+                  </>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/progress"
+              element={
+                userId ? (
+                  <>
+                    <Nav onLogout={handleLogout} />
+                    <ProgressPage userId={userId} refreshTrigger={progressRefreshTrigger} />
+                  </>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                userId ? (
+                  <>
+                    <Nav onLogout={handleLogout} />
+                    <SettingsPage
+                      userId={userId}
+                      onError={setError}
+                      onSuccess={setSuccess}
+                    />
+                  </>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
   );
 }
