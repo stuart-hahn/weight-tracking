@@ -15,6 +15,8 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  onboarding_complete: boolean;
+  plan: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,7 +35,7 @@ export interface CreateUserRequest {
 }
 
 export interface CreateUserResponse {
-  user: { id: string; email: string };
+  user: { id: string; email: string; onboarding_complete: boolean };
   token: string;
 }
 
@@ -51,6 +53,8 @@ export interface UpdateUserRequest {
   activity_level?: ActivityLevel | null;
   lean_mass_kg?: number | null;
   units?: UnitsPreference;
+  onboarding_complete?: boolean;
+  plan?: string | null;
 }
 
 export interface DailyEntryResponse {

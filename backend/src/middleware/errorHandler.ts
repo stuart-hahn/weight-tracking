@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Prisma } from '../generated/prisma/client.js';
+import type { RequestWithId } from './requestLogger.js';
 
 export interface HttpError extends Error {
   statusCode?: number;
@@ -7,7 +8,7 @@ export interface HttpError extends Error {
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
@@ -30,6 +31,11 @@ export function errorHandler(
     }
   }
 
-  console.error(err);
+  const requestId = (req as RequestWithId).id;
+  if (requestId != null) {
+    console.error(JSON.stringify({ requestId, error: String(err), stack: err instanceof Error ? err.stack : undefined }));
+  } else {
+    console.error(err);
+  }
   res.status(500).json({ error: 'Internal server error' });
 }

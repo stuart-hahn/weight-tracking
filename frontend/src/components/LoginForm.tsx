@@ -1,4 +1,5 @@
 import { useState, useCallback, FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import type { LoginRequest } from '../types/api';
 
 interface LoginFormProps {
@@ -52,6 +53,9 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
             required
             autoComplete="current-password"
           />
+          <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
         </div>
         <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
           Log in

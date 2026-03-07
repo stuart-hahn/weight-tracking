@@ -45,6 +45,8 @@ export interface UserUpdateInput {
   activity_level?: ActivityLevel | null;
   lean_mass_kg?: number | null;
   units?: UnitsPreference;
+  onboarding_complete?: boolean;
+  plan?: string | null;
 }
 
 /** User without sensitive fields for API responses */
@@ -59,6 +61,8 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  onboarding_complete: boolean;
+  plan: string | null;
   created_at: string;
   updated_at: string;
 }

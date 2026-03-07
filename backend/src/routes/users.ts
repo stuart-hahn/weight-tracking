@@ -25,11 +25,16 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
         activityLevel: body.activity_level ?? null,
         leanMassKg: body.lean_mass_kg ?? null,
         units: body.units ?? 'metric',
+        onboardingComplete: false,
+        plan: 'free',
       },
-      select: { id: true, email: true },
+      select: { id: true, email: true, onboardingComplete: true },
     });
     const token = signToken({ sub: user.id, email: user.email });
-    res.status(201).json({ user: { id: user.id, email: user.email }, token });
+    res.status(201).json({
+      user: { id: user.id, email: user.email, onboarding_complete: user.onboardingComplete },
+      token,
+    });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const e = new Error('Email already registered') as Error & { statusCode: number };
@@ -61,6 +66,8 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
       activityLevel: true,
       leanMassKg: true,
       units: true,
+      onboardingComplete: true,
+      plan: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -80,6 +87,8 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     activity_level: user.activityLevel as UserProfile['activity_level'],
     lean_mass_kg: user.leanMassKg,
     units: (user.units as UserProfile['units']) ?? 'metric',
+    onboarding_complete: user.onboardingComplete,
+    plan: user.plan,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
   };
@@ -103,6 +112,8 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     activityLevel?: string | null;
     leanMassKg?: number | null;
     units?: string;
+    onboardingComplete?: boolean;
+    plan?: string | null;
   } = {};
   if (body.age !== undefined) data.age = body.age;
   if (body.sex !== undefined) data.sex = body.sex;
@@ -112,10 +123,28 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
   if (body.activity_level !== undefined) data.activityLevel = body.activity_level ?? null;
   if (body.lean_mass_kg !== undefined) data.leanMassKg = body.lean_mass_kg ?? null;
   if (body.units !== undefined) data.units = body.units;
+  if (body.onboarding_complete !== undefined) data.onboardingComplete = body.onboarding_complete;
+  if (body.plan !== undefined) data.plan = body.plan ?? null;
+  const selectFields = {
+    id: true,
+    email: true,
+    age: true,
+    sex: true,
+    heightCm: true,
+    currentWeightKg: true,
+    targetBodyFatPercent: true,
+    activityLevel: true,
+    leanMassKg: true,
+    units: true,
+    onboardingComplete: true,
+    plan: true,
+    createdAt: true,
+    updatedAt: true,
+  };
   if (Object.keys(data).length === 0) {
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, age: true, sex: true, heightCm: true, currentWeightKg: true, targetBodyFatPercent: true, activityLevel: true, leanMassKg: true, units: true, createdAt: true, updatedAt: true },
+      select: selectFields,
     });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -131,31 +160,35 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
       target_body_fat_percent: user.targetBodyFatPercent,
       activity_level: user.activityLevel as UserProfile['activity_level'],
       lean_mass_kg: user.leanMassKg,
-      units: (user.units as UserProfile['units']) ?? 'metric',
-      created_at: user.createdAt.toISOString(),
-      updated_at: user.updatedAt.toISOString(),
-    };
-    res.json(profile);
-    return;
-  }
-  const user = await prisma.user.update({
-    where: { id },
-    data,
-    select: { id: true, email: true, age: true, sex: true, heightCm: true, currentWeightKg: true, targetBodyFatPercent: true, activityLevel: true, leanMassKg: true, units: true, createdAt: true, updatedAt: true },
-  });
-  const profile: UserProfile = {
-    id: user.id,
-    email: user.email,
-    age: user.age,
-    sex: user.sex as 'male' | 'female',
-    height_cm: user.heightCm,
-    current_weight_kg: user.currentWeightKg,
-    target_body_fat_percent: user.targetBodyFatPercent,
-    activity_level: user.activityLevel as UserProfile['activity_level'],
-    lean_mass_kg: user.leanMassKg,
     units: (user.units as UserProfile['units']) ?? 'metric',
+    onboarding_complete: user.onboardingComplete,
+    plan: user.plan,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
+  };
+  res.json(profile);
+  return;
+  }
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data,
+    select: selectFields,
+  });
+  const profile: UserProfile = {
+    id: updatedUser.id,
+    email: updatedUser.email,
+    age: updatedUser.age,
+    sex: updatedUser.sex as 'male' | 'female',
+    height_cm: updatedUser.heightCm,
+    current_weight_kg: updatedUser.currentWeightKg,
+    target_body_fat_percent: updatedUser.targetBodyFatPercent,
+    activity_level: updatedUser.activityLevel as UserProfile['activity_level'],
+    lean_mass_kg: updatedUser.leanMassKg,
+    units: (updatedUser.units as UserProfile['units']) ?? 'metric',
+    onboarding_complete: updatedUser.onboardingComplete,
+    plan: updatedUser.plan,
+    created_at: updatedUser.createdAt.toISOString(),
+    updated_at: updatedUser.updatedAt.toISOString(),
   };
   res.json(profile);
 });

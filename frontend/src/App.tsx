@@ -6,6 +6,9 @@ import LandingPage from './pages/LandingPage';
 import LogPage from './pages/LogPage';
 import ProgressPage from './pages/ProgressPage';
 import SettingsPage from './pages/SettingsPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import OnboardingPage from './pages/OnboardingPage';
 import Nav from './components/Nav';
 import './App.css';
 
@@ -28,6 +31,7 @@ function storeUserId(id: string): void {
 export default function App() {
   const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   const [tokenReady, setTokenReady] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -36,14 +40,19 @@ export default function App() {
   useEffect(() => {
     if (!hasToken() || !userId) {
       setTokenReady(true);
+      setOnboardingComplete(true);
       return;
     }
     getUser(userId)
-      .then(() => setTokenReady(true))
+      .then((profile) => {
+        setTokenReady(true);
+        setOnboardingComplete(profile.onboarding_complete);
+      })
       .catch(() => {
         clearToken();
         clearStoredUserId();
         setUserId(null);
+        setOnboardingComplete(null);
         setTokenReady(true);
       });
   }, [userId]);
@@ -56,6 +65,7 @@ export default function App() {
       setToken(res.token);
       storeUserId(res.user.id);
       setUserId(res.user.id);
+      setOnboardingComplete(res.user.onboarding_complete);
       setSuccess('Welcome back.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Log in failed');
@@ -70,7 +80,8 @@ export default function App() {
       setToken(res.token);
       storeUserId(res.user.id);
       setUserId(res.user.id);
-      setSuccess('Account created. You can log your first entry below.');
+      setOnboardingComplete(res.user.onboarding_complete);
+      setSuccess('Account created.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed');
     }
@@ -80,6 +91,7 @@ export default function App() {
     clearToken();
     clearStoredUserId();
     setUserId(null);
+    setOnboardingComplete(null);
     setSuccess(null);
     setError(null);
   }, []);
@@ -124,7 +136,11 @@ export default function App() {
               path="/"
               element={
                 userId ? (
-                  <Navigate to="/log" replace />
+                  onboardingComplete === false ? (
+                    <Navigate to="/onboarding" replace />
+                  ) : (
+                    <Navigate to="/log" replace />
+                  )
                 ) : (
                   <LandingPage
                     authMode={authMode}
@@ -136,9 +152,42 @@ export default function App() {
               }
             />
             <Route
-              path="/log"
+              path="/forgot-password"
               element={
                 userId ? (
+                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/log'} replace />
+                ) : (
+                  <ForgotPasswordPage />
+                )
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />}
+            />
+            <Route
+              path="/onboarding"
+              element={
+                userId && onboardingComplete === false ? (
+                  <>
+                    <Nav onLogout={handleLogout} />
+                    <OnboardingPage
+                      userId={userId}
+                      onComplete={() => setOnboardingComplete(true)}
+                      onError={setError}
+                    />
+                  </>
+                ) : userId ? (
+                  <Navigate to="/log" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/log"
+              element={
+                userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} />
                     <LogPage
@@ -147,6 +196,8 @@ export default function App() {
                       onSubmit={handleEntrySubmit}
                     />
                   </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
                 ) : (
                   <Navigate to="/" replace />
                 )
@@ -155,11 +206,13 @@ export default function App() {
             <Route
               path="/progress"
               element={
-                userId ? (
+                userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} />
                     <ProgressPage userId={userId} refreshTrigger={progressRefreshTrigger} />
                   </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
                 ) : (
                   <Navigate to="/" replace />
                 )
@@ -168,7 +221,7 @@ export default function App() {
             <Route
               path="/settings"
               element={
-                userId ? (
+                userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} />
                     <SettingsPage
@@ -177,6 +230,8 @@ export default function App() {
                       onSuccess={setSuccess}
                     />
                   </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
                 ) : (
                   <Navigate to="/" replace />
                 )

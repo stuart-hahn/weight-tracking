@@ -66,8 +66,19 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
   const progressPercent =
     progress?.progress_percent != null ? progress.progress_percent : 0;
 
+  const hasEntryToday =
+    progress?.latest_entry_date != null &&
+    progress.latest_entry_date === todayISO();
+
   return (
     <>
+      {progress !== null && !hasEntryToday && (
+        <section className="app__card retention-banner" role="status" aria-live="polite">
+          <p className="retention-banner__text">
+            You haven&apos;t logged today. Log your weight below to stay on track and see your weekly summary.
+          </p>
+        </section>
+      )}
       {progress !== null && (
         <section className="app__card" aria-label="Progress summary">
           <h2 className="app__card-title">Progress</h2>

@@ -12,6 +12,9 @@ This document describes how to build and run the Body Fat Tracker API and fronte
 | `CORS_ORIGIN`  | Allowed origin for CORS (e.g. `https://your-app.com`) | Yes (set to your frontend origin) |
 | `JWT_SECRET`   | Secret for signing JWTs                          | **Yes** (use a long, random secret) |
 | `DATABASE_URL` | Database connection URL                          | **Yes** |
+| `FRONTEND_URL` | Base URL of the frontend (for password-reset links) | No (default: `http://localhost:5173`) |
+| `RESEND_API_KEY` | Resend.com API key for sending password-reset emails | No (if unset, reset link is logged to stdout) |
+| `RESEND_FROM`  | Sender email for password reset (e.g. `App <noreply@yourdomain.com>`) | No |
 
 - **SQLite (single instance):**  
   `DATABASE_URL=file:/var/lib/body-fat-tracker/data.db`  

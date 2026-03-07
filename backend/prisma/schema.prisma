@@ -22,6 +22,10 @@ model User {
   activityLevel           String?  @map("activity_level") // sedentary | light | moderate | very_active
   leanMassKg              Float?   @map("lean_mass_kg")
   units                   String   @default("metric") // "metric" | "imperial"
+  passwordResetToken      String?  @map("password_reset_token")
+  passwordResetExpiresAt  DateTime? @map("password_reset_expires_at")
+  onboardingComplete      Boolean  @default(true) @map("onboarding_complete")
+  plan                    String?  @default("free") // "free" | "premium" for future feature gating
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @updatedAt @map("updated_at")
 

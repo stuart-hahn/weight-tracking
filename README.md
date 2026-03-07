@@ -88,6 +88,9 @@ App runs at `http://localhost:5173` and proxies `/api` to the backend.
 | `JWT_SECRET`   | Secret for signing JWTs                          | **Required** (set in production)           |
 | `DATABASE_URL` | Prisma connection URL (required for Prisma CLI)   | `file:./data/body_fat_tracker.db` (SQLite)  |
 | `DATABASE_FILE`| Optional; if set and `DATABASE_URL` unset, app uses `file:<DATABASE_FILE>` | `./data/body_fat_tracker.db` |
+| `FRONTEND_URL` | Base URL for password-reset links | `http://localhost:5173` |
+| `RESEND_API_KEY` | Resend.com API key for reset emails (optional; if unset, link is logged to console) | — |
+| `RESEND_FROM`   | Sender for reset emails | `Body Fat Tracker <onboarding@resend.dev>` |
 
 For **production** with PostgreSQL, change the `provider` in `backend/prisma/schema.prisma` to `postgresql` and set:
 
@@ -136,6 +139,8 @@ npm run db:reset
 - `GET /api/users/:id` – get profile (Bearer token)
 - `PATCH /api/users/:id` – update profile (optional fields: age, sex, height_cm, current_weight_kg, target_body_fat_percent, activity_level, lean_mass_kg)
 - `POST /api/auth/login` – log in (email, password; returns `user` + `token`)
+- `POST /api/auth/forgot-password` – request password reset (email; rate-limited; sends link if Resend configured)
+- `POST /api/auth/reset-password` – set new password (token + password from email link)
 - `POST /api/users/:id/entries` – log daily entry
 - `GET /api/users/:id/entries` – list entries
 - `GET /api/users/:id/progress` – progress metrics (computed goal, current from latest entry, trend, % toward goal)

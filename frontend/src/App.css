@@ -213,6 +213,18 @@
   margin-top: 0.5rem;
 }
 
+/* Retention nudge */
+.retention-banner {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: var(--accent);
+}
+
+.retention-banner__text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
 /* Progress stub */
 .progress-bar {
   height: 8px;

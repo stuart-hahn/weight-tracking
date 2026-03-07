@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getEntries, getProgress } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight } from '../utils/units';
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 interface EntryHistoryProps {
   userId: string;
@@ -80,9 +85,20 @@ export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistor
     .map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`)
     .join(' ');
   const goalY = goalKg != null ? toY(goalKg) : null;
+  const hasEntryToday =
+    progress?.latest_entry_date != null &&
+    progress.latest_entry_date === todayISO();
 
   return (
-    <section className="app__card" aria-label="Entry history">
+    <>
+      {progress != null && !hasEntryToday && (
+        <section className="app__card retention-banner" role="status" aria-live="polite">
+          <p className="retention-banner__text">
+            Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
+          </p>
+        </section>
+      )}
+      <section className="app__card" aria-label="Entry history">
       <h2 className="app__card-title">History</h2>
       <div className="chart-wrap" style={{ width: '100%', maxWidth: width, margin: '0 auto 1rem' }}>
         <svg
@@ -143,5 +159,6 @@ export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistor
         ))}
       </ul>
     </section>
+    </>
   );
 }
