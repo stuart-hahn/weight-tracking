@@ -1,5 +1,6 @@
 import { useState, useCallback, FormEvent } from 'react';
-import type { CreateUserRequest } from '../types/api';
+import type { CreateUserRequest, UnitsPreference } from '../types/api';
+import { inToCm, lbToKg } from '../utils/units';
 
 interface SignupFormProps {
   onSubmit: (body: CreateUserRequest) => void;
@@ -10,6 +11,7 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [password, setPassword] = useState('');
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [units, setUnits] = useState<UnitsPreference>('metric');
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [targetBf, setTargetBf] = useState('');
@@ -18,8 +20,12 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const ageNum = Number(age);
-      const heightNum = Number(heightCm);
-      const weightNum = Number(weightKg);
+      let heightNum = Number(heightCm);
+      let weightNum = Number(weightKg);
+      if (units === 'imperial') {
+        heightNum = inToCm(heightNum);
+        weightNum = lbToKg(weightNum);
+      }
       const targetNum = Number(targetBf);
       if (
         !email.trim() ||
@@ -47,9 +53,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         height_cm: heightNum,
         current_weight_kg: weightNum,
         target_body_fat_percent: targetNum,
+        units,
       });
     },
-    [email, password, age, sex, heightCm, weightKg, targetBf, onSubmit]
+    [email, password, age, sex, units, heightCm, weightKg, targetBf, onSubmit]
   );
 
   return (
@@ -119,17 +126,31 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           </select>
         </div>
         <div className="form-group">
+          <label className="form-label" htmlFor="signup-units">
+            Units
+          </label>
+          <select
+            id="signup-units"
+            className="form-input"
+            value={units}
+            onChange={(e) => setUnits(e.target.value as UnitsPreference)}
+          >
+            <option value="metric">Metric (kg, cm)</option>
+            <option value="imperial">Imperial (lb, in)</option>
+          </select>
+        </div>
+        <div className="form-group">
           <label className="form-label" htmlFor="signup-height">
-            Height (cm)
+            Height ({units === 'imperial' ? 'in' : 'cm'})
           </label>
           <input
             id="signup-height"
             type="number"
             className="form-input"
-            min={1}
-            max={300}
-            step={0.1}
-            placeholder="175"
+            min={units === 'imperial' ? 20 : 1}
+            max={units === 'imperial' ? 120 : 300}
+            step={units === 'imperial' ? 1 : 0.1}
+            placeholder={units === 'imperial' ? '70' : '175'}
             value={heightCm}
             onChange={(e) => setHeightCm(e.target.value)}
             required
@@ -137,16 +158,16 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-weight">
-            Current weight (kg)
+            Current weight ({units === 'imperial' ? 'lb' : 'kg'})
           </label>
           <input
             id="signup-weight"
             type="number"
             className="form-input"
-            min={1}
-            max={500}
-            step={0.1}
-            placeholder="75"
+            min={units === 'imperial' ? 44 : 1}
+            max={units === 'imperial' ? 1100 : 500}
+            step={units === 'imperial' ? 1 : 0.1}
+            placeholder={units === 'imperial' ? '165' : '75'}
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}
             required

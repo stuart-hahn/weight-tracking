@@ -1,6 +1,7 @@
 import { useState, useCallback, FormEvent, useEffect } from 'react';
 import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
+import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
 
 interface DailyLogFormProps {
   onSubmit: (body: CreateEntryRequest) => void;
@@ -32,28 +33,34 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
     return () => { cancelled = true; };
   }, [userId, refreshTrigger]);
 
+  const units = progress?.units ?? 'metric';
   const handleSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      const weightNum = Number(weightKg);
-      if (Number.isNaN(weightNum) || weightNum <= 0 || weightNum > 500) return;
+      let weightKgNum = Number(weightKg);
+      if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
+      if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) return;
       const body: CreateEntryRequest = {
         date,
-        weight_kg: weightNum,
+        weight_kg: weightKgNum,
       };
       if (calories.trim() !== '') {
         const cal = Number(calories);
         if (!Number.isNaN(cal) && cal >= 0 && cal <= 10000) body.calories = cal;
       }
       if (optionalOpen) {
-        const w = Number(waistCm);
-        const h = Number(hipCm);
+        let w = Number(waistCm);
+        let h = Number(hipCm);
+        if (units === 'imperial') {
+          w = inToCm(w);
+          h = inToCm(h);
+        }
         if (!Number.isNaN(w) && w > 0 && w <= 200) body.waist_cm = w;
         if (!Number.isNaN(h) && h > 0 && h <= 200) body.hip_cm = h;
       }
       onSubmit(body);
     },
-    [date, weightKg, calories, optionalOpen, waistCm, hipCm, onSubmit]
+    [date, weightKg, calories, optionalOpen, waistCm, hipCm, units, onSubmit]
   );
 
   const progressPercent =
@@ -65,10 +72,10 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
         <section className="app__card" aria-label="Progress summary">
           <h2 className="app__card-title">Progress</h2>
           <p className="progress-text">
-            Current: {progress.current_weight_kg} kg · Goal: {progress.goal_weight_kg} kg ·{' '}
+            Current: {formatWeight(progress.current_weight_kg, progress.units)} · Goal: {formatWeight(progress.goal_weight_kg, progress.units)} ·{' '}
             {progress.entries_count} entries
             {progress.weight_trend_kg_per_week != null && (
-              <> · {progress.weight_trend_kg_per_week >= 0 ? '+' : ''}{progress.weight_trend_kg_per_week.toFixed(2)} kg/week</>
+              <> · {formatTrend(progress.weight_trend_kg_per_week, progress.units)}</>
             )}
           </p>
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
@@ -84,7 +91,9 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
           )}
           {progress.weekly_summary && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {progress.weekly_summary.message}
+              {progress.weekly_summary.weight_change_kg != null
+                ? `This week: ${formatWeightChange(progress.weekly_summary.weight_change_kg, progress.units)}. ${progress.weekly_summary.on_track ? 'On track.' : 'Consider adjusting.'}`
+                : progress.weekly_summary.message}
             </p>
           )}
         </section>
@@ -110,16 +119,16 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="log-weight">
-              Weight (kg)
+              Weight ({units === 'imperial' ? 'lb' : 'kg'})
             </label>
             <input
               id="log-weight"
               type="number"
               className="form-input"
-              min={1}
-              max={500}
-              step={0.1}
-              placeholder="75.0"
+              min={units === 'imperial' ? 20 : 1}
+              max={units === 'imperial' ? 1100 : 500}
+              step={units === 'imperial' ? 1 : 0.1}
+              placeholder={units === 'imperial' ? '165' : '75.0'}
               value={weightKg}
               onChange={(e) => setWeightKg(e.target.value)}
               required
@@ -156,7 +165,7 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               <div className="collapsible__inner">
                 <div className="form-group">
                   <label className="form-label" htmlFor="log-waist">
-                    Waist (cm)
+                    Waist ({units === 'imperial' ? 'in' : 'cm'})
                   </label>
                   <input
                     id="log-waist"
@@ -172,7 +181,7 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="log-hip">
-                    Hip (cm)
+                    Hip ({units === 'imperial' ? 'in' : 'cm'})
                   </label>
                   <input
                     id="log-hip"

@@ -36,6 +36,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       leanMassKg: true,
       age: true,
       activityLevel: true,
+      units: true,
     },
   });
   if (!user) {
@@ -122,8 +123,10 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     };
   }
 
+  const units = (user.units === 'imperial' ? 'imperial' : 'metric') as ProgressMetrics['units'];
   const progress: ProgressMetrics = {
     user_id: userId,
+    units,
     start_weight_kg: startWeightKg,
     current_weight_kg: currentWeightKg,
     goal_weight_kg: goalWeightKg,

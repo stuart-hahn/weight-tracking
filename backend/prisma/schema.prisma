@@ -21,6 +21,7 @@ model User {
   targetBodyFatPercent    Float    @map("target_body_fat_percent")
   activityLevel           String?  @map("activity_level") // sedentary | light | moderate | very_active
   leanMassKg              Float?   @map("lean_mass_kg")
+  units                   String   @default("metric") // "metric" | "imperial"
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @updatedAt @map("updated_at")
 

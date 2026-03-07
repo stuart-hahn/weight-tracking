@@ -5,6 +5,8 @@
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very_active';
 
+export type UnitsPreference = 'metric' | 'imperial';
+
 export interface User {
   id: string;
   email: string;
@@ -16,6 +18,7 @@ export interface User {
   target_body_fat_percent: number;
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
+  units: UnitsPreference;
   created_at: Date;
   updated_at: Date;
 }
@@ -30,6 +33,7 @@ export interface UserCreateInput {
   target_body_fat_percent: number;
   activity_level?: ActivityLevel | null;
   lean_mass_kg?: number | null;
+  units?: UnitsPreference;
 }
 
 export interface UserUpdateInput {
@@ -40,6 +44,7 @@ export interface UserUpdateInput {
   target_body_fat_percent?: number;
   activity_level?: ActivityLevel | null;
   lean_mass_kg?: number | null;
+  units?: UnitsPreference;
 }
 
 /** User without sensitive fields for API responses */
@@ -53,6 +58,7 @@ export interface UserProfile {
   target_body_fat_percent: number;
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
+  units: UnitsPreference;
   created_at: string;
   updated_at: string;
 }
@@ -86,6 +92,7 @@ export interface WeeklySummary {
 /** Progress metrics with computed goal, trend, calories, and weekly summary */
 export interface ProgressMetrics {
   user_id: string;
+  units: UnitsPreference;
   start_weight_kg: number;
   current_weight_kg: number;
   goal_weight_kg: number;

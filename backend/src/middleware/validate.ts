@@ -29,6 +29,7 @@ export function validateCreateUser(
   if (typeof target_body_fat_percent !== 'number' || target_body_fat_percent <= 0 || target_body_fat_percent >= 100) errors.push('target_body_fat_percent must be between 0 and 100');
   if (body.activity_level != null && !['sedentary', 'light', 'moderate', 'very_active'].includes(body.activity_level)) errors.push('Invalid activity_level');
   if (body.lean_mass_kg != null && (typeof body.lean_mass_kg !== 'number' || body.lean_mass_kg <= 0 || body.lean_mass_kg > 500)) errors.push('Invalid lean_mass_kg');
+  if (body.units !== undefined && body.units !== null && body.units !== 'metric' && body.units !== 'imperial') errors.push('units must be "metric" or "imperial"');
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
@@ -56,6 +57,7 @@ export function validateUpdateUser(
   if (body.target_body_fat_percent !== undefined && (typeof body.target_body_fat_percent !== 'number' || body.target_body_fat_percent <= 0 || body.target_body_fat_percent >= 100)) errors.push('target_body_fat_percent must be between 0 and 100');
   if (body.activity_level !== undefined && body.activity_level != null && !['sedentary', 'light', 'moderate', 'very_active'].includes(body.activity_level)) errors.push('Invalid activity_level');
   if (body.lean_mass_kg !== undefined && body.lean_mass_kg != null && (typeof body.lean_mass_kg !== 'number' || body.lean_mass_kg <= 0 || body.lean_mass_kg > 500)) errors.push('Invalid lean_mass_kg');
+  if (body.units !== undefined && body.units !== null && body.units !== 'metric' && body.units !== 'imperial') errors.push('units must be "metric" or "imperial"');
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

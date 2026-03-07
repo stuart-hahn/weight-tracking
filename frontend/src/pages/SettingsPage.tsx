@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { getUser, updateUser } from '../api/client';
-import type { UserProfile, UpdateUserRequest, ActivityLevel } from '../types/api';
+import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 
 interface SettingsPageProps {
   userId: string;
@@ -19,6 +19,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [targetBodyFatPercent, setTargetBodyFatPercent] = useState('');
   const [activityLevel, setActivityLevel] = useState<string>('');
   const [leanMassKg, setLeanMassKg] = useState('');
+  const [units, setUnits] = useState<UnitsPreference>('metric');
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +34,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           setTargetBodyFatPercent(String(p.target_body_fat_percent));
           setActivityLevel(p.activity_level ?? '');
           setLeanMassKg(p.lean_mass_kg != null ? String(p.lean_mass_kg) : '');
+          setUnits(p.units ?? 'metric');
         }
       })
       .catch(() => {
@@ -71,6 +73,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       } else {
         body.lean_mass_kg = null;
       }
+      body.units = units;
       if (Object.keys(body).length === 0) {
         onSuccess('No changes to save.');
         return;
@@ -86,7 +89,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         setSaving(false);
       }
     },
-    [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, onError, onSuccess]
+    [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, units, onError, onSuccess]
   );
 
   if (loading) {
@@ -107,6 +110,18 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         {profile.email}
       </p>
       <form onSubmit={handleSubmit} noValidate>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-units">Units</label>
+          <select
+            id="settings-units"
+            className="form-input"
+            value={units}
+            onChange={(e) => setUnits(e.target.value as UnitsPreference)}
+          >
+            <option value="metric">Metric (kg, cm)</option>
+            <option value="imperial">Imperial (lb, in)</option>
+          </select>
+        </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-age">Age</label>
           <input

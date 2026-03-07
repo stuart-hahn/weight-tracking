@@ -102,9 +102,19 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 | Command | Description |
 |--------|-------------|
 | `npm run db:push` | Apply schema to DB (no migration history). Good for local SQLite. |
+| `npm run db:seed` | Seed a test user with ~35 days of entries (dev/demo only). |
 | `npm run db:migrate` | Create and run a migration (`prisma migrate dev`). Use for production/versioned schema. |
 | `npm run db:studio` | Open Prisma Studio to inspect/edit data. |
 | `npm run db:reset` | Reset DB (drops and reapplies). **Destructive.** |
+
+### Test user (dev/demo)
+
+After `db:push`, run `npm run db:seed` (or `npx prisma db seed`) to create a test user with about one month of realistic daily entries. Log in with:
+
+- **Email:** test@example.com  
+- **Password:** TestPassword123  
+
+Use for demos, QA, or trying the app without manual data entry. Do not use in production.
 
 ### Reset the SQLite database
 

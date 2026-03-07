@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getEntries, getProgress } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
+import { formatWeight } from '../utils/units';
 
 interface EntryHistoryProps {
   userId: string;
@@ -117,9 +118,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistor
             />
           ))}
         </svg>
-        {goalKg != null && (
+        {goalKg != null && progress && (
           <p className="progress-text" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
-            Dashed line: goal {goalKg} kg
+            Dashed line: goal {formatWeight(goalKg, progress.units)}
           </p>
         )}
       </div>
@@ -136,7 +137,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistor
             }}
           >
             <span>{e.date}</span>
-            <span><strong>{e.weight_kg}</strong> kg</span>
+            <span><strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong></span>
             {e.calories != null && <span>{e.calories} kcal</span>}
           </li>
         ))}
