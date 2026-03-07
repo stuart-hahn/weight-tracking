@@ -53,8 +53,8 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   );
 
   return (
-    <section className="app__card" aria-labelledby="signup-heading">
-      <h2 id="signup-heading" className="app__card-title">
+    <>
+      <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
         Create account
       </h2>
       <form onSubmit={handleSubmit} noValidate>
@@ -174,6 +174,6 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           Create account
         </button>
       </form>
-    </section>
+    </>
   );
 }

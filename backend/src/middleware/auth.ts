@@ -33,9 +33,5 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 }
 
 export function signToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(
-    payload,
-    JWT_SECRET,
-    { expiresIn: '7d', subject: payload.sub }
-  );
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }

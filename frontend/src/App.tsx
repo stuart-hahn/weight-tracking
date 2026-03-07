@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { createUser, createEntry, getUser, setToken, hasToken, clearToken } from './api/client';
-import type { CreateUserRequest, CreateEntryRequest } from './types/api';
+import { createUser, login, createEntry, getUser, setToken, hasToken, clearToken } from './api/client';
+import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
+import LoginForm from './components/LoginForm';
 import SignupForm from './components/SignupForm';
 import DailyLogForm from './components/DailyLogForm';
 import './App.css';
+
+type AuthMode = 'login' | 'signup';
 
 const USER_ID_KEY = 'body_fat_tracker_user_id';
 
@@ -22,6 +25,7 @@ function storeUserId(id: string): void {
 export default function App() {
   const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   const [tokenReady, setTokenReady] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -39,6 +43,20 @@ export default function App() {
         setTokenReady(true);
       });
   }, [userId]);
+
+  const handleLogin = useCallback(async (body: LoginRequest) => {
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await login(body);
+      setToken(res.token);
+      storeUserId(res.user.id);
+      setUserId(res.user.id);
+      setSuccess('Welcome back.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Log in failed');
+    }
+  }, []);
 
   const handleSignup = useCallback(async (body: CreateUserRequest) => {
     setError(null);
@@ -96,7 +114,39 @@ export default function App() {
         {success && <div className="app__success" role="status">{success}</div>}
 
         {!userId ? (
-          <SignupForm onSubmit={handleSignup} />
+          <div className="app__card">
+            <div className="auth-tabs" role="tablist" aria-label="Log in or create account">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={authMode === 'login'}
+                aria-controls="auth-panel"
+                id="tab-login"
+                className={`auth-tabs__tab ${authMode === 'login' ? 'auth-tabs__tab--active' : ''}`}
+                onClick={() => { setAuthMode('login'); setError(null); setSuccess(null); }}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={authMode === 'signup'}
+                aria-controls="auth-panel"
+                id="tab-signup"
+                className={`auth-tabs__tab ${authMode === 'signup' ? 'auth-tabs__tab--active' : ''}`}
+                onClick={() => { setAuthMode('signup'); setError(null); setSuccess(null); }}
+              >
+                Create account
+              </button>
+            </div>
+            <div id="auth-panel" role="tabpanel" aria-labelledby={authMode === 'login' ? 'tab-login' : 'tab-signup'}>
+              {authMode === 'login' ? (
+                <LoginForm onSubmit={handleLogin} />
+              ) : (
+                <SignupForm onSubmit={handleSignup} />
+              )}
+            </div>
+          </div>
         ) : (
           <>
             <DailyLogForm onSubmit={handleEntrySubmit} userId={userId} />

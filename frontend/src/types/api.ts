@@ -33,6 +33,11 @@ export interface CreateUserResponse {
   token: string;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
 export interface DailyEntryResponse {
   id: string;
   user_id: string;

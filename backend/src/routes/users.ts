@@ -1,6 +1,6 @@
 import { Router, type Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, signToken, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateUser } from '../middleware/validate.js';

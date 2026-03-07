@@ -1,6 +1,7 @@
 import type {
   CreateUserRequest,
   CreateUserResponse,
+  LoginRequest,
   UserProfile,
   CreateEntryRequest,
   DailyEntryResponse,
@@ -31,6 +32,17 @@ export async function createUser(body: CreateUserRequest): Promise<CreateUserRes
   });
   const data = (await res.json()) as CreateUserResponse | ApiError;
   if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to create user');
+  return data as CreateUserResponse;
+}
+
+export async function login(body: LoginRequest): Promise<CreateUserResponse> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as CreateUserResponse | ApiError;
+  if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to log in');
   return data as CreateUserResponse;
 }
 

@@ -1,5 +1,5 @@
 import { Router, type Response } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateEntry } from '../middleware/validate.js';
