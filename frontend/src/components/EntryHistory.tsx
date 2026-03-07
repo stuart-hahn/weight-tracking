@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getEntries, getProgress } from '../api/client';
+import { getEntries, getProgress, getOptionalMetrics } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight } from '../utils/units';
 
@@ -19,16 +19,22 @@ const CHART_PADDING = { top: 8, right: 8, bottom: 24, left: 36 };
 export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistoryProps) {
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [bodyFatByDate, setBodyFatByDate] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([getEntries(userId), getProgress(userId)])
-      .then(([e, p]) => {
+    Promise.all([getEntries(userId), getProgress(userId), getOptionalMetrics(userId)])
+      .then(([e, p, om]) => {
         if (!cancelled) {
           setEntries(e);
           setProgress(p);
+          const map: Record<string, number> = {};
+          for (const m of om) {
+            if (m.body_fat_percent != null) map[m.date] = m.body_fat_percent;
+          }
+          setBodyFatByDate(map);
         }
       })
       .catch(() => {})
@@ -155,6 +161,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0 }: EntryHistor
             <span>{e.date}</span>
             <span><strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong></span>
             {e.calories != null && <span>{e.calories} kcal</span>}
+            {bodyFatByDate[e.date] != null && <span>{bodyFatByDate[e.date]}% BF</span>}
           </li>
         ))}
       </ul>

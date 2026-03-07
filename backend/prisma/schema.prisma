@@ -24,6 +24,9 @@ model User {
   units                   String   @default("metric") // "metric" | "imperial"
   passwordResetToken      String?  @map("password_reset_token")
   passwordResetExpiresAt  DateTime? @map("password_reset_expires_at")
+  emailVerifiedAt         DateTime? @map("email_verified_at")
+  emailVerificationToken  String?  @map("email_verification_token")
+  emailVerificationExpiresAt DateTime? @map("email_verification_expires_at")
   onboardingComplete      Boolean  @default(true) @map("onboarding_complete")
   plan                    String?  @default("free") // "free" | "premium" for future feature gating
   createdAt               DateTime @default(now()) @map("created_at")

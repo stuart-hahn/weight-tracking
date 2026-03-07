@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
-import { getUser, updateUser } from '../api/client';
+import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 
 interface SettingsPageProps {
@@ -20,6 +20,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [activityLevel, setActivityLevel] = useState<string>('');
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +92,19 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     },
     [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, units, onError, onSuccess]
   );
+
+  const handleExport = useCallback(async () => {
+    onError(null);
+    setExporting(true);
+    try {
+      await exportUserData(userId);
+      onSuccess('Data downloaded.');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }, [userId, onError, onSuccess]);
 
   if (loading) {
     return (
@@ -218,6 +232,19 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           {saving ? 'Saving…' : 'Save'}
         </button>
       </form>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          {exporting ? 'Preparing…' : 'Download my data'}
+        </button>
+        <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+          Downloads your profile, entries, and optional metrics as JSON.
+        </p>
+      </div>
     </section>
   );
 }

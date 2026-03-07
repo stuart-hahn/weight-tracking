@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { createUser, login, createEntry, getUser, setToken, hasToken, clearToken } from './api/client';
+import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
+import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
 import LandingPage from './pages/LandingPage';
 import LogPage from './pages/LogPage';
 import ProgressPage from './pages/ProgressPage';
@@ -9,6 +10,7 @@ import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import Nav from './components/Nav';
 import './App.css';
 
@@ -32,6 +34,7 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   const [tokenReady, setTokenReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -41,18 +44,21 @@ export default function App() {
     if (!hasToken() || !userId) {
       setTokenReady(true);
       setOnboardingComplete(true);
+      setEmailVerifiedAt(null);
       return;
     }
     getUser(userId)
       .then((profile) => {
         setTokenReady(true);
         setOnboardingComplete(profile.onboarding_complete);
+        setEmailVerifiedAt(profile.email_verified_at);
       })
       .catch(() => {
         clearToken();
         clearStoredUserId();
         setUserId(null);
         setOnboardingComplete(null);
+        setEmailVerifiedAt(null);
         setTokenReady(true);
       });
   }, [userId]);
@@ -66,6 +72,7 @@ export default function App() {
       storeUserId(res.user.id);
       setUserId(res.user.id);
       setOnboardingComplete(res.user.onboarding_complete);
+      setEmailVerifiedAt(res.user.email_verified_at ?? null);
       setSuccess('Welcome back.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Log in failed');
@@ -81,6 +88,7 @@ export default function App() {
       storeUserId(res.user.id);
       setUserId(res.user.id);
       setOnboardingComplete(res.user.onboarding_complete);
+      setEmailVerifiedAt(res.user.email_verified_at ?? null);
       setSuccess('Account created.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed');
@@ -92,16 +100,20 @@ export default function App() {
     clearStoredUserId();
     setUserId(null);
     setOnboardingComplete(null);
+    setEmailVerifiedAt(null);
     setSuccess(null);
     setError(null);
   }, []);
 
-  const handleEntrySubmit = useCallback(async (body: CreateEntryRequest) => {
+  const handleEntrySubmit = useCallback(async (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => {
     if (!userId) return;
     setError(null);
     setSuccess(null);
     try {
       await createEntry(userId, body);
+      if (optionalBodyFat) {
+        await upsertOptionalMetric(userId, optionalBodyFat.date, optionalBodyFat.body_fat_percent);
+      }
       setSuccess('Entry saved.');
       setProgressRefreshTrigger((n) => n + 1);
     } catch (e) {
@@ -130,6 +142,13 @@ export default function App() {
         <main className="app__main">
           {error && <div className="app__error" role="alert">{error}</div>}
           {success && <div className="app__success" role="status">{success}</div>}
+          {userId && !emailVerifiedAt && (
+            <section className="app__card retention-banner" role="status">
+              <p className="retention-banner__text">
+                Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
+              </p>
+            </section>
+          )}
 
           <Routes>
             <Route
@@ -164,6 +183,12 @@ export default function App() {
             <Route
               path="/reset-password"
               element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />}
+            />
+            <Route
+              path="/verify-email"
+              element={
+                <VerifyEmailPage onVerified={() => setEmailVerifiedAt(new Date().toISOString())} />
+              }
             />
             <Route
               path="/onboarding"

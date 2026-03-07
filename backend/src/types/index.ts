@@ -61,6 +61,7 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
   created_at: string;
@@ -108,6 +109,11 @@ export interface ProgressMetrics {
   recommended_calories_min: number | null;
   recommended_calories_max: number | null;
   weekly_summary: WeeklySummary;
+}
+
+export interface OptionalMetricCreateInput {
+  date: string; // YYYY-MM-DD
+  body_fat_percent: number; // 0–100
 }
 
 export interface OptionalMetrics {

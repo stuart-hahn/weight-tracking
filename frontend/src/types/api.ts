@@ -15,6 +15,7 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
   created_at: string;
@@ -35,7 +36,7 @@ export interface CreateUserRequest {
 }
 
 export interface CreateUserResponse {
-  user: { id: string; email: string; onboarding_complete: boolean };
+  user: { id: string; email: string; onboarding_complete: boolean; email_verified_at: string | null };
   token: string;
 }
 
@@ -96,6 +97,14 @@ export interface ProgressResponse {
   recommended_calories_min: number | null;
   recommended_calories_max: number | null;
   weekly_summary: WeeklySummaryResponse;
+}
+
+export interface OptionalMetricResponse {
+  id: string;
+  user_id: string;
+  date: string;
+  body_fat_percent: number | null;
+  created_at: string;
 }
 
 export interface ApiError {

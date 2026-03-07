@@ -7,6 +7,7 @@ import type {
   CreateEntryRequest,
   DailyEntryResponse,
   ProgressResponse,
+  OptionalMetricResponse,
   ApiError,
 } from '../types/api';
 
@@ -69,6 +70,17 @@ export async function resetPassword(token: string, password: string): Promise<{ 
   return data as { message: string };
 }
 
+export async function verifyEmail(token: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  const data = (await res.json()) as { message?: string } | ApiError;
+  if (!res.ok) throw new Error('error' in data ? (data as ApiError).error : 'Verification failed');
+  return data as { message: string };
+}
+
 export async function getUser(id: string): Promise<UserProfile> {
   const res = await fetch(`${API_BASE}/users/${id}`, { headers: getAuthHeaders() });
   const data = (await res.json()) as UserProfile | ApiError;
@@ -113,6 +125,44 @@ export async function getProgress(userId: string): Promise<ProgressResponse> {
   const data = (await res.json()) as ProgressResponse | ApiError;
   if (!res.ok) throw new Error('error' in data ? data.error : 'Failed to fetch progress');
   return data as ProgressResponse;
+}
+
+export async function getOptionalMetrics(userId: string): Promise<OptionalMetricResponse[]> {
+  const res = await fetch(`${API_BASE}/users/${userId}/optional-metrics`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as OptionalMetricResponse[] | ApiError;
+  if (!res.ok) throw new Error('error' in data ? (data as ApiError).error : 'Failed to fetch optional metrics');
+  return data as OptionalMetricResponse[];
+}
+
+export async function upsertOptionalMetric(
+  userId: string,
+  date: string,
+  body_fat_percent: number
+): Promise<OptionalMetricResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/optional-metrics`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ date, body_fat_percent }),
+  });
+  const data = (await res.json()) as OptionalMetricResponse | ApiError;
+  if (!res.ok) throw new Error('error' in data ? (data as ApiError).error : 'Failed to save body fat');
+  return data as OptionalMetricResponse;
+}
+
+export async function exportUserData(userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/export`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error('error' in data ? data.error : 'Failed to export data');
+  }
+  const data = await res.json();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `body-fat-tracker-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function setToken(token: string): void {

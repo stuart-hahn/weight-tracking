@@ -1,9 +1,11 @@
 import { Router, type Response, type NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, signToken, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateUser, validateUpdateUser } from '../middleware/validate.js';
+import { sendVerificationEmail } from '../lib/email.js';
 import type { UserCreateInput, UserUpdateInput, UserProfile } from '../types/index.js';
 
 const router = Router();
@@ -12,6 +14,8 @@ const router = Router();
 router.post('/', validateCreateUser, async (req, res: Response, next: NextFunction): Promise<void> => {
   const body = req.body as UserCreateInput;
   const passwordHash = await bcrypt.hash(body.password, 10);
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   try {
     const user = await prisma.user.create({
       data: {
@@ -27,14 +31,19 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
         units: body.units ?? 'metric',
         onboardingComplete: false,
         plan: 'free',
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiresAt: verificationExpiresAt,
       },
       select: { id: true, email: true, onboardingComplete: true },
     });
     const token = signToken({ sub: user.id, email: user.email });
     res.status(201).json({
-      user: { id: user.id, email: user.email, onboarding_complete: user.onboardingComplete },
+      user: { id: user.id, email: user.email, onboarding_complete: user.onboardingComplete, email_verified_at: null },
       token,
     });
+    const baseUrl = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
+    const verifyLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    sendVerificationEmail(user.email, verifyLink).catch((err) => console.error('Verification email failed:', err));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const e = new Error('Email already registered') as Error & { statusCode: number };
@@ -44,6 +53,90 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
     }
     next(err);
   }
+});
+
+/** GET /api/users/:id/export - Export user data (profile + entries + optional metrics) (protected) */
+router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = req.params.id;
+  if (req.userId !== id) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      email: true,
+      age: true,
+      sex: true,
+      heightCm: true,
+      currentWeightKg: true,
+      targetBodyFatPercent: true,
+      activityLevel: true,
+      leanMassKg: true,
+      units: true,
+      emailVerifiedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const [entries, optionalMetrics] = await Promise.all([
+    prisma.dailyEntry.findMany({
+      where: { userId: id },
+      orderBy: { date: 'desc' },
+      select: {
+        id: true,
+        date: true,
+        weightKg: true,
+        calories: true,
+        waistCm: true,
+        hipCm: true,
+        createdAt: true,
+      },
+    }),
+    prisma.optionalMetric.findMany({
+      where: { userId: id },
+      orderBy: { date: 'desc' },
+      select: { date: true, bodyFatPercent: true, createdAt: true },
+    }),
+  ]);
+  const exportData = {
+    exported_at: new Date().toISOString(),
+    profile: {
+      id: user.id,
+      email: user.email,
+      age: user.age,
+      sex: user.sex,
+      height_cm: user.heightCm,
+      current_weight_kg: user.currentWeightKg,
+      target_body_fat_percent: user.targetBodyFatPercent,
+      activity_level: user.activityLevel,
+      lean_mass_kg: user.leanMassKg,
+      units: user.units,
+      email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
+      created_at: user.createdAt.toISOString(),
+      updated_at: user.updatedAt.toISOString(),
+    },
+    entries: entries.map((e) => ({
+      id: e.id,
+      date: e.date.toISOString().slice(0, 10),
+      weight_kg: e.weightKg,
+      calories: e.calories,
+      waist_cm: e.waistCm,
+      hip_cm: e.hipCm,
+      created_at: e.createdAt.toISOString(),
+    })),
+    optional_metrics: optionalMetrics.map((m) => ({
+      date: m.date.toISOString().slice(0, 10),
+      body_fat_percent: m.bodyFatPercent,
+      created_at: m.createdAt.toISOString(),
+    })),
+  };
+  res.json(exportData);
 });
 
 /** GET /api/users/:id - Get user profile (protected) */
@@ -66,6 +159,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
       activityLevel: true,
       leanMassKg: true,
       units: true,
+      emailVerifiedAt: true,
       onboardingComplete: true,
       plan: true,
       createdAt: true,
@@ -87,6 +181,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     activity_level: user.activityLevel as UserProfile['activity_level'],
     lean_mass_kg: user.leanMassKg,
     units: (user.units as UserProfile['units']) ?? 'metric',
+    email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: user.onboardingComplete,
     plan: user.plan,
     created_at: user.createdAt.toISOString(),
@@ -136,6 +231,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     activityLevel: true,
     leanMassKg: true,
     units: true,
+    emailVerifiedAt: true,
     onboardingComplete: true,
     plan: true,
     createdAt: true,
@@ -160,14 +256,15 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
       target_body_fat_percent: user.targetBodyFatPercent,
       activity_level: user.activityLevel as UserProfile['activity_level'],
       lean_mass_kg: user.leanMassKg,
-    units: (user.units as UserProfile['units']) ?? 'metric',
-    onboarding_complete: user.onboardingComplete,
-    plan: user.plan,
-    created_at: user.createdAt.toISOString(),
-    updated_at: user.updatedAt.toISOString(),
-  };
-  res.json(profile);
-  return;
+      units: (user.units as UserProfile['units']) ?? 'metric',
+      email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
+      onboarding_complete: user.onboardingComplete,
+      plan: user.plan,
+      created_at: user.createdAt.toISOString(),
+      updated_at: user.updatedAt.toISOString(),
+    };
+    res.json(profile);
+    return;
   }
   const updatedUser = await prisma.user.update({
     where: { id },
@@ -185,6 +282,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     activity_level: updatedUser.activityLevel as UserProfile['activity_level'],
     lean_mass_kg: updatedUser.leanMassKg,
     units: (updatedUser.units as UserProfile['units']) ?? 'metric',
+    email_verified_at: updatedUser.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: updatedUser.onboardingComplete,
     plan: updatedUser.plan,
     created_at: updatedUser.createdAt.toISOString(),

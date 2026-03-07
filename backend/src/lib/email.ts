@@ -23,3 +23,22 @@ export async function sendPasswordResetEmail(to: string, resetLink: string): Pro
     console.log('[Dev] Password reset link for', to, ':', resetLink);
   }
 }
+
+export async function sendVerificationEmail(to: string, verifyLink: string): Promise<void> {
+  if (RESEND_API_KEY && RESEND_API_KEY.length > 0) {
+    const { Resend } = await import('resend');
+    const resend = new Resend(RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: 'Verify your Body Fat Tracker email',
+      html: `<p>Welcome! Please verify your email by clicking the link below (link expires in 24 hours):</p><p><a href="${verifyLink}">${verifyLink}</a></p><p>If you didn't create an account, you can ignore this email.</p>`,
+    });
+    if (error) {
+      console.error('Resend error:', error);
+      throw new Error('Failed to send verification email');
+    }
+  } else {
+    console.log('[Dev] Verification link for', to, ':', verifyLink);
+  }
+}

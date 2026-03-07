@@ -16,11 +16,13 @@ This document describes how to build and run the Body Fat Tracker API and fronte
 | `RESEND_API_KEY` | Resend.com API key for sending password-reset emails | No (if unset, reset link is logged to stdout) |
 | `RESEND_FROM`  | Sender email for password reset (e.g. `App <noreply@yourdomain.com>`) | No |
 
+**Rate limiting:** All `/api` routes are limited to 100 requests per 15 minutes per IP. Stricter limits apply to auth: login (10 per 15 minutes), forgot-password (5 per 15 minutes). Responses include `Retry-After` when a limit is exceeded.
+
 - **SQLite (single instance):**  
   `DATABASE_URL=file:/var/lib/body-fat-tracker/data.db`  
   Use an absolute path. Ensure the process has read/write access to the directory and file. SQLite is suitable for a single server; no separate DB process. Back up the `.db` file regularly (e.g. cron copy or snapshot). For multi-instance or high concurrency, use PostgreSQL.
 - **PostgreSQL:**  
-  Change `provider` in `backend/prisma/schema.prisma` to `postgresql`, run migrations, and set  
+  See [PostgreSQL runbook](#postgresql-runbook) below. Set  
   `DATABASE_URL=postgresql://user:password@host:5432/dbname`.
 
 ### Frontend
@@ -136,6 +138,61 @@ volumes:
 ```
 
 Run: `docker compose up -d`. Set `JWT_SECRET` and `CORS_ORIGIN` in `.env` or the shell.
+
+## PostgreSQL runbook
+
+Use this runbook when moving from SQLite to PostgreSQL (e.g. for production, high availability, or multi-instance scaling).
+
+### 1. Prerequisites
+
+- A PostgreSQL 14+ server (local or managed).
+- Connection string: `postgresql://USER:PASSWORD@HOST:5432/DATABASE`.
+
+### 2. Switch provider in schema
+
+In `backend/prisma/schema.prisma`, change the datasource:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+Remove any SQLite-specific types if present (the current schema uses standard types that work on both).
+
+### 3. Create the database
+
+On the PostgreSQL server, create the database if it does not exist:
+
+```sql
+CREATE DATABASE body_fat_tracker;
+```
+
+### 4. Run migrations
+
+From the backend directory, with `DATABASE_URL` set to your PostgreSQL URL:
+
+```bash
+cd backend
+export DATABASE_URL="postgresql://user:password@host:5432/body_fat_tracker"
+npx prisma migrate dev --name init_postgres
+```
+
+This creates a migration from the current schema. For an existing production SQLite DB you would need a data migration (export from SQLite, import to Postgres) separately; this runbook covers a fresh Postgres setup or a new environment.
+
+### 5. Deploy
+
+- Set `DATABASE_URL` in your production environment to the PostgreSQL URL.
+- Run `npx prisma generate` and `npm run build` in your build step (no need to run migrations in the app process if you ran them in step 4; for CI/production you can run `npx prisma migrate deploy` before starting the app).
+- Start the backend as usual. The app uses Prisma and does not contain SQLite-specific code, so it works with PostgreSQL without code changes.
+
+### 6. Caveats and notes
+
+- **Date/time:** Prisma maps `DateTime` to `timestamp with time zone` on PostgreSQL. The app stores dates in UTC; ensure your connection timezone or app logic is consistent.
+- **Backup:** Use PostgreSQL backup tools (e.g. `pg_dump`, managed backups) instead of file copies.
+- **Migrations:** For production, run `prisma migrate deploy` in your deploy pipeline after setting `DATABASE_URL`; do not use `migrate dev` in production.
+- **Optional: CI against Postgres:** You can add a CI job that runs tests against a PostgreSQL service container (e.g. `postgres:16`) and `DATABASE_URL` pointing to it, to catch provider-specific issues.
 
 ## Checklist
 

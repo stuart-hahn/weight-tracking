@@ -3,8 +3,13 @@ import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
 
+export interface OptionalBodyFatSubmit {
+  date: string;
+  body_fat_percent: number;
+}
+
 interface DailyLogFormProps {
-  onSubmit: (body: CreateEntryRequest) => void;
+  onSubmit: (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => void;
   userId: string;
   /** Increment to refetch progress (e.g. after saving an entry) */
   refreshTrigger?: number;
@@ -19,6 +24,8 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
   const [optionalOpen, setOptionalOpen] = useState(false);
+  const [bodyFatOpen, setBodyFatOpen] = useState(false);
+  const [bodyFatPercent, setBodyFatPercent] = useState('');
   const [waistCm, setWaistCm] = useState('');
   const [hipCm, setHipCm] = useState('');
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
@@ -58,9 +65,12 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
         if (!Number.isNaN(w) && w > 0 && w <= 200) body.waist_cm = w;
         if (!Number.isNaN(h) && h > 0 && h <= 200) body.hip_cm = h;
       }
-      onSubmit(body);
+      const bf = bodyFatPercent.trim() !== '' ? Number(bodyFatPercent) : NaN;
+      const optionalBodyFat: OptionalBodyFatSubmit | undefined =
+        !Number.isNaN(bf) && bf >= 0 && bf <= 100 ? { date, body_fat_percent: bf } : undefined;
+      onSubmit(body, optionalBodyFat);
     },
-    [date, weightKg, calories, optionalOpen, waistCm, hipCm, units, onSubmit]
+    [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, onSubmit]
   );
 
   const progressPercent =
@@ -160,6 +170,38 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               value={calories}
               onChange={(e) => setCalories(e.target.value)}
             />
+          </div>
+
+          <div className="collapsible">
+            <button
+              type="button"
+              className="collapsible__trigger"
+              onClick={() => setBodyFatOpen(!bodyFatOpen)}
+              aria-expanded={bodyFatOpen}
+            >
+              Optional: body fat %
+              <span aria-hidden>{bodyFatOpen ? '−' : '+'}</span>
+            </button>
+            <div className="collapsible__content" hidden={!bodyFatOpen}>
+              <div className="collapsible__inner">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="log-bodyfat">
+                    Body fat (%)
+                  </label>
+                  <input
+                    id="log-bodyfat"
+                    type="number"
+                    className="form-input"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    placeholder="e.g. 22"
+                    value={bodyFatPercent}
+                    onChange={(e) => setBodyFatPercent(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="collapsible">

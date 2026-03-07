@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { UserCreateInput, UserUpdateInput, DailyEntryCreateInput } from '../types/index.js';
+import type { UserCreateInput, UserUpdateInput, DailyEntryCreateInput, OptionalMetricCreateInput } from '../types/index.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,6 +83,26 @@ export function validateCreateEntry(
   if (body.calories != null && (typeof body.calories !== 'number' || body.calories < 0 || body.calories > 10000)) errors.push('calories must be 0–10000 or omitted');
   if (body.waist_cm != null && (typeof body.waist_cm !== 'number' || body.waist_cm <= 0 || body.waist_cm > 200)) errors.push('Invalid waist_cm');
   if (body.hip_cm != null && (typeof body.hip_cm !== 'number' || body.hip_cm <= 0 || body.hip_cm > 200)) errors.push('Invalid hip_cm');
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateOptionalMetric(
+  req: Request<{ id: string }, unknown, OptionalMetricCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (typeof body.date !== 'string' || !isValidDate(body.date)) errors.push('Valid date (YYYY-MM-DD) required');
+  if (typeof body.body_fat_percent !== 'number' || body.body_fat_percent < 0 || body.body_fat_percent > 100) errors.push('body_fat_percent must be a number between 0 and 100');
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

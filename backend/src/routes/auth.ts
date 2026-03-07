@@ -16,6 +16,14 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts; try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 interface LoginBody {
   email?: string;
   password?: string;
@@ -30,8 +38,12 @@ interface ResetPasswordBody {
   password?: string;
 }
 
+interface VerifyEmailBody {
+  token?: string;
+}
+
 /** POST /api/auth/login - Log in with email + password */
-router.post('/login', async (req, res: Response): Promise<void> => {
+router.post('/login', loginLimiter, async (req, res: Response): Promise<void> => {
   const body = req.body as LoginBody;
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   const password = typeof body.password === 'string' ? body.password : '';
@@ -43,7 +55,7 @@ router.post('/login', async (req, res: Response): Promise<void> => {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, passwordHash: true, onboardingComplete: true },
+    select: { id: true, email: true, passwordHash: true, onboardingComplete: true, emailVerifiedAt: true },
   });
 
   if (!user) {
@@ -59,7 +71,12 @@ router.post('/login', async (req, res: Response): Promise<void> => {
 
   const token = signToken({ sub: user.id, email: user.email });
   res.json({
-    user: { id: user.id, email: user.email, onboarding_complete: user.onboardingComplete },
+    user: {
+      id: user.id,
+      email: user.email,
+      onboarding_complete: user.onboardingComplete,
+      email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
+    },
     token,
   });
 });
@@ -145,6 +162,36 @@ router.post('/reset-password', async (req, res: Response): Promise<void> => {
   });
 
   res.json({ message: 'Password has been reset. You can log in with your new password.' });
+});
+
+/** POST /api/auth/verify-email - Verify email using token from link */
+router.post('/verify-email', async (req, res: Response): Promise<void> => {
+  const body = req.body as VerifyEmailBody;
+  const token = typeof body.token === 'string' ? body.token.trim() : '';
+  if (!token) {
+    res.status(400).json({ error: 'Verification token is required' });
+    return;
+  }
+  const user = await prisma.user.findFirst({
+    where: {
+      emailVerificationToken: token,
+      emailVerificationExpiresAt: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+  if (!user) {
+    res.status(400).json({ error: 'Invalid or expired verification link. Request a new one from settings.' });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+      emailVerificationExpiresAt: null,
+    },
+  });
+  res.json({ message: 'Email verified. You can now use all features.' });
 });
 
 export default router;

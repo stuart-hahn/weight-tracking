@@ -141,9 +141,13 @@ npm run db:reset
 - `POST /api/auth/login` – log in (email, password; returns `user` + `token`)
 - `POST /api/auth/forgot-password` – request password reset (email; rate-limited; sends link if Resend configured)
 - `POST /api/auth/reset-password` – set new password (token + password from email link)
+- `POST /api/auth/verify-email` – verify email (token from signup email link)
 - `POST /api/users/:id/entries` – log daily entry
 - `GET /api/users/:id/entries` – list entries
 - `GET /api/users/:id/progress` – progress metrics (computed goal, current from latest entry, trend, % toward goal)
+- `POST /api/users/:id/optional-metrics` – upsert body fat % for a date
+- `GET /api/users/:id/optional-metrics` – list optional metrics (body fat by date)
+- `GET /api/users/:id/export` – export user data (profile + entries + optional metrics) as JSON (Bearer token)
 
 **Weight semantics:** In progress, "current weight" = latest entry's weight when the user has entries, otherwise the profile (starting) weight. Profile "current weight" is the reference/starting value and is editable via PATCH.
 
