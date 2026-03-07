@@ -1,0 +1,60 @@
+// Body Fat Tracker - SQLite schema (Prisma)
+// Database-agnostic design: swap provider to postgresql/mysql for production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String   @id @default(uuid())
+  email                   String   @unique
+  passwordHash            String   @map("password_hash")
+  age                     Int
+  sex                     String   // 'male' | 'female'
+  heightCm                Float    @map("height_cm")
+  currentWeightKg         Float    @map("current_weight_kg")
+  targetBodyFatPercent    Float    @map("target_body_fat_percent")
+  activityLevel           String?  @map("activity_level") // sedentary | light | moderate | very_active
+  leanMassKg              Float?   @map("lean_mass_kg")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  dailyEntries    DailyEntry[]
+  optionalMetrics OptionalMetric[]
+}
+
+model DailyEntry {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime // stored as date in SQLite
+  weightKg  Float    @map("weight_kg")
+  calories  Int?
+  waistCm   Float?   @map("waist_cm")
+  hipCm     Float?   @map("hip_cm")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_entries")
+}
+
+model OptionalMetric {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  date            DateTime
+  bodyFatPercent  Float?   @map("body_fat_percent")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("optional_metrics")
+}
