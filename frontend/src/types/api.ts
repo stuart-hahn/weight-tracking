@@ -77,6 +77,13 @@ export interface CreateEntryRequest {
   hip_cm?: number | null;
 }
 
+export interface UpdateEntryRequest {
+  weight_kg?: number;
+  calories?: number | null;
+  waist_cm?: number | null;
+  hip_cm?: number | null;
+}
+
 export interface WeeklySummaryResponse {
   weight_change_kg: number | null;
   on_track: boolean | null;

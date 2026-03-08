@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getProgress, createEntry, updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
+import PageLoading from '../components/PageLoading';
 
 interface OnboardingPageProps {
   userId: string;
@@ -68,11 +69,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   );
 
   if (progress === null) {
-    return (
-      <div className="app__card">
-        <p>Loading…</p>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   const units = progress.units;
@@ -97,6 +94,22 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
           onClick={() => setStep(1)}
         >
           Continue
+        </button>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          style={{ marginTop: '0.75rem' }}
+          onClick={async () => {
+            try {
+              await updateUser(userId, { onboarding_complete: true });
+              onComplete();
+              navigate('/log');
+            } catch (err) {
+              onError(err instanceof Error ? err.message : 'Failed to skip');
+            }
+          }}
+        >
+          Skip for now
         </button>
       </div>
     );

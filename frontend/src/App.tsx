@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useCallback, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
@@ -32,6 +32,7 @@ function storeUserId(id: string): void {
 
 export default function App() {
   const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [tokenReady, setTokenReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export default function App() {
       setTokenReady(true);
       setOnboardingComplete(true);
       setEmailVerifiedAt(null);
+      setUserEmail(null);
       return;
     }
     getUser(userId)
@@ -52,6 +54,7 @@ export default function App() {
         setTokenReady(true);
         setOnboardingComplete(profile.onboarding_complete);
         setEmailVerifiedAt(profile.email_verified_at);
+        setUserEmail(profile.email);
       })
       .catch(() => {
         clearToken();
@@ -59,6 +62,7 @@ export default function App() {
         setUserId(null);
         setOnboardingComplete(null);
         setEmailVerifiedAt(null);
+        setUserEmail(null);
         setTokenReady(true);
       });
   }, [userId]);
@@ -71,6 +75,7 @@ export default function App() {
       setToken(res.token);
       storeUserId(res.user.id);
       setUserId(res.user.id);
+      setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
       setSuccess('Welcome back.');
@@ -87,6 +92,7 @@ export default function App() {
       setToken(res.token);
       storeUserId(res.user.id);
       setUserId(res.user.id);
+      setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
       setSuccess('Account created.');
@@ -99,6 +105,7 @@ export default function App() {
     clearToken();
     clearStoredUserId();
     setUserId(null);
+    setUserEmail(null);
     setOnboardingComplete(null);
     setEmailVerifiedAt(null);
     setSuccess(null);
@@ -124,33 +131,120 @@ export default function App() {
   if (!tokenReady) {
     return (
       <div className="app">
-        <div className="app__main">
-          <p>Loading…</p>
-        </div>
+        <header className="app__header">
+          <h1 className="app__title">Body Fat Tracker</h1>
+          <p className="app__subtitle">Track weight and body fat toward your goal</p>
+        </header>
+        <main className="app__main">
+          <p className="progress-text">Loading…</p>
+        </main>
       </div>
     );
   }
 
   return (
     <BrowserRouter>
-      <div className="app">
-        <header className="app__header">
-          <h1 className="app__title">Body Fat Tracker</h1>
-          <p className="app__subtitle">Track weight & progress toward your goal</p>
-        </header>
+      <AppContent
+        userId={userId}
+        userEmail={userEmail}
+        onboardingComplete={onboardingComplete}
+        onOnboardingComplete={() => setOnboardingComplete(true)}
+        emailVerifiedAt={emailVerifiedAt}
+        onEmailVerified={() => setEmailVerifiedAt(new Date().toISOString())}
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        error={error}
+        setError={setError}
+        success={success}
+        setSuccess={setSuccess}
+        progressRefreshTrigger={progressRefreshTrigger}
+        setProgressRefreshTrigger={setProgressRefreshTrigger}
+        handleLogin={handleLogin}
+        handleSignup={handleSignup}
+        handleLogout={handleLogout}
+        handleEntrySubmit={handleEntrySubmit}
+      />
+    </BrowserRouter>
+  );
+}
 
-        <main className="app__main">
-          {error && <div className="app__error" role="alert">{error}</div>}
-          {success && <div className="app__success" role="status">{success}</div>}
-          {userId && !emailVerifiedAt && (
-            <section className="app__card retention-banner" role="status">
-              <p className="retention-banner__text">
-                Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
-              </p>
-            </section>
+type AppContentProps = {
+  userId: string | null;
+  userEmail: string | null;
+  onboardingComplete: boolean | null;
+  onOnboardingComplete: () => void;
+  emailVerifiedAt: string | null;
+  onEmailVerified: () => void;
+  authMode: AuthMode;
+  setAuthMode: (m: AuthMode) => void;
+  error: string | null;
+  setError: (e: string | null) => void;
+  success: string | null;
+  setSuccess: (s: string | null) => void;
+  progressRefreshTrigger: number;
+  setProgressRefreshTrigger: React.Dispatch<React.SetStateAction<number>>;
+  handleLogin: (body: import('./types/api').LoginRequest) => Promise<void>;
+  handleSignup: (body: CreateUserRequest) => Promise<void>;
+  handleLogout: () => void;
+  handleEntrySubmit: (body: CreateEntryRequest, optionalBodyFat?: import('./components/DailyLogForm').OptionalBodyFatSubmit) => Promise<void>;
+};
+
+function AppContent({
+  userId,
+  userEmail,
+  onboardingComplete,
+  onOnboardingComplete,
+  emailVerifiedAt,
+  onEmailVerified,
+  authMode,
+  setAuthMode,
+  error,
+  setError,
+  success,
+  setSuccess,
+  progressRefreshTrigger,
+  setProgressRefreshTrigger,
+  handleLogin,
+  handleSignup,
+  handleLogout,
+  handleEntrySubmit,
+}: AppContentProps) {
+  const location = useLocation();
+  const prevPathRef = React.useRef(location.pathname);
+
+  useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      setError(null);
+      setSuccess(null);
+    }
+  }, [location.pathname, setError, setSuccess]);
+
+  return (
+    <div className="app">
+      <header className="app__header">
+        <h1 className="app__title">
+          {userId ? (
+            <Link to="/log" className="app__title-link">Body Fat Tracker</Link>
+          ) : (
+            'Body Fat Tracker'
           )}
+        </h1>
+        <p className="app__subtitle">Track weight and body fat toward your goal</p>
+      </header>
 
-          <Routes>
+      <main className="app__main">
+        {error && <div className="app__error" role="alert">{error}</div>}
+        {success && <div className="app__success" role="status">{success}</div>}
+        {userId && !emailVerifiedAt && (
+          <section className="app__card retention-banner" role="status">
+            <p className="retention-banner__text">
+              Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
+            </p>
+          </section>
+        )}
+
+        <Routes>
             <Route
               path="/"
               element={
@@ -187,7 +281,7 @@ export default function App() {
             <Route
               path="/verify-email"
               element={
-                <VerifyEmailPage onVerified={() => setEmailVerifiedAt(new Date().toISOString())} />
+                <VerifyEmailPage onVerified={onEmailVerified} />
               }
             />
             <Route
@@ -195,10 +289,10 @@ export default function App() {
               element={
                 userId && onboardingComplete === false ? (
                   <>
-                    <Nav onLogout={handleLogout} />
+                    <Nav onLogout={handleLogout} email={userEmail} />
                     <OnboardingPage
                       userId={userId}
-                      onComplete={() => setOnboardingComplete(true)}
+                      onComplete={onOnboardingComplete}
                       onError={setError}
                     />
                   </>
@@ -214,11 +308,12 @@ export default function App() {
               element={
                 userId && onboardingComplete !== false ? (
                   <>
-                    <Nav onLogout={handleLogout} />
+                    <Nav onLogout={handleLogout} email={userEmail} />
                     <LogPage
                       userId={userId}
                       refreshTrigger={progressRefreshTrigger}
                       onSubmit={handleEntrySubmit}
+                      onError={setError}
                     />
                   </>
                 ) : userId ? (
@@ -233,8 +328,12 @@ export default function App() {
               element={
                 userId && onboardingComplete !== false ? (
                   <>
-                    <Nav onLogout={handleLogout} />
-                    <ProgressPage userId={userId} refreshTrigger={progressRefreshTrigger} />
+                    <Nav onLogout={handleLogout} email={userEmail} />
+                    <ProgressPage
+                      userId={userId}
+                      refreshTrigger={progressRefreshTrigger}
+                      onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
+                    />
                   </>
                 ) : userId ? (
                   <Navigate to="/onboarding" replace />
@@ -248,7 +347,7 @@ export default function App() {
               element={
                 userId && onboardingComplete !== false ? (
                   <>
-                    <Nav onLogout={handleLogout} />
+                    <Nav onLogout={handleLogout} email={userEmail} />
                     <SettingsPage
                       userId={userId}
                       onError={setError}
@@ -266,6 +365,5 @@ export default function App() {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
   );
 }

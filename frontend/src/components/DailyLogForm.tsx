@@ -1,4 +1,5 @@
 import { useState, useCallback, FormEvent, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
@@ -9,7 +10,8 @@ export interface OptionalBodyFatSubmit {
 }
 
 interface DailyLogFormProps {
-  onSubmit: (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => void;
+  onSubmit: (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => Promise<void>;
+  onError?: (message: string | null) => void;
   userId: string;
   /** Increment to refetch progress (e.g. after saving an entry) */
   refreshTrigger?: number;
@@ -19,7 +21,7 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: DailyLogFormProps) {
+export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
   const [date, setDate] = useState(todayISO);
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
@@ -29,6 +31,9 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
   const [waistCm, setWaistCm] = useState('');
   const [hipCm, setHipCm] = useState('');
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [weightError, setWeightError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,11 +47,15 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
 
   const units = progress?.units ?? 'metric';
   const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setWeightError(null);
       let weightKgNum = Number(weightKg);
       if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
-      if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) return;
+      if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
+        setWeightError('Please enter a valid weight.');
+        return;
+      }
       const body: CreateEntryRequest = {
         date,
         weight_kg: weightKgNum,
@@ -68,9 +77,23 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
       const bf = bodyFatPercent.trim() !== '' ? Number(bodyFatPercent) : NaN;
       const optionalBodyFat: OptionalBodyFatSubmit | undefined =
         !Number.isNaN(bf) && bf >= 0 && bf <= 100 ? { date, body_fat_percent: bf } : undefined;
-      onSubmit(body, optionalBodyFat);
+      setDuplicateDate(null);
+      setSubmitting(true);
+      try {
+        await onSubmit(body, optionalBodyFat);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to save entry';
+        if (msg.includes('already exists') || msg.includes('Entry already')) {
+          setDuplicateDate(date);
+          onError?.(null);
+        } else {
+          onError?.(msg);
+        }
+      } finally {
+        setSubmitting(false);
+      }
     },
-    [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, onSubmit]
+    [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, onSubmit, onError]
   );
 
   const progressPercent =
@@ -135,6 +158,7 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               className="form-input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              max={todayISO()}
               required
             />
           </div>
@@ -151,9 +175,16 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               step={units === 'imperial' ? 1 : 0.1}
               placeholder={units === 'imperial' ? '165' : '75.0'}
               value={weightKg}
-              onChange={(e) => setWeightKg(e.target.value)}
+              onChange={(e) => { setWeightKg(e.target.value); setWeightError(null); }}
               required
             />
+            {weightError && <p className="form-error" role="alert">{weightError}</p>}
+            {duplicateDate && (
+              <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
+                You already have an entry for this date.{' '}
+                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit it</Link>.
+              </p>
+            )}
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="log-calories">
@@ -180,7 +211,7 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               aria-expanded={bodyFatOpen}
             >
               Optional: body fat %
-              <span aria-hidden>{bodyFatOpen ? '−' : '+'}</span>
+              <span className="collapsible__chevron" aria-hidden>▼</span>
             </button>
             <div className="collapsible__content" hidden={!bodyFatOpen}>
               <div className="collapsible__inner">
@@ -212,7 +243,7 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
               aria-expanded={optionalOpen}
             >
               Optional: waist / hip
-              <span aria-hidden>{optionalOpen ? '−' : '+'}</span>
+              <span className="collapsible__chevron" aria-hidden>▼</span>
             </button>
             <div className="collapsible__content" hidden={!optionalOpen}>
               <div className="collapsible__inner">
@@ -252,8 +283,8 @@ export default function DailyLogForm({ onSubmit, userId, refreshTrigger = 0 }: D
             </div>
           </div>
 
-          <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
-            Save entry
+          <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save entry'}
           </button>
         </form>
       </section>

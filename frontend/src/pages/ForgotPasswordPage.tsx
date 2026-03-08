@@ -28,9 +28,22 @@ export default function ForgotPasswordPage() {
         Forgot password
       </h2>
       {submitted ? (
-        <p className="app__success" role="status">
-          If an account exists with that email, you will receive a reset link. Check your inbox and spam folder.
-        </p>
+        <>
+          <p className="app__success" role="status">
+            If an account exists with that email, you will receive a reset link. Check your inbox and spam folder.
+          </p>
+          <p className="progress-text" style={{ marginTop: '0.75rem' }}>
+            Didn&apos;t get it? Check spam or try again with your email.
+          </p>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            style={{ marginTop: '1rem' }}
+            onClick={() => setSubmitted(false)}
+          >
+            Try again
+          </button>
+        </>
       ) : (
         <>
           <p style={{ marginBottom: '1rem' }}>
