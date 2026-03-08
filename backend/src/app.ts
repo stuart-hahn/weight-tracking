@@ -10,7 +10,7 @@ import optionalMetricsRouter from './routes/optionalMetrics.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());
