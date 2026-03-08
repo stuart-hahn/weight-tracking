@@ -1,5 +1,4 @@
-// Body Fat Tracker - SQLite schema (Prisma)
-// Database-agnostic design: swap provider to postgresql/mysql for production.
+// Body Fat Tracker - Prisma schema (PostgreSQL: Neon, Render, local, etc.)
 
 generator client {
   provider = "prisma-client-js"
@@ -7,7 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {

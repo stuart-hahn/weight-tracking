@@ -1,37 +1,16 @@
 /**
  * Seed script: creates a test user with one month of realistic daily entries.
  * For dev/demo only. Run: npx prisma db seed (from backend directory).
+ * Requires DATABASE_URL (PostgreSQL).
  */
 import 'dotenv/config';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 const TEST_EMAIL = 'test@example.com';
 const TEST_PASSWORD = 'TestPassword123';
 
-// Resolve DATABASE_URL same way as app
-let databaseUrl = process.env.DATABASE_URL ?? 'file:./data/body_fat_tracker.db';
-if (
-  process.env.DATABASE_FILE !== undefined &&
-  process.env.DATABASE_FILE !== '' &&
-  process.env.DATABASE_URL === undefined
-) {
-  process.env.DATABASE_URL = `file:${process.env.DATABASE_FILE}`;
-  databaseUrl = process.env.DATABASE_URL;
-}
-if (databaseUrl.startsWith('file:./') || databaseUrl.startsWith('file:../')) {
-  const relativePath = databaseUrl.slice(5);
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const backendRoot = path.resolve(__dirname, '..');
-  const absolutePath = path.resolve(backendRoot, relativePath);
-  databaseUrl = `file:${absolutePath}`;
-}
-
-const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 /** Seeded RNG for reproducible weight variance (minimal drift) */
 function seeded(seed: number): () => number {

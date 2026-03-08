@@ -1,10 +1,11 @@
 /**
- * API integration tests. Use a separate test DB:
- *   DATABASE_URL=file:./data/integration_test.db npx prisma db push
- *   npm run test:integration
- * Or run once: npm run db:push:test && npm run test:integration
+ * API integration tests. Use a test DB (PostgreSQL). In CI, DATABASE_URL is set by the workflow.
+ * Locally: set DATABASE_URL or run a Postgres (e.g. Docker) and use the default below.
  */
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'file:./data/integration_test.db';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ??
+  process.env.TEST_DATABASE_URL ??
+  'postgresql://postgres:postgres@localhost:5432/body_fat_tracker_test';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-for-integration-tests';
 
 import { describe, it, expect, beforeAll } from 'vitest';
