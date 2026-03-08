@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
+import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
+import PageLoading from '../components/PageLoading';
 
 interface SettingsPageProps {
   userId: string;
@@ -107,12 +109,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   }, [userId, onError, onSuccess]);
 
   if (loading) {
-    return (
-      <section className="app__card" aria-label="Settings">
-        <h2 className="app__card-title">Settings</h2>
-        <p className="progress-text">Loading…</p>
-      </section>
-    );
+    return <PageLoading title="Settings" />;
   }
 
   if (!profile) return null;
@@ -161,29 +158,53 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label" htmlFor="settings-height">Height (cm)</label>
+          <label className="form-label" htmlFor="settings-height">
+            Height ({units === 'imperial' ? 'in' : 'cm'})
+          </label>
           <input
             id="settings-height"
             type="number"
             className="form-input"
-            min={1}
-            max={300}
-            step={0.1}
-            value={heightCm}
-            onChange={(e) => setHeightCm(e.target.value)}
+            min={units === 'imperial' ? 20 : 1}
+            max={units === 'imperial' ? 120 : 300}
+            step={units === 'imperial' ? 1 : 0.1}
+            value={units === 'imperial'
+              ? (() => { const n = Number(heightCm); return Number.isNaN(n) ? '' : Math.round(cmToIn(n) * 10) / 10; })()
+              : heightCm}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (units === 'imperial') {
+                const n = Number(v);
+                setHeightCm(Number.isNaN(n) ? '' : String(inToCm(n)));
+              } else {
+                setHeightCm(v);
+              }
+            }}
           />
         </div>
         <div className="form-group">
-          <label className="form-label" htmlFor="settings-weight">Current weight (kg)</label>
+          <label className="form-label" htmlFor="settings-weight">
+            Current weight ({units === 'imperial' ? 'lb' : 'kg'})
+          </label>
           <input
             id="settings-weight"
             type="number"
             className="form-input"
-            min={1}
-            max={500}
-            step={0.1}
-            value={currentWeightKg}
-            onChange={(e) => setCurrentWeightKg(e.target.value)}
+            min={units === 'imperial' ? 44 : 1}
+            max={units === 'imperial' ? 1100 : 500}
+            step={units === 'imperial' ? 1 : 0.1}
+            value={units === 'imperial'
+              ? (() => { const n = Number(currentWeightKg); return Number.isNaN(n) ? '' : Math.round(kgToLb(n)); })()
+              : currentWeightKg}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (units === 'imperial') {
+                const n = Number(v);
+                setCurrentWeightKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
+              } else {
+                setCurrentWeightKg(v);
+              }
+            }}
           />
         </div>
         <div className="form-group">
@@ -239,10 +260,10 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           onClick={handleExport}
           disabled={exporting}
         >
-          {exporting ? 'Preparing…' : 'Download my data'}
+          {exporting ? 'Preparing…' : 'Download my data (export)'}
         </button>
         <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-          Downloads your profile, entries, and optional metrics as JSON.
+          Export your profile, entries, and optional metrics as JSON.
         </p>
       </div>
     </section>

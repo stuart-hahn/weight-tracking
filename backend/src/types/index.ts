@@ -87,6 +87,13 @@ export interface DailyEntryCreateInput {
   hip_cm?: number | null;
 }
 
+export interface DailyEntryUpdateInput {
+  weight_kg?: number;
+  calories?: number | null;
+  waist_cm?: number | null;
+  hip_cm?: number | null;
+}
+
 /** Weekly summary for progress */
 export interface WeeklySummary {
   weight_change_kg: number | null;

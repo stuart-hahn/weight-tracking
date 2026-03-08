@@ -15,10 +15,12 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [targetBf, setTargetBf] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setSubmitError(null);
       const ageNum = Number(age);
       let heightNum = Number(heightCm);
       let weightNum = Number(weightKg);
@@ -27,22 +29,15 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         weightNum = lbToKg(weightNum);
       }
       const targetNum = Number(targetBf);
-      if (
-        !email.trim() ||
-        password.length < 8 ||
-        Number.isNaN(ageNum) ||
-        ageNum < 10 ||
-        ageNum > 120 ||
-        Number.isNaN(heightNum) ||
-        heightNum <= 0 ||
-        heightNum > 300 ||
-        Number.isNaN(weightNum) ||
-        weightNum <= 0 ||
-        weightNum > 500 ||
-        Number.isNaN(targetNum) ||
-        targetNum <= 0 ||
-        targetNum >= 100
-      ) {
+      const errors: string[] = [];
+      if (!email.trim()) errors.push('Email is required');
+      if (password.length < 8) errors.push('Password must be at least 8 characters');
+      if (Number.isNaN(ageNum) || ageNum < 10 || ageNum > 120) errors.push('Age must be between 10 and 120');
+      if (Number.isNaN(heightNum) || heightNum <= 0 || heightNum > 300) errors.push('Height is required and must be valid');
+      if (Number.isNaN(weightNum) || weightNum <= 0 || weightNum > 500) errors.push('Weight is required and must be valid');
+      if (Number.isNaN(targetNum) || targetNum <= 0 || targetNum >= 100) errors.push('Target body fat % must be between 1 and 99');
+      if (errors.length > 0) {
+        setSubmitError(errors.join('. '));
         return;
       }
       onSubmit({
@@ -65,6 +60,11 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         Create account
       </h2>
       <form onSubmit={handleSubmit} noValidate>
+        {submitError && (
+          <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+            {submitError}
+          </div>
+        )}
         <div className="form-group">
           <label className="form-label" htmlFor="signup-email">
             Email

@@ -27,6 +27,21 @@
   color: var(--text);
 }
 
+.app__title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app__title-link:hover {
+  color: var(--accent);
+}
+
+.app__title-link:focus-visible {
+  outline: none;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
 .app__subtitle {
   font-size: 0.9rem;
   color: var(--muted);
@@ -142,6 +157,12 @@
   margin-top: 0.25rem;
 }
 
+.form-error {
+  font-size: 0.875rem;
+  color: var(--danger);
+  margin-top: 0.35rem;
+}
+
 /* Buttons – large touch targets */
 .btn {
   display: inline-flex;
@@ -180,6 +201,22 @@
   background: var(--border);
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.app__nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.collapsible__trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius);
+}
+
 /* Collapsible */
 .collapsible__trigger {
   width: 100%;
@@ -187,16 +224,29 @@
   align-items: center;
   justify-content: space-between;
   min-height: var(--touch-min);
-  padding: 0 0.5rem;
-  background: transparent;
-  border: none;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--muted);
   font-size: 0.9rem;
   cursor: pointer;
+  text-align: left;
 }
 
 .collapsible__trigger:hover {
   color: var(--text);
+  border-color: var(--accent);
+}
+
+.collapsible__trigger .collapsible__chevron {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.collapsible__trigger[aria-expanded="true"] .collapsible__chevron {
+  transform: rotate(180deg);
 }
 
 .collapsible__content {
@@ -213,16 +263,17 @@
   margin-top: 0.5rem;
 }
 
-/* Retention nudge */
+/* Retention nudge – visually demoted from primary cards */
 .retention-banner {
-  background: rgba(56, 189, 248, 0.08);
-  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.06);
+  border-color: var(--border);
+  padding: 0.75rem 1rem;
 }
 
 .retention-banner__text {
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--text);
+  font-size: 0.875rem;
+  color: var(--muted);
 }
 
 /* Progress stub */
@@ -292,4 +343,8 @@
 .app__logout .btn {
   width: 100%;
   max-width: var(--max-width);
+}
+
+.entry-row:hover {
+  background: rgba(56, 189, 248, 0.08);
 }
