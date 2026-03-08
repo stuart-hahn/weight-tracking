@@ -39,6 +39,10 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
     return () => { cancelled = true; };
   }, [userId, onError]);
 
+  useEffect(() => {
+    if (step === 1) weightInputRef.current?.focus();
+  }, [step]);
+
   const handleLogFirstEntry = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -74,10 +78,6 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   }
 
   const units = progress.units;
-
-  useEffect(() => {
-    if (step === 1) weightInputRef.current?.focus();
-  }, [step]);
 
   if (step === 0) {
     return (
