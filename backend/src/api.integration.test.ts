@@ -143,6 +143,10 @@ describe('API integration', () => {
   });
 
   it('POST /api/auth/verify-email verifies with valid token', async () => {
+    if (!userId) {
+      expect.fail('userId not set (previous test may have failed)');
+      return;
+    }
     const verificationToken = await prisma.user
       .findUnique({ where: { id: userId }, select: { emailVerificationToken: true } })
       .then((u) => u?.emailVerificationToken);

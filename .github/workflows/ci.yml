@@ -44,6 +44,9 @@ jobs:
         working-directory: backend
 
       - name: Integration tests
+        env:
+          # Use same DB as db:push:test so the app sees the schema (imports run before test file top-level code)
+          DATABASE_URL: file:./data/integration_test.db
         run: npm run test:integration
         working-directory: backend
 
