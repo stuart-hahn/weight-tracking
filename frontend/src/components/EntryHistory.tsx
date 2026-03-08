@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
@@ -32,6 +32,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editError, setEditError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const editFirstInputRef = useRef<HTMLInputElement>(null);
+  const editTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +75,15 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     setEditHip(editingEntry.hip_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.hip_cm) * 10) / 10) : String(editingEntry.hip_cm)) : '');
     setEditError(null);
   }, [editingEntry, progress]);
+
+  useEffect(() => {
+    if (editingEntry) {
+      editFirstInputRef.current?.focus();
+    } else {
+      editTriggerRef.current?.focus();
+      editTriggerRef.current = null;
+    }
+  }, [editingEntry]);
 
   const handleEditSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -264,8 +275,10 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
             <div className="form-group">
-              <label className="form-label">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
+              <label className="form-label" htmlFor="edit-entry-weight">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
               <input
+                ref={editFirstInputRef}
+                id="edit-entry-weight"
                 type="number"
                 className="form-input"
                 min={progress.units === 'imperial' ? 20 : 1}
@@ -330,7 +343,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             <button
               type="button"
               className="entry-row"
-              onClick={() => setEditingEntry(e)}
+              onClick={(ev) => { editTriggerRef.current = ev.currentTarget; setEditingEntry(e); }}
               style={{
                 width: '100%',
                 display: 'flex',

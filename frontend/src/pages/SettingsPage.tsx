@@ -23,6 +23,8 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
   const [exporting, setExporting] = useState(false);
+  const [localSuccess, setLocalSuccess] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +57,8 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       if (!profile) return;
       onError(null);
       onSuccess(null);
+      setLocalError(null);
+      setLocalSuccess(null);
       const body: UpdateUserRequest = {};
       const ageNum = Number(age);
       if (!Number.isNaN(ageNum) && ageNum >= 10 && ageNum <= 120) body.age = ageNum;
@@ -78,16 +82,20 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       }
       body.units = units;
       if (Object.keys(body).length === 0) {
-        onSuccess('No changes to save.');
+        setLocalSuccess('No changes to save.');
         return;
       }
       setSaving(true);
       try {
         const updated = await updateUser(userId, body);
         setProfile(updated);
-        onSuccess('Profile updated.');
+        setLocalSuccess('Profile updated.');
+        onSuccess(null);
+        window.setTimeout(() => setLocalSuccess(null), 3000);
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to update profile');
+        const msg = err instanceof Error ? err.message : 'Failed to update profile';
+        setLocalError(msg);
+        onError(null);
       } finally {
         setSaving(false);
       }
@@ -97,12 +105,17 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
 
   const handleExport = useCallback(async () => {
     onError(null);
+    setLocalError(null);
+    setLocalSuccess(null);
     setExporting(true);
     try {
       await exportUserData(userId);
-      onSuccess('Data downloaded.');
+      setLocalSuccess('Data downloaded.');
+      onSuccess(null);
+      window.setTimeout(() => setLocalSuccess(null), 3000);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Export failed');
+      setLocalError(err instanceof Error ? err.message : 'Export failed');
+      onError(null);
     } finally {
       setExporting(false);
     }
@@ -117,6 +130,16 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   return (
     <section className="app__card" aria-label="Settings">
       <h2 className="app__card-title">Settings</h2>
+      {localError && (
+        <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+          {localError}
+        </div>
+      )}
+      {localSuccess && (
+        <div className="app__success" role="status" style={{ marginBottom: '1rem' }}>
+          {localSuccess}
+        </div>
+      )}
       <p className="progress-text" style={{ marginBottom: '1rem' }}>
         {profile.email}
       </p>
