@@ -7,18 +7,23 @@ on:
     branches: [main, master]
 
 jobs:
-  build-and-test:
+  backend:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: npm ci
         working-directory: backend
 
@@ -26,34 +31,50 @@ jobs:
         run: npx prisma generate
         working-directory: backend
 
-      - name: Typecheck backend
+      - name: Typecheck
         run: npx tsc --noEmit
         working-directory: backend
 
-      - name: Test backend
+      - name: Unit tests
         run: npm run test
         working-directory: backend
 
-      - name: Backend integration tests
+      - name: Integration tests
         run: npm run test:integration
         working-directory: backend
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-
-      - name: Typecheck frontend
-        run: npx tsc --noEmit
-        working-directory: frontend
-
-      - name: Test frontend
-        run: npm run test
-        working-directory: frontend
-
-      - name: Build backend
+      - name: Build
         run: npm run build
         working-directory: backend
 
-      - name: Build frontend
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: frontend
+
+      - name: Tests
+        run: npm run test
+        working-directory: frontend
+
+      - name: Build
         run: npm run build
         working-directory: frontend
