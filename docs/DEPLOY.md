@@ -2,6 +2,8 @@
 
 This document describes how to build and run the Body Fat Tracker API and frontend in a production-like environment.
 
+**Branching:** To deploy only when you merge to `main`, use feature branches and configure Render/Vercel to deploy from `main` only. See [BRANCHING_AND_DEPLOY.md](BRANCHING_AND_DEPLOY.md).
+
 ## Environment variables (production)
 
 ### Backend

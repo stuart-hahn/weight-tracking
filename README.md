@@ -4,99 +4,90 @@ Production-ready body fat tracker: log weight and calories, track progress towar
 
 ## Tech Stack
 
-- **Backend:** Express.js + TypeScript (strict), Prisma + SQLite (local) / PostgreSQL (production-ready), JWT
+- **Backend:** Express.js + TypeScript (strict), Prisma + PostgreSQL, JWT
 - **Frontend:** React + TypeScript (strict), vanilla CSS, mobile-first
 
 ## Quick Start (Local Development)
 
-### 1. Install dependencies
+Local dev uses **PostgreSQL**. Easiest: run Postgres in Docker, then run the app on your machine.
+
+### 1. Start a local database
+
+From the repo root:
 
 ```bash
-# Backend
-cd backend
-npm install
-
-# Frontend (from repo root)
-cd frontend
-npm install
+docker compose up -d db
 ```
 
-### 2. Configure environment
+This starts PostgreSQL 16 on `localhost:5432` with user `postgres`, password `postgres`, database `body_fat_tracker`.
+
+**Alternative:** Use a [Neon](https://neon.tech) branch or any `postgresql://` URL and skip Docker.
+
+### 2. Install dependencies
+
+```bash
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### 3. Configure the backend
 
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env: set JWT_SECRET (and optionally PORT, CORS_ORIGIN).
-# DATABASE_URL is already set for SQLite (file:./data/body_fat_tracker.db).
 ```
 
-### 3. Create the database (SQLite)
+Edit `.env`. For Docker Postgres above, use:
 
-From the `backend` directory:
-
-```bash
-# Create the data directory (SQLite file path)
-mkdir -p data
-
-# Apply schema (creates DB file and tables)
-npx prisma db push
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker
+JWT_SECRET=any-random-string-for-local-dev
 ```
 
-Or use migrations for versioned schema changes:
+Leave `CORS_ORIGIN` unset or set to `http://localhost:5173`.
 
-```bash
-npx prisma migrate dev --name init
-```
-
-### 4. Generate Prisma client
-
-Required after cloning or after changing `prisma/schema.prisma`:
+### 4. Apply the schema and (optional) seed
 
 ```bash
 cd backend
 npx prisma generate
+npx prisma db push
+npm run db:seed   # optional: test user test@example.com / TestPassword123
 ```
 
-The `npm run dev` and `npm run build` scripts run `prisma generate` automatically.
+### 5. Run backend and frontend
 
-### 5. Run the backend
+**Terminal 1 – backend:**
 
 ```bash
 cd backend
 npm run dev
 ```
 
-API runs at `http://localhost:3001`.
+API: `http://localhost:3001`.
 
-### 6. Run the frontend
+**Terminal 2 – frontend:**
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-App runs at `http://localhost:5173` and proxies `/api` to the backend.
+App: `http://localhost:5173`. The Vite dev server proxies `/api` to the backend; no `VITE_API_URL` needed locally.
 
 ---
 
 ## Environment (Backend)
 
-| Variable        | Description                                      | Default / example                          |
+| Variable        | Description                                      | Local default / example                    |
 |----------------|--------------------------------------------------|--------------------------------------------|
 | `PORT`         | Server port                                      | `3001`                                     |
 | `CORS_ORIGIN`  | Allowed origin for CORS                          | `http://localhost:5173`                     |
-| `JWT_SECRET`   | Secret for signing JWTs                          | **Required** (set in production)           |
-| `DATABASE_URL` | Prisma connection URL (required for Prisma CLI)   | `file:./data/body_fat_tracker.db` (SQLite)  |
-| `DATABASE_FILE`| Optional; if set and `DATABASE_URL` unset, app uses `file:<DATABASE_FILE>` | `./data/body_fat_tracker.db` |
-| `FRONTEND_URL` | Base URL for password-reset links | `http://localhost:5173` |
-| `RESEND_API_KEY` | Resend.com API key for reset emails (optional; if unset, link is logged to console) | — |
-| `RESEND_FROM`   | Sender for reset emails | `Body Fat Tracker <onboarding@resend.dev>` |
-
-For **production** with PostgreSQL, change the `provider` in `backend/prisma/schema.prisma` to `postgresql` and set:
-
-```bash
-DATABASE_URL=postgresql://user:password@host:5432/dbname
-```
+| `JWT_SECRET`   | Secret for signing JWTs                          | Any string locally; **required** in prod   |
+| `DATABASE_URL` | PostgreSQL connection URL                        | `postgresql://postgres:postgres@localhost:5432/body_fat_tracker` |
+| `FRONTEND_URL` | Base URL for password-reset/verification links   | `http://localhost:5173`                    |
+| `RESEND_API_KEY` | Resend.com API key (optional)                  | If unset, reset link is logged to console  |
+| `RESEND_FROM`  | Sender for reset emails                          | —                                          |
 
 ---
 
@@ -104,32 +95,20 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 | Command | Description |
 |--------|-------------|
-| `npm run db:push` | Apply schema to DB (no migration history). Good for local SQLite. |
+| `npm run db:push` | Apply schema to the DB (no migration history). |
 | `npm run db:seed` | Seed a test user with ~35 days of entries (dev/demo only). |
-| `npm run db:migrate` | Create and run a migration (`prisma migrate dev`). Use for production/versioned schema. |
+| `npm run db:migrate` | Create and run a migration (`prisma migrate dev`). |
 | `npm run db:studio` | Open Prisma Studio to inspect/edit data. |
 | `npm run db:reset` | Reset DB (drops and reapplies). **Destructive.** |
 
 ### Test user (dev/demo)
 
-After `db:push`, run `npm run db:seed` (or `npx prisma db seed`) to create a test user with about one month of realistic daily entries. Log in with:
+After `db:seed`, log in with:
 
 - **Email:** test@example.com  
 - **Password:** TestPassword123  
 
-Use for demos, QA, or trying the app without manual data entry. Do not use in production.
-
-### Reset the SQLite database
-
-To wipe and recreate the local DB:
-
-```bash
-cd backend
-npm run db:reset
-# Or manually:
-# rm -f data/body_fat_tracker.db
-# npx prisma db push
-```
+Do not use in production.
 
 ---
 
@@ -153,12 +132,16 @@ npm run db:reset
 
 ---
 
+## Branches and production deploys
+
+Use **feature branches** for work; merge into `main` only when you want to deploy to production. CI runs on every push and on PRs. Configure Render and Vercel so that **only `main`** triggers production; other branches can use preview deploys if you want. See **[docs/BRANCHING_AND_DEPLOY.md](docs/BRANCHING_AND_DEPLOY.md)** for the full workflow.
+
 ## Project layout
 
 ```
 backend/
   prisma/
-    schema.prisma    # Canonical schema (SQLite; switch provider for Postgres/MySQL)
+    schema.prisma    # Canonical schema (PostgreSQL)
   src/
     config/db.ts    # Prisma client (singleton)
     middleware/     # auth, validation
