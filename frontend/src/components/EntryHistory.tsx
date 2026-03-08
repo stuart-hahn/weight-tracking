@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
-import { formatWeight, formatTrend, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
+import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
 
 function todayISO(): string {
@@ -193,12 +193,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
   const chartSummary = progress
     ? (() => {
-        const rangeAndGoal = `Range ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)} over ${sortedEntries.length} entries.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
+        const rangeAndGoal = `${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
         const trend = progress.weight_trend_kg_per_week;
         if (trend == null) return rangeAndGoal;
         const absTrend = Math.abs(trend);
-        const trendWord = absTrend < 0.02 ? 'Stable' : trend < 0 ? 'Losing' : 'Gaining';
-        const trendPhrase = absTrend < 0.02 ? 'Stable.' : `${trendWord} ${formatTrend(trend, progress.units)}.`;
+        const trendPhrase =
+          absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
         return `${trendPhrase} ${rangeAndGoal}`;
       })()
     : '';
@@ -285,7 +285,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       {progress && progress.lean_mass_kg != null && (
         <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
-          Lean mass: {progress.lean_mass_kg.toFixed(1)} kg ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+          Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+        </p>
+      )}
+      {progress && progress.estimated_body_fat_percent != null && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
         </p>
       )}
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>

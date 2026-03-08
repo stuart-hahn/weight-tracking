@@ -170,7 +170,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           )}
           {progress.lean_mass_kg != null && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              Lean mass: {progress.lean_mass_kg.toFixed(1)} kg ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+              Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+            </p>
+          )}
+          {progress.estimated_body_fat_percent != null && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
             </p>
           )}
         </section>

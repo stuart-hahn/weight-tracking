@@ -86,6 +86,15 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     user.leanMassKg ?? estimateLeanMassKg(currentWeightKg, user.heightCm, user.sex as 'male' | 'female');
   const leanMassIsEstimated = user.leanMassKg == null;
 
+  let estimatedBodyFatPercent: number | null = null;
+  if (
+    currentWeightKg > 0 &&
+    effectiveLeanMassKg < currentWeightKg
+  ) {
+    const raw = (1 - effectiveLeanMassKg / currentWeightKg) * 100;
+    estimatedBodyFatPercent = Math.round(Math.max(0, Math.min(100, raw)) * 10) / 10;
+  }
+
   const agg = await prisma.dailyEntry.aggregate({
     where: { userId },
     _max: { date: true },
@@ -155,6 +164,12 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     ...(estimatedGoalMessage ? { estimated_goal_message: estimatedGoalMessage } : {}),
     lean_mass_kg: Math.round(effectiveLeanMassKg * 100) / 100,
     lean_mass_is_estimated: leanMassIsEstimated,
+    ...(estimatedBodyFatPercent != null
+      ? {
+          estimated_body_fat_percent: estimatedBodyFatPercent,
+          body_fat_is_estimated: true,
+        }
+      : {}),
   };
   res.json(progress);
 });

@@ -74,6 +74,18 @@ export function formatTrend(kgPerWeek: number, units: UnitsPreference): string {
   return `${prefix}${rounded} kg/week`;
 }
 
+/** Trend magnitude only (unsigned) for use with "Losing" / "Gaining" (e.g. "1.4 lb per week") */
+export function formatTrendMagnitude(kgPerWeek: number, units: UnitsPreference): string {
+  const abs = Math.abs(kgPerWeek);
+  if (units === 'imperial') {
+    const lbPerWeek = abs / KG_PER_LB;
+    const rounded = Math.round(lbPerWeek * 10) / 10;
+    return `${rounded} lb per week`;
+  }
+  const rounded = Math.round(abs * 100) / 100;
+  return `${rounded} kg per week`;
+}
+
 /** Weekly weight change for summary (e.g. "−0.4 kg" or "−0.9 lb") */
 export function formatWeightChange(kg: number, units: UnitsPreference): string {
   if (units === 'imperial') {

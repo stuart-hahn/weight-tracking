@@ -108,6 +108,8 @@ export interface ProgressResponse {
   estimated_goal_message?: string;
   lean_mass_kg?: number;
   lean_mass_is_estimated?: boolean;
+  estimated_body_fat_percent?: number | null;
+  body_fat_is_estimated?: boolean;
 }
 
 export interface OptionalMetricResponse {
