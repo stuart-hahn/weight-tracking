@@ -66,6 +66,16 @@ node dist/index.js
 
 Or with a process manager (e.g. systemd, PM2): run `node dist/index.js` with `NODE_ENV=production` and the env vars above. Ensure the working directory is `backend` (or that `DATABASE_URL` and any file paths are absolute).
 
+### Frontend (Vercel) – point to backend
+
+The frontend uses `VITE_API_URL` at build time for the API base URL. If unset, it falls back to `/api` (same-origin).
+
+1. In **Vercel** → your project → **Settings** → **Environment Variables**, add:
+   - **Name:** `VITE_API_URL`
+   - **Value:** your backend URL including the `/api` path, no trailing slash, e.g. `https://weight-tracking-iwor.onrender.com/api`
+   - Apply to **Production** (and Preview if you want).
+2. **Redeploy** the frontend so the new build picks up the variable (trigger a new deployment after saving).
+
 ### Frontend (static)
 
 Serve the `frontend/dist` directory:
@@ -78,8 +88,13 @@ Serve the `frontend/dist` directory:
 1. Create a **Web Service**, connect your repo, set **Root Directory** to `backend`.
 2. **Build command:** `npm ci && npx prisma generate && npm run build`
 3. **Start command:** `node dist/index.js`
-4. Set **Environment** variables (see table above). Use a PostgreSQL `DATABASE_URL` (e.g. from [Neon](https://neon.tech) or [Supabase](https://supabase.com)); set `CORS_ORIGIN` to your frontend URL (e.g. your Vercel URL).
-5. **Important:** Ensure devDependencies are installed during the build (TypeScript and `@types/*` are in devDependencies). If Render sets `NODE_ENV=production` before the build, the install may skip them and the build will fail. In Render’s **Environment** tab, either leave `NODE_ENV` unset for the build, or add a build-time variable `NODE_ENV=development` so that `npm ci` installs devDependencies. You can set `NODE_ENV=production` only at runtime (e.g. in the start command or in a runtime-only env group) if your platform supports it.
+4. Set **Environment** variables (see table above):
+   - `DATABASE_URL` = your Neon PostgreSQL connection string.
+   - `CORS_ORIGIN` = your Vercel frontend URL, e.g. `https://weight-tracking-beta.vercel.app` (no trailing slash).
+   - `JWT_SECRET` = a long random secret (e.g. `openssl rand -hex 32`).
+   - `FRONTEND_URL` = same as CORS_ORIGIN (for password-reset and verification links).
+5. **Apply the schema to Neon** once (from your machine): `cd backend`, set `DATABASE_URL` to your Neon URL, then run `npx prisma db push` (or `npx prisma migrate deploy` if you use migrations).
+6. **Important:** Ensure devDependencies are installed during the build (TypeScript and `@types/*` are in devDependencies). If Render sets `NODE_ENV=production` before the build, the install may skip them and the build will fail. In Render’s **Environment** tab, either leave `NODE_ENV` unset for the build, or add a build-time variable `NODE_ENV=development` so that `npm ci` installs devDependencies. You can set `NODE_ENV=production` only at runtime (e.g. in the start command or in a runtime-only env group) if your platform supports it.
 
 ### SQLite: path and backup
 
