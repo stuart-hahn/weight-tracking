@@ -62,8 +62,9 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       createdAt: true,
     },
   });
+  type Row = { id: string; userId: string; date: Date; bodyFatPercent: number | null; createdAt: Date };
   res.json(
-    rows.map((r) => ({
+    rows.map((r: Row) => ({
       id: r.id,
       user_id: r.userId,
       date: r.date.toISOString().slice(0, 10),

@@ -59,7 +59,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     take: TREND_ENTRIES_LIMIT,
     select: { date: true, weightKg: true },
   });
-  const trendEntries = entriesForTrend.reverse().map((e) => ({ date: e.date, weightKg: e.weightKg }));
+  type TrendRow = { date: Date; weightKg: number };
+  const trendEntries = entriesForTrend.reverse().map((e: TrendRow) => ({ date: e.date, weightKg: e.weightKg }));
 
   const goalWeightKg = computeGoalWeightKg({
     currentWeightKg: startWeightKg,

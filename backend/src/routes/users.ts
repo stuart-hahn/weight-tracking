@@ -1,7 +1,7 @@
 import { Router, type Response, type NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, signToken, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateUser, validateUpdateUser } from '../middleware/validate.js';
@@ -45,13 +45,14 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
     const verifyLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
     sendVerificationEmail(user.email, verifyLink).catch((err) => console.error('Verification email failed:', err));
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    const prismaErr = err as Prisma.PrismaClientKnownRequestError;
+    if (prismaErr instanceof Prisma.PrismaClientKnownRequestError && prismaErr.code === 'P2002') {
       const e = new Error('Email already registered') as Error & { statusCode: number };
       e.statusCode = 409;
       next(e);
       return;
     }
-    next(err);
+    next(err as Error);
   }
 });
 
@@ -121,7 +122,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString(),
     },
-    entries: entries.map((e) => ({
+    entries: entries.map((e: { id: string; date: Date; weightKg: number; calories: number | null; waistCm: number | null; hipCm: number | null; createdAt: Date }) => ({
       id: e.id,
       date: e.date.toISOString().slice(0, 10),
       weight_kg: e.weightKg,
@@ -130,7 +131,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       hip_cm: e.hipCm,
       created_at: e.createdAt.toISOString(),
     })),
-    optional_metrics: optionalMetrics.map((m) => ({
+    optional_metrics: optionalMetrics.map((m: { date: Date; bodyFatPercent: number | null; createdAt: Date }) => ({
       date: m.date.toISOString().slice(0, 10),
       body_fat_percent: m.bodyFatPercent,
       created_at: m.createdAt.toISOString(),

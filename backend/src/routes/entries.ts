@@ -1,5 +1,5 @@
 import { Router, type Response, type NextFunction } from 'express';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateEntry } from '../middleware/validate.js';
@@ -38,13 +38,13 @@ router.post('/', requireAuth, validateCreateEntry, async (req: AuthRequest, res:
       created_at: entry.createdAt.toISOString(),
     });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && (err as Prisma.PrismaClientKnownRequestError).code === 'P2002') {
       const e = new Error('Entry already exists for this date') as Error & { statusCode: number };
       e.statusCode = 409;
       next(e);
       return;
     }
-    next(err);
+    next(err as Error);
   }
 });
 
@@ -61,8 +61,9 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     orderBy: { date: 'desc' },
     take: limit,
   });
+  type EntryRow = { id: string; userId: string; date: Date; weightKg: number; calories: number | null; waistCm: number | null; hipCm: number | null; createdAt: Date };
   res.json(
-    entries.map((e) => ({
+    entries.map((e: EntryRow) => ({
       id: e.id,
       user_id: e.userId,
       date: e.date.toISOString().slice(0, 10),
