@@ -116,6 +116,10 @@ export interface ProgressMetrics {
   recommended_calories_min: number | null;
   recommended_calories_max: number | null;
   weekly_summary: WeeklySummary;
+  estimated_goal_date?: string | null;
+  estimated_goal_message?: string;
+  lean_mass_kg?: number;
+  lean_mass_is_estimated?: boolean;
 }
 
 export interface OptionalMetricCreateInput {

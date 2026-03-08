@@ -52,11 +52,12 @@ function formatWeightKg(kg: number): string {
   return oneDecimal(kg);
 }
 
-/** Weight in kg to display string (metric: "X kg", imperial: "X lb") */
+/** Weight in kg to display string (metric: "X kg", imperial: "X lb" with one decimal) */
 export function formatWeight(kg: number, units: UnitsPreference): string {
   if (units === 'imperial') {
-    const lb = Math.round(kgToLb(kg));
-    return `${lb} lb`;
+    const lb = Math.round(kgToLb(kg) * 10) / 10;
+    const lbStr = lb % 1 === 0 ? String(lb) : lb.toFixed(1);
+    return `${lbStr} lb`;
   }
   return `${formatWeightKg(kg)} kg`;
 }

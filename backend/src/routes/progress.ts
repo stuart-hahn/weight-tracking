@@ -5,6 +5,8 @@ import {
   computeGoalWeightKg,
   computeWeightTrendKgPerWeek,
   computeProgressPercent,
+  estimateGoalReachDate,
+  estimateLeanMassKg,
 } from '../services/progress.js';
 import {
   computeTDEE,
@@ -74,6 +76,16 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
 
   const progressPercent = computeProgressPercent(startWeightKg, currentWeightKg, goalWeightKg);
 
+  const { date: estimatedGoalDate, message: estimatedGoalMessage } = estimateGoalReachDate(
+    currentWeightKg,
+    goalWeightKg,
+    weightTrendKgPerWeek
+  );
+
+  const effectiveLeanMassKg =
+    user.leanMassKg ?? estimateLeanMassKg(currentWeightKg, user.heightCm, user.sex as 'male' | 'female');
+  const leanMassIsEstimated = user.leanMassKg == null;
+
   const agg = await prisma.dailyEntry.aggregate({
     where: { userId },
     _max: { date: true },
@@ -139,6 +151,10 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     recommended_calories_min: caloriesRange.recommended_calories_min,
     recommended_calories_max: caloriesRange.recommended_calories_max,
     weekly_summary,
+    estimated_goal_date: estimatedGoalDate,
+    ...(estimatedGoalMessage ? { estimated_goal_message: estimatedGoalMessage } : {}),
+    lean_mass_kg: Math.round(effectiveLeanMassKg * 100) / 100,
+    lean_mass_is_estimated: leanMassIsEstimated,
   };
   res.json(progress);
 });

@@ -21,6 +21,12 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function yesterdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
   const [date, setDate] = useState(todayISO);
   const [weightKg, setWeightKg] = useState('');
@@ -35,6 +41,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [submitting, setSubmitting] = useState(false);
   const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [showFormForOtherDate, setShowFormForOtherDate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,12 +161,47 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
                 : progress.weekly_summary.message}
             </p>
           )}
+          {(progress.estimated_goal_date ?? progress.estimated_goal_message) && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              {progress.estimated_goal_date
+                ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
+                : progress.estimated_goal_message}
+            </p>
+          )}
+          {progress.lean_mass_kg != null && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              Lean mass: {progress.lean_mass_kg.toFixed(1)} kg ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+            </p>
+          )}
         </section>
       )}
 
+      {progress !== null && hasEntryToday && !showFormForOtherDate ? (
+        <section className="app__card" aria-labelledby="today-entry-heading">
+          <h2 id="today-entry-heading" className="app__card-title">
+            Today&apos;s entry
+          </h2>
+          <p className="progress-text">
+            You logged {formatWeight(progress.current_weight_kg, progress.units)} for today.
+          </p>
+          <p style={{ marginTop: '1rem' }}>
+            <Link to="/progress" state={{ editDate: todayISO() }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
+              Edit today&apos;s entry
+            </Link>
+          </p>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            style={{ marginTop: '0.75rem' }}
+            onClick={() => { setShowFormForOtherDate(true); setDate(yesterdayISO()); }}
+          >
+            Log another date
+          </button>
+        </section>
+      ) : (
       <section className="app__card" aria-labelledby="log-heading">
         <h2 id="log-heading" className="app__card-title">
-          Log today
+          {hasEntryToday && showFormForOtherDate ? 'Log another date' : 'Log today'}
         </h2>
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
@@ -186,8 +228,8 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               className="form-input"
               min={units === 'imperial' ? 20 : 1}
               max={units === 'imperial' ? 1100 : 500}
-              step={units === 'imperial' ? 1 : 0.1}
-              placeholder={units === 'imperial' ? '165' : '75.0'}
+              step={0.1}
+              placeholder={units === 'imperial' ? '176.4' : '75.0'}
               value={weightKg}
               onChange={(e) => { setWeightKg(e.target.value); setWeightError(null); }}
               required
@@ -313,6 +355,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           )}
         </form>
       </section>
+      )}
     </>
   );
 }

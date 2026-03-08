@@ -30,7 +30,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         if (!cancelled) {
           setProgress(p);
           const w = p.units === 'imperial'
-            ? String(Math.round(kgToLb(p.current_weight_kg)))
+            ? String(Math.round(kgToLb(p.current_weight_kg) * 10) / 10)
             : String(p.current_weight_kg);
           setWeight(w);
         }

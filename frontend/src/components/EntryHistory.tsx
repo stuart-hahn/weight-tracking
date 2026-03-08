@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
-import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
+import { formatWeight, formatTrend, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
 
 function todayISO(): string {
@@ -69,7 +69,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   useEffect(() => {
     if (!editingEntry || !progress) return;
     const u = progress.units;
-    setEditWeight(u === 'imperial' ? String(Math.round(kgToLb(editingEntry.weight_kg))) : String(editingEntry.weight_kg));
+    setEditWeight(u === 'imperial' ? String(Math.round(kgToLb(editingEntry.weight_kg) * 10) / 10) : String(editingEntry.weight_kg));
     setEditCalories(editingEntry.calories != null ? String(editingEntry.calories) : '');
     setEditWaist(editingEntry.waist_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.waist_cm) * 10) / 10) : String(editingEntry.waist_cm)) : '');
     setEditHip(editingEntry.hip_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.hip_cm) * 10) / 10) : String(editingEntry.hip_cm)) : '');
@@ -192,7 +192,15 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const yTicks = [minY, minY + range * 0.5, maxY].filter((v, i, a) => a.indexOf(v) === i);
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
   const chartSummary = progress
-    ? `Weight from ${formatWeight(minW, progress.units)} to ${formatWeight(maxW, progress.units)} over ${sortedEntries.length} entries.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`
+    ? (() => {
+        const rangeAndGoal = `Range ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)} over ${sortedEntries.length} entries.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
+        const trend = progress.weight_trend_kg_per_week;
+        if (trend == null) return rangeAndGoal;
+        const absTrend = Math.abs(trend);
+        const trendWord = absTrend < 0.02 ? 'Stable' : trend < 0 ? 'Losing' : 'Gaining';
+        const trendPhrase = absTrend < 0.02 ? 'Stable.' : `${trendWord} ${formatTrend(trend, progress.units)}.`;
+        return `${trendPhrase} ${rangeAndGoal}`;
+      })()
     : '';
 
   return (
@@ -268,6 +276,18 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           {chartSummary}
         </figcaption>
       </figure>
+      {progress && (progress.estimated_goal_date ?? progress.estimated_goal_message) && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          {progress.estimated_goal_date
+            ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
+            : progress.estimated_goal_message}
+        </p>
+      )}
+      {progress && progress.lean_mass_kg != null && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          Lean mass: {progress.lean_mass_kg.toFixed(1)} kg ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+        </p>
+      )}
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
       {editingEntry && progress && (
         <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
@@ -283,7 +303,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                 className="form-input"
                 min={progress.units === 'imperial' ? 20 : 1}
                 max={progress.units === 'imperial' ? 1100 : 500}
-                step={progress.units === 'imperial' ? 1 : 0.1}
+                step={0.1}
                 value={editWeight}
                 onChange={(e) => setEditWeight(e.target.value)}
               />
