@@ -19,7 +19,7 @@
     "db:reset": "prisma migrate reset --force"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.4.2",
