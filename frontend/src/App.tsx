@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
-import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken } from './api/client';
+import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken, resendVerificationEmail } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
 import LandingPage from './pages/LandingPage';
@@ -40,6 +40,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [progressRefreshTrigger, setProgressRefreshTrigger] = useState(0);
+  const [resendVerificationStatus, setResendVerificationStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   useEffect(() => {
     if (!hasToken() || !userId) {
@@ -121,22 +122,35 @@ export default function App() {
       if (optionalBodyFat) {
         await upsertOptionalMetric(userId, optionalBodyFat.date, optionalBodyFat.body_fat_percent);
       }
-      setSuccess('Entry saved.');
       setProgressRefreshTrigger((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save entry');
     }
   }, [userId]);
 
+  const handleResendVerification = useCallback(async () => {
+    if (!userId) return;
+    setResendVerificationStatus('sending');
+    try {
+      await resendVerificationEmail(userId);
+      setResendVerificationStatus('sent');
+    } catch {
+      setResendVerificationStatus('error');
+    }
+  }, [userId]);
+
   if (!tokenReady) {
     return (
-      <div className="app">
+      <div className="app" aria-busy="true">
         <header className="app__header">
           <h1 className="app__title">Body Fat Tracker</h1>
           <p className="app__subtitle">Track weight and body fat toward your goal</p>
         </header>
         <main className="app__main">
-          <p className="progress-text">Loading…</p>
+          <div className="app__card" style={{ padding: '1.5rem' }}>
+            <div className="skeleton skeleton-line" style={{ width: '100%', height: '0.875rem', marginBottom: '0.75rem' }} aria-hidden />
+            <div className="skeleton skeleton-line skeleton-line--short" aria-hidden />
+          </div>
         </main>
       </div>
     );
@@ -163,6 +177,9 @@ export default function App() {
         handleSignup={handleSignup}
         handleLogout={handleLogout}
         handleEntrySubmit={handleEntrySubmit}
+        resendVerificationStatus={resendVerificationStatus}
+        setResendVerificationStatus={setResendVerificationStatus}
+        onResendVerification={handleResendVerification}
       />
     </BrowserRouter>
   );
@@ -187,6 +204,9 @@ type AppContentProps = {
   handleSignup: (body: CreateUserRequest) => Promise<void>;
   handleLogout: () => void;
   handleEntrySubmit: (body: CreateEntryRequest, optionalBodyFat?: import('./components/DailyLogForm').OptionalBodyFatSubmit) => Promise<void>;
+  resendVerificationStatus: 'idle' | 'sending' | 'sent' | 'error';
+  setResendVerificationStatus: React.Dispatch<React.SetStateAction<'idle' | 'sending' | 'sent' | 'error'>>;
+  onResendVerification: () => Promise<void>;
 };
 
 function AppContent({
@@ -208,6 +228,9 @@ function AppContent({
   handleSignup,
   handleLogout,
   handleEntrySubmit,
+  resendVerificationStatus,
+  setResendVerificationStatus,
+  onResendVerification,
 }: AppContentProps) {
   const location = useLocation();
   const prevPathRef = React.useRef(location.pathname);
@@ -217,8 +240,9 @@ function AppContent({
       prevPathRef.current = location.pathname;
       setError(null);
       setSuccess(null);
+      setResendVerificationStatus('idle');
     }
-  }, [location.pathname, setError, setSuccess]);
+  }, [location.pathname, setError, setSuccess, setResendVerificationStatus]);
 
   return (
     <div className="app">
@@ -239,8 +263,25 @@ function AppContent({
         {userId && !emailVerifiedAt && (
           <section className="app__card retention-banner" role="status">
             <p className="retention-banner__text">
-              Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
+              Verify your email to secure your account.
             </p>
+            {resendVerificationStatus === 'sent' && (
+              <p className="retention-banner__text" style={{ marginTop: '0.5rem' }}>
+                Email sent. Check your inbox.
+              </p>
+            )}
+            {resendVerificationStatus === 'error' && (
+              <p className="form-error" style={{ marginTop: '0.5rem' }}>Send failed. Try again.</p>
+            )}
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ marginTop: '0.75rem' }}
+              onClick={onResendVerification}
+              disabled={resendVerificationStatus === 'sending'}
+            >
+              {resendVerificationStatus === 'sending' ? 'Sending…' : 'Resend email'}
+            </button>
           </section>
         )}
 

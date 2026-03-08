@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
-import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
+import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
 
 function todayISO(): string {
@@ -32,6 +32,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editError, setEditError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const editFirstInputRef = useRef<HTMLInputElement>(null);
+  const editTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,12 +69,21 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   useEffect(() => {
     if (!editingEntry || !progress) return;
     const u = progress.units;
-    setEditWeight(u === 'imperial' ? String(Math.round(kgToLb(editingEntry.weight_kg))) : String(editingEntry.weight_kg));
+    setEditWeight(u === 'imperial' ? String(Math.round(kgToLb(editingEntry.weight_kg) * 10) / 10) : String(editingEntry.weight_kg));
     setEditCalories(editingEntry.calories != null ? String(editingEntry.calories) : '');
     setEditWaist(editingEntry.waist_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.waist_cm) * 10) / 10) : String(editingEntry.waist_cm)) : '');
     setEditHip(editingEntry.hip_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.hip_cm) * 10) / 10) : String(editingEntry.hip_cm)) : '');
     setEditError(null);
   }, [editingEntry, progress]);
+
+  useEffect(() => {
+    if (editingEntry) {
+      editFirstInputRef.current?.focus();
+    } else {
+      editTriggerRef.current?.focus();
+      editTriggerRef.current = null;
+    }
+  }, [editingEntry]);
 
   const handleEditSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -181,7 +192,15 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const yTicks = [minY, minY + range * 0.5, maxY].filter((v, i, a) => a.indexOf(v) === i);
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
   const chartSummary = progress
-    ? `Weight from ${formatWeight(minW, progress.units)} to ${formatWeight(maxW, progress.units)} over ${sortedEntries.length} entries.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`
+    ? (() => {
+        const rangeAndGoal = `${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
+        const trend = progress.weight_trend_kg_per_week;
+        if (trend == null) return rangeAndGoal;
+        const absTrend = Math.abs(trend);
+        const trendPhrase =
+          absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
+        return `${trendPhrase} ${rangeAndGoal}`;
+      })()
     : '';
 
   return (
@@ -257,6 +276,23 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           {chartSummary}
         </figcaption>
       </figure>
+      {progress && (progress.estimated_goal_date ?? progress.estimated_goal_message) && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          {progress.estimated_goal_date
+            ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
+            : progress.estimated_goal_message}
+        </p>
+      )}
+      {progress && progress.lean_mass_kg != null && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+        </p>
+      )}
+      {progress && progress.estimated_body_fat_percent != null && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+          Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
+        </p>
+      )}
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
       {editingEntry && progress && (
         <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
@@ -264,13 +300,15 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
             <div className="form-group">
-              <label className="form-label">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
+              <label className="form-label" htmlFor="edit-entry-weight">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
               <input
+                ref={editFirstInputRef}
+                id="edit-entry-weight"
                 type="number"
                 className="form-input"
                 min={progress.units === 'imperial' ? 20 : 1}
                 max={progress.units === 'imperial' ? 1100 : 500}
-                step={progress.units === 'imperial' ? 1 : 0.1}
+                step={0.1}
                 value={editWeight}
                 onChange={(e) => setEditWeight(e.target.value)}
               />
@@ -330,7 +368,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             <button
               type="button"
               className="entry-row"
-              onClick={() => setEditingEntry(e)}
+              onClick={(ev) => { editTriggerRef.current = ev.currentTarget; setEditingEntry(e); }}
               style={{
                 width: '100%',
                 display: 'flex',

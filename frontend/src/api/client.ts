@@ -98,6 +98,16 @@ export async function getUser(id: string): Promise<UserProfile> {
   return data as UserProfile;
 }
 
+export async function resendVerificationEmail(userId: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/users/${userId}/resend-verification`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = (await res.json()) as { message?: string } | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to send verification email'));
+  return data as { message: string };
+}
+
 export async function updateUser(userId: string, body: UpdateUserRequest): Promise<UserProfile> {
   const res = await fetch(`${API_BASE}/users/${userId}`, {
     method: 'PATCH',

@@ -56,6 +56,44 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
   }
 });
 
+/** POST /api/users/:id/resend-verification - Resend verification email (protected, rate-limited by global limiter) */
+router.post('/:id/resend-verification', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  const id = req.params.id;
+  if (req.userId !== id) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, emailVerifiedAt: true },
+    });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (user.emailVerifiedAt) {
+      res.status(400).json({ error: 'Email already verified' });
+      return;
+    }
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.user.update({
+      where: { id },
+      data: {
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiresAt: verificationExpiresAt,
+      },
+    });
+    const baseUrl = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
+    const verifyLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    await sendVerificationEmail(user.email, verifyLink);
+    res.json({ message: 'Verification email sent. Check your inbox.' });
+  } catch (err) {
+    next(err as Error);
+  }
+});
+
 /** GET /api/users/:id/export - Export user data (profile + entries + optional metrics) (protected) */
 router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id;

@@ -15,7 +15,7 @@ export interface UserForGoalWeight {
  * Estimate lean body mass (kg) using Boer equations.
  * Weight in kg, height in cm.
  */
-function estimateLeanMassKg(weightKg: number, heightCm: number, sex: 'male' | 'female'): number {
+export function estimateLeanMassKg(weightKg: number, heightCm: number, sex: 'male' | 'female'): number {
   if (sex === 'male') {
     return 0.407 * weightKg + 0.267 * heightCm - 19.2;
   }
@@ -78,4 +78,34 @@ export function computeProgressPercent(
   if (percent < 0) return 0;
   if (percent > 100) return 100;
   return percent;
+}
+
+export interface EstimatedGoalResult {
+  date: string | null;
+  message: string;
+}
+
+/**
+ * Estimate when the user will reach goal weight based on current trend.
+ * Returns date (YYYY-MM-DD) when trend is toward goal; otherwise null with message.
+ */
+export function estimateGoalReachDate(
+  currentWeightKg: number,
+  goalWeightKg: number,
+  trendKgPerWeek: number | null
+): EstimatedGoalResult {
+  if (trendKgPerWeek == null || Math.abs(trendKgPerWeek) < 0.001) {
+    return { date: null, message: 'Log at least 2 entries to see estimated goal date.' };
+  }
+  const movingTowardGoal =
+    (goalWeightKg < currentWeightKg && trendKgPerWeek < 0) ||
+    (goalWeightKg > currentWeightKg && trendKgPerWeek > 0);
+  if (!movingTowardGoal) {
+    return { date: null, message: 'Trend is moving away from goal. Adjust habits to see an estimate.' };
+  }
+  const kgToGo = goalWeightKg - currentWeightKg;
+  const weeks = kgToGo / trendKgPerWeek;
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + Math.round(weeks * 7));
+  return { date: targetDate.toISOString().slice(0, 10), message: '' };
 }

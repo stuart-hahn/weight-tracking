@@ -21,6 +21,12 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function yesterdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
   const [date, setDate] = useState(todayISO);
   const [weightKg, setWeightKg] = useState('');
@@ -34,6 +40,8 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [weightError, setWeightError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [showFormForOtherDate, setShowFormForOtherDate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,9 +86,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       const optionalBodyFat: OptionalBodyFatSubmit | undefined =
         !Number.isNaN(bf) && bf >= 0 && bf <= 100 ? { date, body_fat_percent: bf } : undefined;
       setDuplicateDate(null);
+      setSavedMessage(null);
       setSubmitting(true);
       try {
         await onSubmit(body, optionalBodyFat);
+        setSavedMessage('Entry saved.');
+        window.setTimeout(() => setSavedMessage(null), 3000);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to save entry';
         if (msg.includes('already exists') || msg.includes('Entry already')) {
@@ -105,6 +116,16 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
 
   return (
     <>
+      {progress === null && (
+        <section className="app__card" aria-label="Loading progress" aria-busy="true">
+          <div className="skeleton skeleton-line" style={{ width: '6rem', height: '1rem', marginBottom: '0.75rem' }} aria-hidden />
+          <div className="skeleton skeleton-line" style={{ width: '100%', marginBottom: '0.5rem' }} aria-hidden />
+          <div className="skeleton skeleton-line skeleton-line--short" style={{ marginBottom: '0.75rem' }} aria-hidden />
+          <div className="progress-bar" style={{ marginTop: '0.5rem' }}>
+            <div className="skeleton" style={{ height: '8px', width: '40%', borderRadius: '4px' }} aria-hidden />
+          </div>
+        </section>
+      )}
       {progress !== null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
@@ -140,12 +161,52 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
                 : progress.weekly_summary.message}
             </p>
           )}
+          {(progress.estimated_goal_date ?? progress.estimated_goal_message) && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              {progress.estimated_goal_date
+                ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
+                : progress.estimated_goal_message}
+            </p>
+          )}
+          {progress.lean_mass_kg != null && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+            </p>
+          )}
+          {progress.estimated_body_fat_percent != null && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+              Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
+            </p>
+          )}
         </section>
       )}
 
+      {progress !== null && hasEntryToday && !showFormForOtherDate ? (
+        <section className="app__card" aria-labelledby="today-entry-heading">
+          <h2 id="today-entry-heading" className="app__card-title">
+            Today&apos;s entry
+          </h2>
+          <p className="progress-text">
+            You logged {formatWeight(progress.current_weight_kg, progress.units)} for today.
+          </p>
+          <p style={{ marginTop: '1rem' }}>
+            <Link to="/progress" state={{ editDate: todayISO() }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
+              Edit today&apos;s entry
+            </Link>
+          </p>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            style={{ marginTop: '0.75rem' }}
+            onClick={() => { setShowFormForOtherDate(true); setDate(yesterdayISO()); }}
+          >
+            Log another date
+          </button>
+        </section>
+      ) : (
       <section className="app__card" aria-labelledby="log-heading">
         <h2 id="log-heading" className="app__card-title">
-          Log today
+          {hasEntryToday && showFormForOtherDate ? 'Log another date' : 'Log today'}
         </h2>
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
@@ -172,8 +233,8 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               className="form-input"
               min={units === 'imperial' ? 20 : 1}
               max={units === 'imperial' ? 1100 : 500}
-              step={units === 'imperial' ? 1 : 0.1}
-              placeholder={units === 'imperial' ? '165' : '75.0'}
+              step={0.1}
+              placeholder={units === 'imperial' ? '176.4' : '75.0'}
               value={weightKg}
               onChange={(e) => { setWeightKg(e.target.value); setWeightError(null); }}
               required
@@ -182,7 +243,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             {duplicateDate && (
               <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
                 You already have an entry for this date.{' '}
-                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit it</Link>.
+                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit existing entry</Link>.
               </p>
             )}
           </div>
@@ -203,6 +264,9 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             />
           </div>
 
+          <p className="form-hint" style={{ marginBottom: '0.75rem' }}>
+            More metrics (optional): body fat %, waist, hip — expand below if you track them.
+          </p>
           <div className="collapsible">
             <button
               type="button"
@@ -286,8 +350,17 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
             {submitting ? 'Saving…' : 'Save entry'}
           </button>
+          {savedMessage && (
+            <p className="app__success" style={{ marginTop: '1rem', marginBottom: 0 }} role="status">
+              {savedMessage}{' '}
+              <Link to="/progress" className="app__title-link" style={{ fontSize: 'inherit', fontWeight: 600 }}>
+                View progress
+              </Link>
+            </p>
+          )}
         </form>
       </section>
+      )}
     </>
   );
 }

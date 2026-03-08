@@ -1,6 +1,6 @@
 import { useState, useCallback, FormEvent } from 'react';
 import type { CreateUserRequest, UnitsPreference } from '../types/api';
-import { inToCm, lbToKg } from '../utils/units';
+import { cmToIn, inToCm, lbToKg } from '../utils/units';
 
 interface SignupFormProps {
   onSubmit: (body: CreateUserRequest) => void;
@@ -22,10 +22,9 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
       e.preventDefault();
       setSubmitError(null);
       const ageNum = Number(age);
-      let heightNum = Number(heightCm);
+      const heightNum = Number(heightCm);
       let weightNum = Number(weightKg);
       if (units === 'imperial') {
-        heightNum = inToCm(heightNum);
         weightNum = lbToKg(weightNum);
       }
       const targetNum = Number(targetBf);
@@ -139,23 +138,68 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             <option value="imperial">Imperial (lb, in)</option>
           </select>
         </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-height">
-            Height ({units === 'imperial' ? 'in' : 'cm'})
-          </label>
-          <input
-            id="signup-height"
-            type="number"
-            className="form-input"
-            min={units === 'imperial' ? 20 : 1}
-            max={units === 'imperial' ? 120 : 300}
-            step={units === 'imperial' ? 1 : 0.1}
-            placeholder={units === 'imperial' ? '70' : '175'}
-            value={heightCm}
-            onChange={(e) => setHeightCm(e.target.value)}
-            required
-          />
-        </div>
+        {units === 'metric' ? (
+          <div className="form-group">
+            <label className="form-label" htmlFor="signup-height-cm">
+              Height (cm)
+            </label>
+            <input
+              id="signup-height-cm"
+              type="number"
+              className="form-input"
+              min={1}
+              max={300}
+              step={0.1}
+              placeholder="175"
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
+              required
+            />
+          </div>
+        ) : (
+          <>
+            <div className="form-group">
+              <label className="form-label" htmlFor="signup-height-ft">Height (feet)</label>
+              <input
+                id="signup-height-ft"
+                type="number"
+                className="form-input"
+                min={2}
+                max={8}
+                step={1}
+                placeholder="5"
+                value={heightCm === '' ? '' : Math.floor(cmToIn(Number(heightCm)) / 12)}
+                onChange={(e) => {
+                  const ft = Number(e.target.value);
+                  const inch = heightCm === '' ? 0 : Math.round(cmToIn(Number(heightCm)) % 12);
+                  if (Number.isNaN(ft)) setHeightCm('');
+                  else setHeightCm(String(inToCm(ft * 12 + inch)));
+                }}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="signup-height-in">Height (inches)</label>
+              <input
+                id="signup-height-in"
+                type="number"
+                className="form-input"
+                min={0}
+                max={11}
+                step={1}
+                placeholder="10"
+                value={heightCm === '' ? '' : Math.round(cmToIn(Number(heightCm)) % 12)}
+                onChange={(e) => {
+                  const inch = Number(e.target.value);
+                  const ft = heightCm === '' ? 0 : Math.floor(cmToIn(Number(heightCm)) / 12);
+                  if (Number.isNaN(inch) || inch < 0 || inch > 11) return;
+                  setHeightCm(String(inToCm(ft * 12 + inch)));
+                }}
+                required
+              />
+            </div>
+          </>
+        )}
         <div className="form-group">
           <label className="form-label" htmlFor="signup-weight">
             Current weight ({units === 'imperial' ? 'lb' : 'kg'})
@@ -166,8 +210,8 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             className="form-input"
             min={units === 'imperial' ? 44 : 1}
             max={units === 'imperial' ? 1100 : 500}
-            step={units === 'imperial' ? 1 : 0.1}
-            placeholder={units === 'imperial' ? '165' : '75'}
+            step={0.1}
+            placeholder={units === 'imperial' ? '176.4' : '75'}
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}
             required

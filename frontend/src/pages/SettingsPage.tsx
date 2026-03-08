@@ -23,6 +23,8 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
   const [exporting, setExporting] = useState(false);
+  const [localSuccess, setLocalSuccess] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +57,8 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       if (!profile) return;
       onError(null);
       onSuccess(null);
+      setLocalError(null);
+      setLocalSuccess(null);
       const body: UpdateUserRequest = {};
       const ageNum = Number(age);
       if (!Number.isNaN(ageNum) && ageNum >= 10 && ageNum <= 120) body.age = ageNum;
@@ -78,16 +82,20 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       }
       body.units = units;
       if (Object.keys(body).length === 0) {
-        onSuccess('No changes to save.');
+        setLocalSuccess('No changes to save.');
         return;
       }
       setSaving(true);
       try {
         const updated = await updateUser(userId, body);
         setProfile(updated);
-        onSuccess('Profile updated.');
+        setLocalSuccess('Profile updated.');
+        onSuccess(null);
+        window.setTimeout(() => setLocalSuccess(null), 3000);
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to update profile');
+        const msg = err instanceof Error ? err.message : 'Failed to update profile';
+        setLocalError(msg);
+        onError(null);
       } finally {
         setSaving(false);
       }
@@ -97,12 +105,17 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
 
   const handleExport = useCallback(async () => {
     onError(null);
+    setLocalError(null);
+    setLocalSuccess(null);
     setExporting(true);
     try {
       await exportUserData(userId);
-      onSuccess('Data downloaded.');
+      setLocalSuccess('Data downloaded.');
+      onSuccess(null);
+      window.setTimeout(() => setLocalSuccess(null), 3000);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Export failed');
+      setLocalError(err instanceof Error ? err.message : 'Export failed');
+      onError(null);
     } finally {
       setExporting(false);
     }
@@ -117,6 +130,16 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   return (
     <section className="app__card" aria-label="Settings">
       <h2 className="app__card-title">Settings</h2>
+      {localError && (
+        <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+          {localError}
+        </div>
+      )}
+      {localSuccess && (
+        <div className="app__success" role="status" style={{ marginBottom: '1rem' }}>
+          {localSuccess}
+        </div>
+      )}
       <p className="progress-text" style={{ marginBottom: '1rem' }}>
         {profile.email}
       </p>
@@ -157,31 +180,59 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             <option value="female">Female</option>
           </select>
         </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-height">
-            Height ({units === 'imperial' ? 'in' : 'cm'})
-          </label>
-          <input
-            id="settings-height"
-            type="number"
-            className="form-input"
-            min={units === 'imperial' ? 20 : 1}
-            max={units === 'imperial' ? 120 : 300}
-            step={units === 'imperial' ? 1 : 0.1}
-            value={units === 'imperial'
-              ? (() => { const n = Number(heightCm); return Number.isNaN(n) ? '' : Math.round(cmToIn(n) * 10) / 10; })()
-              : heightCm}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (units === 'imperial') {
-                const n = Number(v);
-                setHeightCm(Number.isNaN(n) ? '' : String(inToCm(n)));
-              } else {
-                setHeightCm(v);
-              }
-            }}
-          />
-        </div>
+        {units === 'metric' ? (
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-height-cm">Height (cm)</label>
+            <input
+              id="settings-height-cm"
+              type="number"
+              className="form-input"
+              min={1}
+              max={300}
+              step={0.1}
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="form-group">
+              <label className="form-label" htmlFor="settings-height-ft">Height (feet)</label>
+              <input
+                id="settings-height-ft"
+                type="number"
+                className="form-input"
+                min={2}
+                max={8}
+                step={1}
+                value={heightCm === '' ? '' : Math.floor(cmToIn(Number(heightCm)) / 12)}
+                onChange={(e) => {
+                  const ft = Number(e.target.value);
+                  const inch = heightCm === '' ? 0 : Math.round(cmToIn(Number(heightCm)) % 12);
+                  setHeightCm(Number.isNaN(ft) ? '' : String(inToCm(ft * 12 + inch)));
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="settings-height-in">Height (inches)</label>
+              <input
+                id="settings-height-in"
+                type="number"
+                className="form-input"
+                min={0}
+                max={11}
+                step={1}
+                value={heightCm === '' ? '' : Math.round(cmToIn(Number(heightCm)) % 12)}
+                onChange={(e) => {
+                  const inch = Number(e.target.value);
+                  const ft = heightCm === '' ? 0 : Math.floor(cmToIn(Number(heightCm)) / 12);
+                  if (Number.isNaN(inch) || inch < 0 || inch > 11) return;
+                  setHeightCm(String(inToCm(ft * 12 + inch)));
+                }}
+              />
+            </div>
+          </>
+        )}
         <div className="form-group">
           <label className="form-label" htmlFor="settings-weight">
             Current weight ({units === 'imperial' ? 'lb' : 'kg'})
@@ -192,9 +243,14 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             className="form-input"
             min={units === 'imperial' ? 44 : 1}
             max={units === 'imperial' ? 1100 : 500}
-            step={units === 'imperial' ? 1 : 0.1}
+            step={0.1}
             value={units === 'imperial'
-              ? (() => { const n = Number(currentWeightKg); return Number.isNaN(n) ? '' : Math.round(kgToLb(n)); })()
+              ? (() => {
+                  const n = Number(currentWeightKg);
+                  if (Number.isNaN(n)) return '';
+                  const lb = Math.round(kgToLb(n) * 10) / 10;
+                  return lb % 1 === 0 ? String(lb) : lb.toFixed(1);
+                })()
               : currentWeightKg}
             onChange={(e) => {
               const v = e.target.value;

@@ -1,4 +1,4 @@
-import { useState, useCallback, FormEvent, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProgress, createEntry, updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
@@ -21,6 +21,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [weight, setWeight] = useState('');
   const [calories, setCalories] = useState('');
+  const weightInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +30,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         if (!cancelled) {
           setProgress(p);
           const w = p.units === 'imperial'
-            ? String(Math.round(kgToLb(p.current_weight_kg)))
+            ? String(Math.round(kgToLb(p.current_weight_kg) * 10) / 10)
             : String(p.current_weight_kg);
           setWeight(w);
         }
@@ -37,6 +38,10 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
       .catch(() => onError('Failed to load progress'));
     return () => { cancelled = true; };
   }, [userId, onError]);
+
+  useEffect(() => {
+    if (step === 1) weightInputRef.current?.focus();
+  }, [step]);
 
   const handleLogFirstEntry = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -80,10 +85,8 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         <h2 className="app__card-title" style={{ marginTop: 0 }}>
           Set your first goal
         </h2>
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
-          Current weight: {formatWeight(progress.current_weight_kg, units)}
-          <br />
-          Goal weight: {formatWeight(progress.goal_weight_kg, units)} (target {progress.target_body_fat_percent}% body fat)
+        <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+          We'll use this as your starting point. Current: {formatWeight(progress.current_weight_kg, units)} → Goal: {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat).
         </p>
         <p style={{ marginBottom: '1.5rem' }}>
           You can adjust these in Settings anytime. When you’re ready, log your first entry below.
@@ -111,6 +114,9 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         >
           Skip for now
         </button>
+        <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+          If you skip, you can add your first entry on the Log page.
+        </p>
       </div>
     );
   }
@@ -123,12 +129,16 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
       <p style={{ marginBottom: '1rem' }}>
         Enter today’s weight to start tracking. You can add calories and other metrics later.
       </p>
+      <p className="form-hint" style={{ marginBottom: '1rem' }}>
+        You can change units in Settings.
+      </p>
       <form onSubmit={handleLogFirstEntry} noValidate>
         <div className="form-group">
           <label className="form-label" htmlFor="onboarding-weight">
             Weight ({units === 'imperial' ? 'lb' : 'kg'})
           </label>
           <input
+            ref={weightInputRef}
             id="onboarding-weight"
             type="number"
             step={units === 'imperial' ? 1 : 0.1}
