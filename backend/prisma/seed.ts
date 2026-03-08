@@ -5,12 +5,15 @@
  */
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 const TEST_EMAIL = 'test@example.com';
 const TEST_PASSWORD = 'TestPassword123';
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL ?? '';
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 /** Seeded RNG for reproducible weight variance (minimal drift) */
 function seeded(seed: number): () => number {
