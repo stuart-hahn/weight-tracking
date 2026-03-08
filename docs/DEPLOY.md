@@ -43,7 +43,7 @@ npx prisma generate
 npm run build
 ```
 
-Output: `backend/dist/` (compiled JavaScript). The Prisma client is generated into `backend/src/generated/prisma` and used at runtime.
+Output: `backend/dist/` (compiled JavaScript). The Prisma client is generated into `backend/generated/prisma` and used at runtime.
 
 ### Frontend
 
@@ -72,6 +72,14 @@ Serve the `frontend/dist` directory:
 
 - **nginx:** root pointing to `frontend/dist`, and a `try_files` (or equivalent) so all routes return `index.html` for client-side routing.
 - **Same server as API:** e.g. Express can serve static files from `frontend/dist` and proxy `/api` to the backend if both run together.
+
+### Deploying the backend to Render
+
+1. Create a **Web Service**, connect your repo, set **Root Directory** to `backend`.
+2. **Build command:** `npm ci && npx prisma generate && npm run build`
+3. **Start command:** `node dist/index.js`
+4. Set **Environment** variables (see table above). Use a PostgreSQL `DATABASE_URL` (e.g. from [Neon](https://neon.tech) or [Supabase](https://supabase.com)); set `CORS_ORIGIN` to your frontend URL (e.g. your Vercel URL).
+5. **Important:** Ensure devDependencies are installed during the build (TypeScript and `@types/*` are in devDependencies). If Render sets `NODE_ENV=production` before the build, the install may skip them and the build will fail. In Render’s **Environment** tab, either leave `NODE_ENV` unset for the build, or add a build-time variable `NODE_ENV=development` so that `npm ci` installs devDependencies. You can set `NODE_ENV=production` only at runtime (e.g. in the start command or in a runtime-only env group) if your platform supports it.
 
 ### SQLite: path and backup
 
