@@ -14,7 +14,7 @@ This document describes how to build and run the Body Fat Tracker API and fronte
 | `CORS_ORIGIN`  | Allowed origin for CORS (e.g. `https://your-app.com`) | Yes (set to your frontend origin) |
 | `JWT_SECRET`   | Secret for signing JWTs                          | **Yes** (use a long, random secret) |
 | `DATABASE_URL` | Database connection URL                          | **Yes** |
-| `FRONTEND_URL` | Base URL of the frontend (for password-reset links) | No (default: `http://localhost:5173`) |
+| `FRONTEND_URL` | Base URL of the frontend SPA origin (for password-reset and email verification links) | No (default: `http://localhost:5173`) |
 | `RESEND_API_KEY` | Resend.com API key for sending password-reset emails | No (if unset, reset link is logged to stdout) |
 | `RESEND_FROM`  | Sender email for password reset (e.g. `App <noreply@yourdomain.com>`) | No |
 
@@ -78,12 +78,26 @@ The frontend uses `VITE_API_URL` at build time for the API base URL. If unset, i
    - Apply to **Production** (and Preview if you want).
 2. **Redeploy** the frontend so the new build picks up the variable (trigger a new deployment after saving).
 
+3. Ensure **deep links use client-side routing**:
+   - If you select the Vercel **Vite** preset, Vercel will serve `index.html` for unknown routes by default.
+   - If you configure routes manually, make sure any non-asset path (e.g. `/log`, `/progress`, `/verify-email`) returns `index.html` so React Router can handle it.
+
 ### Frontend (static)
 
 Serve the `frontend/dist` directory:
 
 - **nginx:** root pointing to `frontend/dist`, and a `try_files` (or equivalent) so all routes return `index.html` for client-side routing.
 - **Same server as API:** e.g. Express can serve static files from `frontend/dist` and proxy `/api` to the backend if both run together.
+
+### Email verification links
+
+Both password reset and email verification links are built from `FRONTEND_URL` on the backend:
+
+- Set `FRONTEND_URL` to the public origin of your frontend SPA, e.g. `https://weight-tracking-beta.vercel.app` (no trailing slash).
+- Password reset links will look like: `https://your-frontend/reset-password?token=...`.
+- Email verification links will look like: `https://your-frontend/verify-email?token=...`.
+
+If `FRONTEND_URL` is accidentally set to the backend URL (e.g. Render), those links will 404 because the backend does not serve `/reset-password` or `/verify-email` routes.
 
 ### Deploying the backend to Render
 
@@ -223,6 +237,7 @@ This creates a migration from the current schema. For an existing production SQL
 
 - [ ] Set `JWT_SECRET` to a strong random value.
 - [ ] Set `CORS_ORIGIN` to the frontend origin.
+ - [ ] Set `FRONTEND_URL` to the frontend SPA origin (used for password reset and email verification links).
 - [ ] Use absolute `DATABASE_URL` for SQLite; ensure directory exists and is writable.
 - [ ] For SQLite: single backend process; schedule backups.
 - [ ] For production DB: run `prisma migrate deploy` (or equivalent) before starting the app.

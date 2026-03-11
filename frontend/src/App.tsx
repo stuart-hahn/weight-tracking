@@ -265,6 +265,9 @@ function AppContent({
             <p className="retention-banner__text">
               Verify your email to secure your account.
             </p>
+            <p className="retention-banner__text" style={{ marginTop: '0.25rem' }}>
+              If your link expired or didn&apos;t work, you can resend a new verification email below.
+            </p>
             {resendVerificationStatus === 'sent' && (
               <p className="retention-banner__text" style={{ marginTop: '0.5rem' }}>
                 Email sent. Check your inbox.
