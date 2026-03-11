@@ -11,7 +11,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Missing verification link.');
+      setMessage('This verification link is missing a token. Try opening the link directly from your email again, or request a new one from Settings.');
       return;
     }
     verifyEmail(token)
@@ -22,17 +22,27 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
       })
       .catch((err) => {
         setStatus('error');
-        setMessage(err instanceof Error ? err.message : 'Verification failed.');
+        const raw = err instanceof Error ? err.message : 'Verification failed.';
+        // Align with backend: 400 for invalid/expired links
+        const friendly =
+          raw.includes('Invalid or expired verification link') ||
+          raw.includes('Verification token is required')
+            ? 'Invalid or expired verification link. Request a new one from Settings.'
+            : raw;
+        setMessage(friendly);
       });
   }, [token, onVerified]);
 
   return (
     <section className="app__card" aria-label="Verify email">
       <h2 className="app__card-title">Verify email</h2>
-      {status === 'loading' && <p className="progress-text">Verifying…</p>}
+      {status === 'loading' && <p className="progress-text">Verifying your email…</p>}
       {status === 'success' && (
         <>
           <p className="progress-text" style={{ color: 'var(--success)' }}>{message}</p>
+          <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+            You can close this tab or continue into the app.
+          </p>
           <p style={{ marginTop: '1rem' }}>
             <Link to="/log" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
               Go to Log
