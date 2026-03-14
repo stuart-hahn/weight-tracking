@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { getProgress, createEntry, updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
+import { getTodayInTimezone } from '../utils/date';
 import PageLoading from '../components/PageLoading';
 
 interface OnboardingPageProps {
   userId: string;
   onComplete: () => void;
   onError: (message: string) => void;
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export default function OnboardingPage({ userId, onComplete, onError }: OnboardingPageProps) {
@@ -54,7 +51,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         onError('Please enter a valid weight');
         return;
       }
-      const date = todayISO();
+      const date = getTodayInTimezone(progress?.timezone ?? undefined);
       try {
         await createEntry(userId, {
           date,

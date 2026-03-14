@@ -3,11 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
+import { getTodayInTimezone } from '../utils/date';
 import PageLoading from './PageLoading';
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 interface EntryHistoryProps {
   userId: string;
@@ -30,10 +27,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editHip, setEditHip] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const editFirstInputRef = useRef<HTMLInputElement>(null);
   const editTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelConfirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,11 +125,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     [editingEntry, progress, editWeight, editCalories, editWaist, editHip, userId, onEntryUpdated]
   );
 
-  const handleDeleteEntry = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!editingEntry) return;
-    if (!window.confirm(`Delete entry for ${editingEntry.date}?`)) return;
     setEditError(null);
     setEditSaving(true);
+    setShowDeleteConfirm(false);
     try {
       await deleteEntry(userId, editingEntry.id);
       onEntryUpdated?.();
@@ -140,6 +140,19 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       setEditSaving(false);
     }
   }, [editingEntry, userId, onEntryUpdated]);
+
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+    cancelConfirmRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowDeleteConfirm(false);
+        deleteButtonRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showDeleteConfirm]);
 
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -184,23 +197,39 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const points = sortedEntries
     .map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`)
     .join(' ');
+  const firstEntry = sortedEntries[0];
+  const firstDateMs = new Date(firstEntry.date).getTime();
+  const firstWeight = firstEntry.weight_kg;
+  const trendPerDay = progress?.weight_trend_kg_per_week != null ? progress.weight_trend_kg_per_week / 7 : 0;
+  const trendLinePoints =
+    Math.abs(trendPerDay) >= 0.001
+      ? sortedEntries
+          .map((e) => {
+            const days = (new Date(e.date).getTime() - firstDateMs) / (1000 * 60 * 60 * 24);
+            const trendWeight = firstWeight + trendPerDay * days;
+            return `${toX(new Date(e.date))},${toY(trendWeight)}`;
+          })
+          .join(' ')
+      : null;
   const goalY = goalKg != null ? toY(goalKg) : null;
   const hasEntryToday =
     progress?.latest_entry_date != null &&
-    progress.latest_entry_date === todayISO();
+    progress.latest_entry_date === getTodayInTimezone(progress?.timezone ?? undefined);
 
   const yTicks = [minY, minY + range * 0.5, maxY].filter((v, i, a) => a.indexOf(v) === i);
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
   const chartSummary = progress
-    ? (() => {
-        const rangeAndGoal = `${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
-        const trend = progress.weight_trend_kg_per_week;
-        if (trend == null) return rangeAndGoal;
-        const absTrend = Math.abs(trend);
-        const trendPhrase =
-          absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
-        return `${trendPhrase} ${rangeAndGoal}`;
-      })()
+    ? (progress.messages?.trend_message
+        ? `${progress.messages.trend_message} ${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`
+        : (() => {
+            const rangeAndGoal = `${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
+            const trend = progress.weight_trend_kg_per_week;
+            if (trend == null) return rangeAndGoal;
+            const absTrend = Math.abs(trend);
+            const trendPhrase =
+              absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
+            return `${trendPhrase} ${rangeAndGoal}`;
+          })())
     : '';
 
   return (
@@ -208,13 +237,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {progress != null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
-            Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
+            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? <>Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.</>}
           </p>
         </section>
       )}
-      <section className="app__card" aria-label="Progress">
+      <section className="app__card" aria-label="Progress, goal timeline, and weight history">
       <h2 className="app__card-title">Progress</h2>
-      <figure className="chart-wrap" style={{ width: '100%', maxWidth: width, margin: '0 auto 1rem' }} aria-label="Weight over time">
+      <figure className="chart-wrap" style={{ width: '100%', maxWidth: width, margin: '0 auto 1rem' }} aria-label="Weight over time with goal line and trend">
         <svg
           viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
@@ -256,6 +285,16 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               strokeWidth="1"
             />
           )}
+          {trendLinePoints && (
+            <polyline
+              fill="none"
+              stroke="var(--muted)"
+              strokeDasharray="3 3"
+              strokeWidth="1.5"
+              points={trendLinePoints}
+              aria-hidden
+            />
+          )}
           <polyline
             fill="none"
             stroke="var(--accent)"
@@ -274,13 +313,47 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </svg>
         <figcaption className="progress-text" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
           {chartSummary}
+          {progress?.trend_entries_count != null && progress.trend_entries_count >= 2 && (
+            <span style={{ display: 'block', marginTop: '0.25rem' }}>Based on last {progress.trend_entries_count} entries.{trendLinePoints ? ' Dashed line: trend at current pace.' : ''}</span>
+          )}
         </figcaption>
       </figure>
-      {progress && (progress.estimated_goal_date ?? progress.estimated_goal_message) && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
-          {progress.estimated_goal_date
-            ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
-            : progress.estimated_goal_message}
+      {progress?.pace_status && (
+        <p style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+          <span className={`pace-badge pace-badge--${progress.pace_status}`} aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}>
+            {progress.pace_status === 'ahead' ? 'Ahead of pace' : progress.pace_status === 'on_track' ? 'On track' : progress.pace_status === 'slightly_behind' ? 'A bit behind' : 'Behind'}
+          </span>
+        </p>
+      )}
+      {progress?.estimated_goal_date && progress?.progress_percent != null && progress.progress_percent < 100 && (
+        <div className="goal-timeline" style={{ marginBottom: '0.5rem' }} role="status" aria-label="Goal timeline">
+          <div className="goal-timeline__bar">
+            <span className="goal-timeline__marker goal-timeline__marker--start" aria-hidden />
+            <span className="goal-timeline__marker goal-timeline__marker--now" style={{ left: `${progress.progress_percent}%` }} aria-hidden />
+            <span className="goal-timeline__marker goal-timeline__marker--goal" aria-hidden />
+          </div>
+          <div className="goal-timeline__labels">
+            <span>Start</span>
+            <span>Now ({Math.round(progress.progress_percent)}%)</span>
+            <span>Goal ~{new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
+          </div>
+        </div>
+      )}
+      {(progress?.messages?.goal_date_message ?? progress?.estimated_goal_date ?? progress?.estimated_goal_message) && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+          {progress.messages?.goal_date_message ?? (progress.estimated_goal_date
+            ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.${progress.estimate_basis ? ` ${progress.estimate_basis}` : ''}`
+            : progress.estimated_goal_message ?? '')}
+        </p>
+      )}
+      {progress?.messages?.recovery_message && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+          {progress.messages.recovery_message}
+        </p>
+      )}
+      {progress?.messages?.uncertainty_message && (
+        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }} role="status">
+          {progress.messages.uncertainty_message}
         </p>
       )}
       {progress && progress.lean_mass_kg != null && (
@@ -355,12 +428,30 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               <button type="button" className="btn btn--secondary" onClick={() => setEditingEntry(null)} disabled={editSaving}>
                 Cancel
               </button>
-              <button type="button" className="btn btn--secondary" onClick={handleDeleteEntry} disabled={editSaving} style={{ color: 'var(--danger)' }}>
+              <button type="button" className="btn btn--secondary" onClick={() => setShowDeleteConfirm(true)} disabled={editSaving} style={{ color: 'var(--danger)' }} ref={deleteButtonRef}>
                 Delete
               </button>
             </div>
           </form>
         </section>
+      )}
+      {showDeleteConfirm && editingEntry && (
+        <div role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
+          <div className="app__card" style={{ maxWidth: '320px', width: '100%' }}>
+            <h2 id="delete-dialog-title" className="app__card-title" style={{ marginTop: 0 }}>Delete entry?</h2>
+            <p id="delete-dialog-desc" className="progress-text">
+              Delete entry for {editingEntry.date}? This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+              <button type="button" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} onClick={handleDeleteConfirm} disabled={editSaving}>
+                {editSaving ? 'Deleting…' : 'Delete'}
+              </button>
+              <button type="button" className="btn btn--secondary" ref={cancelConfirmRef} onClick={() => { setShowDeleteConfirm(false); deleteButtonRef.current?.focus(); }} disabled={editSaving}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <ul className="entry-list" style={{ listStyle: 'none', margin: 0, padding: 0, marginTop: '0.5rem' }}>
         {[...sortedEntries].reverse().map((e) => (
@@ -371,8 +462,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               onClick={(ev) => { editTriggerRef.current = ev.currentTarget; setEditingEntry(e); }}
               style={{
                 width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
+                display: 'grid',
+                gridTemplateColumns: '1fr minmax(5rem, auto) minmax(5rem, auto) minmax(3.5rem, auto)',
                 alignItems: 'center',
                 padding: '0.5rem 0',
                 borderBottom: '1px solid var(--border)',
@@ -389,8 +480,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             >
               <span>{e.date}</span>
               <span><strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong></span>
-              {e.calories != null && <span>{e.calories} kcal</span>}
-              {bodyFatByDate[e.date] != null && <span>{bodyFatByDate[e.date]}% BF</span>}
+              <span>{e.calories != null ? `${e.calories} kcal` : '—'}</span>
+              <span>{bodyFatByDate[e.date] != null ? `${bodyFatByDate[e.date]}% BF` : '—'}</span>
             </button>
           </li>
         ))}

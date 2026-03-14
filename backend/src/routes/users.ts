@@ -198,6 +198,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
       activityLevel: true,
       leanMassKg: true,
       units: true,
+      timezone: true,
       emailVerifiedAt: true,
       onboardingComplete: true,
       plan: true,
@@ -220,6 +221,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     activity_level: user.activityLevel as UserProfile['activity_level'],
     lean_mass_kg: user.leanMassKg,
     units: (user.units as UserProfile['units']) ?? 'metric',
+    timezone: user.timezone ?? null,
     email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: user.onboardingComplete,
     plan: user.plan,
@@ -248,6 +250,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     units?: string;
     onboardingComplete?: boolean;
     plan?: string | null;
+    timezone?: string | null;
   } = {};
   if (body.age !== undefined) data.age = body.age;
   if (body.sex !== undefined) data.sex = body.sex;
@@ -259,6 +262,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
   if (body.units !== undefined) data.units = body.units;
   if (body.onboarding_complete !== undefined) data.onboardingComplete = body.onboarding_complete;
   if (body.plan !== undefined) data.plan = body.plan ?? null;
+  if (body.timezone !== undefined) data.timezone = body.timezone === '' ? null : body.timezone;
   const selectFields = {
     id: true,
     email: true,
@@ -270,6 +274,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     activityLevel: true,
     leanMassKg: true,
     units: true,
+    timezone: true,
     emailVerifiedAt: true,
     onboardingComplete: true,
     plan: true,
@@ -296,6 +301,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
       activity_level: user.activityLevel as UserProfile['activity_level'],
       lean_mass_kg: user.leanMassKg,
       units: (user.units as UserProfile['units']) ?? 'metric',
+      timezone: user.timezone ?? null,
       email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
       onboarding_complete: user.onboardingComplete,
       plan: user.plan,
@@ -321,6 +327,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     activity_level: updatedUser.activityLevel as UserProfile['activity_level'],
     lean_mass_kg: updatedUser.leanMassKg,
     units: (updatedUser.units as UserProfile['units']) ?? 'metric',
+    timezone: updatedUser.timezone ?? null,
     email_verified_at: updatedUser.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: updatedUser.onboardingComplete,
     plan: updatedUser.plan,

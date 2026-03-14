@@ -28,6 +28,7 @@ model User {
   emailVerificationExpiresAt DateTime? @map("email_verification_expires_at")
   onboardingComplete      Boolean  @default(true) @map("onboarding_complete")
   plan                    String?  @default("free") // "free" | "premium" for future feature gating
+  timezone                String?  @map("timezone") // IANA e.g. America/New_York; null = use browser default
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @updatedAt @map("updated_at")
 

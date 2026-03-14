@@ -47,6 +47,7 @@ export interface UserUpdateInput {
   units?: UnitsPreference;
   onboarding_complete?: boolean;
   plan?: string | null;
+  timezone?: string | null;
 }
 
 /** User without sensitive fields for API responses */
@@ -61,6 +62,7 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  timezone: string | null;
   email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
@@ -101,6 +103,26 @@ export interface WeeklySummary {
   message: string;
 }
 
+/** Message slots for progress UI (motivational messaging) */
+export interface ProgressMessagesType {
+  progress_celebration?: string;
+  trend_message: string;
+  weekly_message: string;
+  goal_date_message?: string;
+  recovery_message?: string;
+  streak_message?: string;
+  retention_message?: string;
+  uncertainty_message?: string;
+  daily_calorie_message?: string;
+}
+
+/** Recovery suggestion when user is behind pace */
+export interface RecoveryType {
+  recovery_weekly_rate_kg: number;
+  recovery_calorie_adjustment_kcal: number | null;
+  message: string;
+}
+
 /** Progress metrics with computed goal, trend, calories, and weekly summary */
 export interface ProgressMetrics {
   user_id: string;
@@ -122,6 +144,17 @@ export interface ProgressMetrics {
   lean_mass_is_estimated?: boolean;
   estimated_body_fat_percent?: number | null;
   body_fat_is_estimated?: boolean;
+  timezone?: string | null;
+  trend_std_error?: number | null;
+  trend_entries_count?: number | null;
+  estimated_goal_date_early?: string | null;
+  estimated_goal_date_late?: string | null;
+  estimate_basis?: string | null;
+  pace_status?: 'ahead' | 'on_track' | 'slightly_behind' | 'behind' | null;
+  recovery?: RecoveryType | null;
+  messages?: ProgressMessagesType;
+  logging_streak_days?: number | null;
+  entries_this_week?: number | null;
 }
 
 export interface OptionalMetricCreateInput {

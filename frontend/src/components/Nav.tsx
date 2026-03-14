@@ -10,7 +10,7 @@ export default function Nav({ onLogout, email }: NavProps) {
   return (
     <nav className="app__nav" aria-label="Main">
       <div className="app__nav-main">
-        <NavLink to="/log" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`} end aria-label="Log weight, add entry">
+        <NavLink to="/log" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`} end aria-label="Log weight, add entry" title="Add weight">
           Log
         </NavLink>
         <NavLink to="/progress" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
