@@ -150,7 +150,7 @@ export default function App() {
         </header>
         <main id="main" className="app__main" tabIndex={-1}>
           <div className="app__card app__card--compact">
-            <div className="skeleton skeleton-line" style={{ width: '100%', height: '0.875rem', marginBottom: '0.75rem' }} aria-hidden />
+            <div className="skeleton skeleton-line w-full mb-3" aria-hidden />
             <div className="skeleton skeleton-line skeleton-line--short" aria-hidden />
           </div>
         </main>
@@ -449,7 +449,7 @@ function AppContent({
               path="*"
               element={
                 <section className="app__card" aria-label="Page not found">
-                  <h2 className="app__card-title" style={{ marginTop: 0 }}>Page not found</h2>
+                  <h2 className="app__card-title app__card-title--first">Page not found</h2>
                   <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
                   <p className="mt-4">
                     <Link to={userId ? '/home' : '/'} className="btn btn--primary btn--inline">

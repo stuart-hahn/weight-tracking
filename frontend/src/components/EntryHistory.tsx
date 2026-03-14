@@ -294,14 +294,15 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     return (
       <section className="app__card empty-state" aria-label="Progress">
         <svg className="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M3 6h18M3 12h14M3 18h10" />
-          <path d="M7 6v12M11 9v9M15 12v6" />
+          <circle cx="12" cy="9" r="4" />
+          <path d="M6 20h12" />
+          <path d="M12 13v7" />
         </svg>
         <h2 className="empty-state__title">No weigh-ins yet</h2>
         <p className="empty-state__text">
           Log your first weigh-in to see your progress and track your trend over time.
         </p>
-        <Link to="/home" className="btn btn--primary" style={{ width: 'auto' }}>
+        <Link to="/home" className="btn btn--primary btn--inline">
           Log your first weigh-in
         </Link>
       </section>
@@ -446,22 +447,22 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             />
           ))}
         </svg>
-        <figcaption className="progress-text" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
+        <figcaption className="progress-text mt-1 text-xs">
           {chartSummary}
           {progress?.trend_entries_count != null && progress.trend_entries_count >= 2 && (
-            <span style={{ display: 'block', marginTop: '0.25rem' }}>Based on your last {progress.trend_entries_count} weigh-ins.{trendLinePoints ? " Dashed line: where you're headed at your current pace." : ''}</span>
+            <span className="chart-figcaption-note">Based on your last {progress.trend_entries_count} weigh-ins.{trendLinePoints ? " Dashed line: where you're headed at your current pace." : ''}</span>
           )}
         </figcaption>
       </figure>
       {progress?.pace_status && (
-        <p style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+        <p className="mt-1 mb-2" role="status">
           <span className={`pace-badge pace-badge--${progress.pace_status}`} aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}>
             {progress.pace_status === 'ahead' ? 'Ahead of pace' : progress.pace_status === 'on_track' ? 'On track' : progress.pace_status === 'slightly_behind' ? 'A bit behind' : 'Behind'}
           </span>
         </p>
       )}
       {progress?.estimated_goal_date && progress?.progress_percent != null && progress.progress_percent < 100 && (
-        <div className="goal-timeline" style={{ marginBottom: '0.5rem' }} role="status" aria-label="Goal timeline">
+        <div className="goal-timeline mb-2" role="status" aria-label="Goal timeline">
           <div className="goal-timeline__bar">
             <span className="goal-timeline__marker goal-timeline__marker--start" aria-hidden />
             <span className="goal-timeline__marker goal-timeline__marker--now" style={{ left: `${progress.progress_percent}%` }} aria-hidden />
@@ -475,41 +476,41 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </div>
       )}
       {(progress?.messages?.goal_date_message ?? progress?.estimated_goal_date ?? progress?.estimated_goal_message) && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+        <p className="progress-text mt-1 mb-2" role="status">
           {progress.messages?.goal_date_message ?? (progress.estimated_goal_date
             ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.${progress.estimate_basis ? ` ${progress.estimate_basis}` : ''}`
             : progress.estimated_goal_message ?? '')}
         </p>
       )}
       {progress?.messages?.recovery_message && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }} role="status">
+        <p className="progress-text mt-1 mb-2" role="status">
           {progress.messages.recovery_message}
         </p>
       )}
       {progress?.messages?.uncertainty_message && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem', fontSize: '0.9rem' }} role="status">
+        <p className="progress-text mt-1 mb-2 text-sm" role="status">
           {progress.messages.uncertainty_message}
         </p>
       )}
       {progress && progress.lean_mass_kg != null && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+        <p className="progress-text mt-1 mb-2">
           Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'we estimated this from your profile' : 'you set'}).
         </p>
       )}
       {progress && progress.estimated_body_fat_percent != null && (
-        <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+        <p className="progress-text mt-1 mb-2">
           Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
         </p>
       )}
       {progress && (
         <>
-          <details className="progress-text" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>How we calculate</summary>
-            <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+          <details className="progress-text mt-3 text-sm">
+            <summary className="details-summary">How we calculate</summary>
+            <p className="mt-2 mb-0">
               Goal weight comes from your target body fat % and lean mass (we estimate lean mass from your height, weight, and sex if you don&apos;t set it). The estimated goal date is based on your recent weigh-in trend—more weigh-ins give a more reliable estimate.
             </p>
           </details>
-          <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+          <p className="mt-2 mb-0">
             <Link to="/settings" className="btn btn--secondary btn--sm">
               Change goal
             </Link>
@@ -531,7 +532,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             <p className="history-add-entry-bar__hint">Add a weigh-in for any date.</p>
           </>
         ) : (
-          <div className="history-add-form" style={{ width: '100%' }}>
+          <div className="history-add-form">
             <h4 className="app__card-title app__card-title--sm mb-3">New weigh-in</h4>
             {addError && (
               <div className="app__error mb-3" role="alert">
@@ -540,11 +541,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             )}
             {addDuplicateDate && (
               <p className="form-error mb-3" role="alert">
-                You already have a weigh-in for {addDuplicateDate}. <button type="button" className="btn btn--sm" style={{ marginLeft: '0.25rem' }} onClick={() => { setEditingEntry(entries.find((e) => e.date === addDuplicateDate) ?? null); setAddDuplicateDate(null); setShowAddForm(false); }}>Edit it instead</button>
+                You already have a weigh-in for {addDuplicateDate}. <button type="button" className="btn btn--sm ml-1" onClick={() => { setEditingEntry(entries.find((e) => e.date === addDuplicateDate) ?? null); setAddDuplicateDate(null); setShowAddForm(false); }}>Edit it instead</button>
               </p>
             )}
             <form onSubmit={handleAddSubmit} noValidate>
-              <fieldset disabled={addSubmitting} aria-busy={addSubmitting} style={{ border: 'none', margin: 0, padding: 0 }}>
+              <fieldset className="fieldset-reset" disabled={addSubmitting} aria-busy={addSubmitting}>
                 <FieldInput
                   ref={addFormFirstInputRef}
                   id="add-entry-date"
@@ -661,14 +662,14 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         )}
       </section>
       {localSuccess && (
-        <p className="app__success" role="status" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+        <p className="app__success mt-2 mb-0" role="status">
           {localSuccess}
         </p>
       )}
       {editingEntry && progress && (
-        <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
+        <section className="app__card mt-4" aria-label="Edit entry">
           <h4 className="app__card-title app__card-title--sm">Edit entry ({editingEntry.date})</h4>
-          {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
+          {editError && <div className="app__error mb-3" role="alert">{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
             <FieldInput
               ref={editFirstInputRef}
@@ -727,7 +728,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {showDeleteConfirm && editingEntry && (
         <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc">
           <div className="dialog-overlay__content app__card" ref={dialogContentRef}>
-            <h2 id="delete-dialog-title" className="app__card-title" style={{ marginTop: 0 }}>Delete entry?</h2>
+            <h2 id="delete-dialog-title" className="app__card-title app__card-title--first">Delete entry?</h2>
             <p id="delete-dialog-desc" className="progress-text">
               Delete this weigh-in for {editingEntry.date}? This can&apos;t be undone.
             </p>

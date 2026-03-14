@@ -59,7 +59,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         )}
       </p>
       {progress.messages?.progress_celebration && (
-        <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+        <p className="progress-text mt-2" role="status">
           {progress.messages.progress_celebration}
         </p>
       )}
@@ -76,7 +76,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         />
       </div>
       {progress.pace_status && (
-        <p style={{ marginTop: '0.5rem' }} role="status">
+        <p className="mt-2" role="status">
           <span
             className={`pace-badge pace-badge--${progress.pace_status}`}
             aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}
@@ -92,23 +92,23 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         </p>
       )}
       {progress.messages?.trend_message && (
-        <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+        <p className="progress-text mt-2" role="status">
           {progress.messages.trend_message}
         </p>
       )}
       {recommendation && (
-        <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+        <p className="progress-text mt-2">
           {recommendation}
         </p>
       )}
-      <details className="progress-text" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
-        <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>How we calculate</summary>
-        <p style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+      <details className="progress-text mt-2 text-xs">
+        <summary className="details-summary">How we calculate</summary>
+        <p className="mt-1 mb-0">
           Goal weight comes from your target body fat % and lean mass. The date estimate uses your recent weigh-in trend.
         </p>
       </details>
       {!showEditGoal ? (
-        <p style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+        <p className="mt-3 mb-0">
           <button
             type="button"
             className="btn btn--secondary btn--sm"
@@ -118,7 +118,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
           </button>
         </p>
       ) : (
-        <form onSubmit={handleGoalSubmit} noValidate style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+        <form className="form-section" onSubmit={handleGoalSubmit} noValidate>
           <FieldInput
             id="progress-summary-target-bf"
             label="Target body fat (%)"
@@ -130,7 +130,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
             onChange={(e) => setTargetBf(e.target.value)}
             error={error}
           />
-          <button type="submit" className="btn btn--primary" style={{ marginRight: '0.5rem' }} disabled={saving}>
+          <button type="submit" className="btn btn--primary mr-2" disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className="btn btn--secondary" onClick={() => { setShowEditGoal(false); setError(null); setTargetBf(String(progress.target_body_fat_percent)); }} disabled={saving}>
@@ -138,7 +138,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
           </button>
         </form>
       )}
-      <p style={{ marginTop: '1rem', marginBottom: 0 }}>
+      <p className="mt-4 mb-0">
         <Link to="/history" className="btn btn--secondary btn--sm">
           See full progress
         </Link>
