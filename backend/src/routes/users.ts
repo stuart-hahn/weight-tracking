@@ -88,7 +88,7 @@ router.post('/:id/resend-verification', requireAuth, async (req: AuthRequest, re
     const baseUrl = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
     const verifyLink = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
     await sendVerificationEmail(user.email, verifyLink);
-    res.json({ message: 'Verification email sent. Check your inbox.' });
+    res.json({ message: "We've sent a verification email. Check your inbox (and spam)." });
   } catch (err) {
     next(err as Error);
   }

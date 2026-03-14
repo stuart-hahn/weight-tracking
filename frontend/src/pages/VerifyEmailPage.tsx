@@ -11,7 +11,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('This verification link is missing a token. Try opening the link directly from your email again, or request a new one from Settings.');
+      setMessage("This link isn't complete. Open it again from your email, or request a new one from Settings.");
       return;
     }
     verifyEmail(token)
@@ -27,7 +27,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
         const friendly =
           raw.includes('Invalid or expired verification link') ||
           raw.includes('Verification token is required')
-            ? 'Invalid or expired verification link. Request a new one from Settings.'
+            ? "This link has expired or already been used. Log in and use the banner above to request a new one."
             : raw;
         setMessage(friendly);
       });
@@ -41,7 +41,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
         <>
           <p className="progress-text" style={{ color: 'var(--success)' }}>{message}</p>
           <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-            You can close this tab or continue into the app.
+            You&apos;re verified. You can close this tab or head into the app.
           </p>
           <p style={{ marginTop: '1rem' }}>
             <Link to="/log" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
@@ -54,7 +54,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
         <>
           <p className="progress-text" style={{ color: 'var(--warn)' }}>{message}</p>
           <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-            Log in to request a new verification email from the banner at the top of the app.
+            Log in and use the banner at the top to resend a verification email.
           </p>
           <p style={{ marginTop: '1rem' }}>
             <Link to="/" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>

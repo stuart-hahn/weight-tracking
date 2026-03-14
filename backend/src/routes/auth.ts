@@ -11,7 +11,7 @@ const router = Router();
 const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: { error: 'Too many reset requests; try again later' },
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -19,7 +19,7 @@ const forgotPasswordLimiter = rateLimit({
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { error: 'Too many login attempts; try again later' },
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -59,13 +59,13 @@ router.post('/login', loginLimiter, async (req, res: Response): Promise<void> =>
   });
 
   if (!user) {
-    res.status(401).json({ error: 'Invalid email or password' });
+    res.status(401).json({ error: "Email or password didn't match. Try again or reset your password." });
     return;
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    res.status(401).json({ error: 'Invalid email or password' });
+    res.status(401).json({ error: "Email or password didn't match. Try again or reset your password." });
     return;
   }
 
@@ -96,7 +96,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res: Response
   });
 
   if (!user) {
-    res.json({ message: 'If an account exists with that email, you will receive a reset link.' });
+    res.json({ message: "If we have an account for that email, we've sent a reset link. Check your inbox and spam folder." });
     return;
   }
 
@@ -119,7 +119,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res: Response
     return;
   }
 
-  res.json({ message: 'If an account exists with that email, you will receive a reset link.' });
+  res.json({ message: "If we have an account for that email, we've sent a reset link. Check your inbox and spam folder." });
 });
 
 /** POST /api/auth/reset-password - Set new password using token from email link */
@@ -147,7 +147,7 @@ router.post('/reset-password', async (req, res: Response): Promise<void> => {
   });
 
   if (!user) {
-    res.status(400).json({ error: 'Invalid or expired reset link. Request a new one.' });
+    res.status(400).json({ error: "That link isn't valid or has expired. Use the link from your email or request a new one." });
     return;
   }
 
@@ -161,7 +161,7 @@ router.post('/reset-password', async (req, res: Response): Promise<void> => {
     },
   });
 
-  res.json({ message: 'Password has been reset. You can log in with your new password.' });
+  res.json({ message: "Your password's been updated. You can log in now with your new password." });
 });
 
 /** POST /api/auth/verify-email - Verify email using token from link */
@@ -180,7 +180,7 @@ router.post('/verify-email', async (req, res: Response): Promise<void> => {
     select: { id: true },
   });
   if (!user) {
-    res.status(400).json({ error: 'Invalid or expired verification link. Request a new one from settings.' });
+    res.status(400).json({ error: "This link has expired or already been used. Log in and use the banner above to request a new one." });
     return;
   }
   await prisma.user.update({
@@ -191,7 +191,7 @@ router.post('/verify-email', async (req, res: Response): Promise<void> => {
       emailVerificationExpiresAt: null,
     },
   });
-  res.json({ message: 'Email verified. You can now use all features.' });
+  res.json({ message: "Your email is verified. You're all set." });
 });
 
 export default router;

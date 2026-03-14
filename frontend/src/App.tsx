@@ -96,7 +96,7 @@ export default function App() {
       setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
-      setSuccess('Account created.');
+      setSuccess("You're all set. Head to Log to add your first weigh-in.");
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed');
     }
@@ -144,7 +144,7 @@ export default function App() {
       <div className="app" aria-busy="true">
         <header className="app__header">
           <h1 className="app__title">Body Fat Tracker</h1>
-          <p className="app__subtitle">Track weight and body fat toward your goal</p>
+          <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
         </header>
         <main className="app__main">
           <div className="app__card" style={{ padding: '1.5rem' }}>
@@ -254,7 +254,7 @@ function AppContent({
             'Body Fat Tracker'
           )}
         </h1>
-        <p className="app__subtitle">Track weight and body fat toward your goal</p>
+        <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
       </header>
 
       <main className="app__main">
@@ -263,18 +263,18 @@ function AppContent({
         {userId && !emailVerifiedAt && (
           <section className="app__card retention-banner" role="status">
             <p className="retention-banner__text">
-              Verify your email to secure your account.
+              One quick step: verify your email so we can keep your account secure.
             </p>
             <p className="retention-banner__text" style={{ marginTop: '0.25rem' }}>
-              If your link expired or didn&apos;t work, you can resend a new verification email below.
+              Link not working or expired? You can resend a new one below.
             </p>
             {resendVerificationStatus === 'sent' && (
               <p className="retention-banner__text" style={{ marginTop: '0.5rem' }}>
-                Email sent. Check your inbox.
+                Sent. Check your inbox (and spam folder).
               </p>
             )}
             {resendVerificationStatus === 'error' && (
-              <p className="form-error" style={{ marginTop: '0.5rem' }}>Send failed. Try again.</p>
+              <p className="form-error" style={{ marginTop: '0.5rem' }}>That didn&apos;t go through. Try again in a moment.</p>
             )}
             <button
               type="button"

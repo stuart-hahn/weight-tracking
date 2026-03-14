@@ -28,6 +28,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [localSuccess, setLocalSuccess] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const editFirstInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +117,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         await updateEntry(userId, editingEntry.id, body);
         onEntryUpdated?.();
         setEditingEntry(null);
+        setLocalSuccess('Updated.');
+        window.setTimeout(() => setLocalSuccess(null), 2500);
       } catch (err) {
         setEditError(err instanceof Error ? err.message : 'Failed to update entry');
       } finally {
@@ -134,6 +137,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       await deleteEntry(userId, editingEntry.id);
       onEntryUpdated?.();
       setEditingEntry(null);
+      setLocalSuccess('Entry removed.');
+      window.setTimeout(() => setLocalSuccess(null), 2500);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Failed to delete entry');
     } finally {
@@ -167,7 +172,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       <section className="app__card" aria-label="Progress">
         <h2 className="app__card-title">Progress</h2>
         <p className="progress-text">
-          No entries yet. <Link to="/log">Log your first weight</Link>.
+          No weigh-ins yet. <Link to="/log">Log your first one to see your progress</Link>.
         </p>
       </section>
     );
@@ -237,7 +242,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {progress != null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
-            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? <>Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.</>}
+            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? <>No weigh-in today yet. <Link to="/log">Log one</Link> to update your trend and weekly summary.</>}
           </p>
         </section>
       )}
@@ -314,7 +319,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         <figcaption className="progress-text" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
           {chartSummary}
           {progress?.trend_entries_count != null && progress.trend_entries_count >= 2 && (
-            <span style={{ display: 'block', marginTop: '0.25rem' }}>Based on last {progress.trend_entries_count} entries.{trendLinePoints ? ' Dashed line: trend at current pace.' : ''}</span>
+            <span style={{ display: 'block', marginTop: '0.25rem' }}>Based on your last {progress.trend_entries_count} weigh-ins.{trendLinePoints ? " Dashed line: where you're headed at your current pace." : ''}</span>
           )}
         </figcaption>
       </figure>
@@ -358,15 +363,20 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       {progress && progress.lean_mass_kg != null && (
         <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
-          Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+          Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'we estimated this from your profile' : 'you set'}).
         </p>
       )}
       {progress && progress.estimated_body_fat_percent != null && (
         <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
-          Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
+          Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
         </p>
       )}
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
+      {localSuccess && (
+        <p className="app__success" role="status" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+          {localSuccess}
+        </p>
+      )}
       {editingEntry && progress && (
         <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
           <h4 className="app__card-title" style={{ fontSize: '0.9rem' }}>Edit entry ({editingEntry.date})</h4>
@@ -440,7 +450,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           <div className="app__card" style={{ maxWidth: '320px', width: '100%' }}>
             <h2 id="delete-dialog-title" className="app__card-title" style={{ marginTop: 0 }}>Delete entry?</h2>
             <p id="delete-dialog-desc" className="progress-text">
-              Delete entry for {editingEntry.date}? This cannot be undone.
+              Delete this weigh-in for {editingEntry.date}? This can&apos;t be undone.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
               <button type="button" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} onClick={handleDeleteConfirm} disabled={editSaving}>

@@ -30,10 +30,10 @@ export default function ForgotPasswordPage() {
       {submitted ? (
         <>
           <p className="app__success" role="status">
-            If an account exists with that email, you will receive a reset link. Check your inbox and spam folder.
+            If we have an account for that email, we&apos;ve sent a reset link. Check your inbox and spam folder.
           </p>
           <p className="progress-text" style={{ marginTop: '0.75rem' }}>
-            Didn&apos;t get it? Check spam or try again with your email.
+            Didn&apos;t get it? Check spam, or try again with the same email.
           </p>
           <button
             type="button"
@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
       ) : (
         <>
           <p style={{ marginBottom: '1rem' }}>
-            Enter your email and we&apos;ll send you a link to reset your password.
+            Enter your email and we&apos;ll send you a link to choose a new password.
           </p>
           <form onSubmit={handleSubmit} noValidate>
             {error && <div className="app__error" role="alert">{error}</div>}

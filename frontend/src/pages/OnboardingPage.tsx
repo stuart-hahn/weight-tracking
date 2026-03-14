@@ -80,13 +80,13 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
     return (
       <div className="app__card">
         <h2 className="app__card-title" style={{ marginTop: 0 }}>
-          Set your first goal
+          Here&apos;s your first goal
         </h2>
         <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
-          We'll use this as your starting point. Current: {formatWeight(progress.current_weight_kg, units)} → Goal: {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat).
+          We&apos;re using this as your starting point: you&apos;re at {formatWeight(progress.current_weight_kg, units)} now, and your goal is {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat). You can change either in Settings anytime.
         </p>
         <p style={{ marginBottom: '1.5rem' }}>
-          You can adjust these in Settings anytime. When you’re ready, log your first entry below.
+          When you&apos;re ready, log your first weigh-in below.
         </p>
         <button
           type="button"
@@ -112,7 +112,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
           Skip for now
         </button>
         <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-          If you skip, you can add your first entry on the Log page.
+          You can always add your first weigh-in later from the Log page.
         </p>
       </div>
     );
@@ -121,13 +121,13 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   return (
     <div className="app__card">
       <h2 className="app__card-title" style={{ marginTop: 0 }}>
-        Log your first entry
+        Log your first weigh-in
       </h2>
       <p style={{ marginBottom: '1rem' }}>
-        Enter today’s weight to start tracking. You can add calories and other metrics later.
+        Enter today&apos;s weight to start. You can add calories and other details later.
       </p>
       <p className="form-hint" style={{ marginBottom: '1rem' }}>
-        You can change units in Settings.
+        You can switch to lb/in in Settings anytime.
       </p>
       <form onSubmit={handleLogFirstEntry} noValidate>
         <div className="form-group">

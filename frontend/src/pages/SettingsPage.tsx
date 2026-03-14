@@ -85,14 +85,14 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       body.units = units;
       body.timezone = timezone === '' ? null : timezone;
       if (Object.keys(body).length === 0) {
-        setLocalSuccess('No changes to save.');
+        setLocalSuccess("You haven't changed anything yet.");
         return;
       }
       setSaving(true);
       try {
         const updated = await updateUser(userId, body);
         setProfile(updated);
-        setLocalSuccess('Profile updated.');
+        setLocalSuccess('Your profile is updated.');
         onSuccess(null);
         window.setTimeout(() => setLocalSuccess(null), 3000);
       } catch (err) {
@@ -113,7 +113,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     setExporting(true);
     try {
       await exportUserData(userId);
-      setLocalSuccess('Data downloaded.');
+      setLocalSuccess('Your data is downloaded.');
       onSuccess(null);
       window.setTimeout(() => setLocalSuccess(null), 3000);
     } catch (err) {
@@ -190,7 +190,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             )}
           </select>
           <p className="form-hint" style={{ marginTop: '0.25rem' }}>
-            Used for &quot;today&quot; when logging weight so dates match your local day.
+            Used for &quot;today&quot; when logging weight so dates match your local day. We use this so &quot;today&quot; and your summaries match your location.
           </p>
         </div>
         <div className="form-group">
@@ -356,7 +356,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           {exporting ? 'Preparing…' : 'Download my data (export)'}
         </button>
         <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-          Export your profile, entries, and optional metrics as JSON.
+          Download your profile, weigh-ins, and optional metrics as a JSON file.
         </p>
       </div>
     </section>

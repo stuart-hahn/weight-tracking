@@ -89,7 +89,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       setSubmitting(true);
       try {
         await onSubmit(body, optionalBodyFat);
-        setSavedMessage('Entry saved.');
+        setSavedMessage('Got it. Your progress is updated.');
         window.setTimeout(() => setSavedMessage(null), 3000);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to save entry';
@@ -117,7 +117,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
     <>
       {progress === null && progressError && (
         <section className="app__card" aria-label="Progress load error" role="alert">
-          <p className="progress-text">Couldn&apos;t load progress. Check your connection and try again.</p>
+          <p className="progress-text">We couldn&apos;t load your progress. Check your connection and try again.</p>
           <button
             type="button"
             className="btn btn--primary"
@@ -141,7 +141,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       {progress !== null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
-            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? 'You haven\'t logged today. Log your weight below to stay on track and see your weekly summary.'}
+            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? "You haven't logged today yet. Adding a weigh-in will keep your trend and weekly summary up to date."}
           </p>
         </section>
       )}
@@ -180,13 +180,13 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           )}
           {(progress.messages?.daily_calorie_message ?? (progress.recommended_calories_min != null && progress.recommended_calories_max != null)) && (
             <p className="progress-text" style={{ marginTop: '0.75rem' }}>
-              {progress.messages?.daily_calorie_message ?? `Aim for ${progress.recommended_calories_min}–${progress.recommended_calories_max} kcal/day`}
+              {progress.messages?.daily_calorie_message ?? `Staying around ${progress.recommended_calories_min}–${progress.recommended_calories_max} kcal/day can keep you on track.`}
             </p>
           )}
           {(progress.messages?.weekly_message ?? progress.weekly_summary?.message) && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
               {progress.messages?.weekly_message ?? (progress.weekly_summary!.weight_change_kg != null
-                ? `This week: ${formatWeightChange(progress.weekly_summary!.weight_change_kg, progress.units)}. ${progress.weekly_summary!.on_track ? 'On track.' : 'Consider adjusting.'}`
+                ? `This week: ${formatWeightChange(progress.weekly_summary!.weight_change_kg, progress.units)}. ${progress.weekly_summary!.on_track ? "You're on track." : 'A small change could help—see the suggestion below.'}`
                 : progress.weekly_summary!.message)}
             </p>
           )}
@@ -223,12 +223,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           )}
           {progress.lean_mass_kg != null && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'estimated' : 'you set'}).
+              Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'we estimated this from your profile' : 'you set'}).
             </p>
           )}
           {progress.estimated_body_fat_percent != null && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}% (from current weight and {progress.lean_mass_is_estimated ? 'estimated ' : ''}lean mass).
+              Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
             </p>
           )}
         </section>
@@ -242,6 +242,11 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           <p className="progress-text">
             You logged {formatWeight(progress.current_weight_kg, progress.units)} for today.
           </p>
+          {progress.entries_count === 1 && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+              You&apos;re off to a good start. Log again when you can to see your trend.
+            </p>
+          )}
           <p style={{ marginTop: '1rem' }}>
             <Link to="/progress" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
               Edit today&apos;s entry
@@ -295,8 +300,8 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             {weightError && <p className="form-error" role="alert">{weightError}</p>}
             {duplicateDate && (
               <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
-                You already have an entry for this date.{' '}
-                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit existing entry</Link>.
+                You&apos;ve already logged this date.{' '}
+                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit that entry instead</Link>.
               </p>
             )}
           </div>
@@ -318,7 +323,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           </div>
 
           <p className="form-hint" style={{ marginBottom: '0.75rem' }}>
-            More metrics (optional): body fat %, waist, hip — expand below if you track them.
+            Optional: body fat %, waist, hip. Expand below if you track these.
           </p>
           <div className="collapsible">
             <button

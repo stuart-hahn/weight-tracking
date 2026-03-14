@@ -23,7 +23,7 @@ export default function ResetPasswordPage() {
         return;
       }
       if (!tokenFromUrl) {
-        setError('Invalid reset link. Request a new one.');
+        setError("That link isn't valid or has expired. Use the link from your email or request a new one.");
         return;
       }
       setError(null);
@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
           Reset password
         </h2>
         <p className="app__error" role="alert">
-          Invalid or missing reset link. Use the link from your email or <Link to="/forgot-password">request a new one</Link>.
+          That link isn&apos;t valid or has expired. Use the link from your email or <Link to="/forgot-password">request a new one</Link>.
         </p>
         <p style={{ marginTop: '1rem' }}>
           <Link to="/">Back to log in</Link>
@@ -63,7 +63,7 @@ export default function ResetPasswordPage() {
           Password reset
         </h2>
         <p className="app__success" role="status">
-          Your password has been reset. You can log in with your new password.
+          Your password&apos;s been updated. You can log in now with your new password.
         </p>
         <p style={{ marginTop: '1.5rem' }}>
           <Link to="/">Log in</Link>

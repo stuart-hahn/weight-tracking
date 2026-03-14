@@ -149,13 +149,13 @@ export function estimateGoalReachDate(
   trendKgPerWeek: number | null
 ): EstimatedGoalResult {
   if (trendKgPerWeek == null || Math.abs(trendKgPerWeek) < 0.001) {
-    return { date: null, message: 'Log at least 2 entries to see estimated goal date.' };
+    return { date: null, message: "Log at least 2 weigh-ins and we'll show an estimated goal date." };
   }
   const movingTowardGoal =
     (goalWeightKg < currentWeightKg && trendKgPerWeek < 0) ||
     (goalWeightKg > currentWeightKg && trendKgPerWeek > 0);
   if (!movingTowardGoal) {
-    return { date: null, message: 'Trend is moving away from goal. Adjust habits to see an estimate.' };
+    return { date: null, message: "Your trend has moved away from your goal lately. Get back on pace and we'll show an estimate again." };
   }
   const kgToGo = goalWeightKg - currentWeightKg;
   const weeks = kgToGo / trendKgPerWeek;
@@ -303,6 +303,6 @@ export function getRecoverySuggestion(
   return {
     recovery_weekly_rate_kg: targetRate,
     recovery_calorie_adjustment_kcal: adjustment > 0 ? adjustment : null,
-    message: `To get back on track, aim for about ${targetRate < 0 ? Math.abs(targetRate).toFixed(1) : targetRate.toFixed(1)} kg per week.${adjustment > 0 ? ` A small change of ~${adjustment} kcal/day can help.` : ''}`,
+    message: `To get back on track, aim for about ${targetRate < 0 ? Math.abs(targetRate).toFixed(1) : targetRate.toFixed(1)} kg per week.${adjustment > 0 ? ` A small change of around ${adjustment} kcal per day can help.` : ''}`,
   };
 }
