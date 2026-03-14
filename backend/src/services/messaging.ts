@@ -58,7 +58,6 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
     estimated_goal_date,
     estimated_goal_date_early,
     estimated_goal_date_late,
-    estimate_basis,
     pace_status,
     recovery_message,
     recommended_calories_min,
@@ -84,16 +83,16 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
     const unit = units === 'imperial' ? 'lb' : 'kg';
     const trendVerb = trendWord === 'Losing' ? "You're losing" : "You're gaining";
     if (pace_status === 'on_track') {
-      out.trend_message = `${trendVerb} about ${mag} ${unit}/week—right on target.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit} per week. Right on target.`;
     } else if (pace_status === 'ahead') {
-      out.trend_message = `${trendVerb} about ${mag} ${unit}/week. Ahead of pace—keep it up.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit} per week. You're ahead of pace, so keep it up.`;
     } else if (pace_status === 'slightly_behind' || pace_status === 'behind') {
-      out.trend_message = `${trendVerb} about ${mag} ${unit}/week. A small tweak can get you back on track.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit} per week. A small tweak could get you back on track.`;
     } else {
-      out.trend_message = `${trendVerb} about ${mag} ${unit}/week.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit} per week.`;
     }
   } else if (weight_trend_kg_per_week != null) {
-    out.trend_message = "Your weight's been stable. A few more weigh-ins will show your trend.";
+    out.trend_message = "Your weight's been stable. Keep logging to see a trend, or adjust calories if you want to move toward your goal.";
   } else {
     out.trend_message = "Log at least 2 weigh-ins and we'll show your trend.";
   }
@@ -111,13 +110,11 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
   }
 
   if (estimated_goal_date) {
+    const mainSentence = `At this pace, you could reach your goal around ${formatDateShort(estimated_goal_date)}.`;
     if (estimated_goal_date_early && estimated_goal_date_late && estimated_goal_date_early !== estimated_goal_date_late) {
-      out.goal_date_message = `At this pace, you could reach your goal around ${formatDateShort(estimated_goal_date)} (roughly ${formatDateShort(estimated_goal_date_early)} – ${formatDateShort(estimated_goal_date_late)}).`;
+      out.goal_date_message = `${mainSentence} We'd expect your actual date to fall somewhere between ${formatDateShort(estimated_goal_date_early)} and ${formatDateShort(estimated_goal_date_late)}, based on your recent weigh-in trend.`;
     } else {
-      out.goal_date_message = `At this pace, you could reach your goal around ${formatDateShort(estimated_goal_date)}.`;
-    }
-    if (estimate_basis) {
-      out.goal_date_message += ` ${estimate_basis}`;
+      out.goal_date_message = `${mainSentence} That's based on your recent weigh-in trend.`;
     }
   }
 
@@ -140,7 +137,7 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
   }
 
   if (lowConfidence && weight_trend_kg_per_week != null && estimated_goal_date) {
-    out.uncertainty_message = "A few more weigh-ins will make your estimate more reliable.";
+    out.uncertainty_message = "A few more weigh-ins will make this estimate more reliable.";
   } else if (trend_entries_count != null && trend_entries_count < 2) {
     out.uncertainty_message = "Log at least 2 weigh-ins and we'll show an estimated goal date.";
   }

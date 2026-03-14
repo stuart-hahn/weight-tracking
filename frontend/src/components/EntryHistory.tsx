@@ -352,19 +352,36 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
 
   const yTicks = [minY, minY + range * 0.5, maxY].filter((v, i, a) => a.indexOf(v) === i);
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
-  const chartSummary = progress
-    ? (progress.messages?.trend_message
-        ? `${progress.messages.trend_message} ${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`
-        : (() => {
-            const rangeAndGoal = `${sortedEntries.length} entries, ${formatWeight(minW, progress.units)}–${formatWeight(maxW, progress.units)}.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`;
-            const trend = progress.weight_trend_kg_per_week;
-            if (trend == null) return rangeAndGoal;
-            const absTrend = Math.abs(trend);
-            const trendPhrase =
-              absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
-            return `${trendPhrase} ${rangeAndGoal}`;
-          })())
-    : '';
+  const chartTakeaway = progress?.messages?.trend_message
+    ? progress.messages.trend_message.trim()
+    : (() => {
+        if (!progress || sortedEntries.length === 0) return '';
+        const trend = progress.weight_trend_kg_per_week;
+        const n = sortedEntries.length;
+        const goalStr = goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : '';
+        if (trend == null) {
+          return `${n} entries, ${formatWeight(minW, progress.units)} to ${formatWeight(maxW, progress.units)}.${goalStr}`;
+        }
+        const absTrend = Math.abs(trend);
+        const trendPhrase =
+          absTrend < 0.02 ? 'Stable.' : `${trend < 0 ? 'Losing' : 'Gaining'} ${formatTrendMagnitude(absTrend, progress.units)}.`;
+        return `${trendPhrase} ${n} entries, ${formatWeight(minW, progress.units)} to ${formatWeight(maxW, progress.units)}.${goalStr}`;
+      })();
+  const lastEntry = sortedEntries.length > 0 ? sortedEntries[sortedEntries.length - 1] : null;
+  const startWeightKg = firstEntry?.weight_kg;
+  const currentWeightKg = lastEntry?.weight_kg ?? progress?.current_weight_kg;
+  const hasTrendFromBackend = Boolean(progress?.messages?.trend_message);
+  const chartRangeSentence = (() => {
+    if (!hasTrendFromBackend || !progress || sortedEntries.length === 0 || startWeightKg == null || currentWeightKg == null) return '';
+    const n = sortedEntries.length;
+    const goalStr = goalKg != null ? ` Your goal is ${formatWeight(goalKg, progress.units)}.` : '';
+    const diff = Math.abs(startWeightKg - currentWeightKg);
+    if (diff < 0.1) {
+      return `You've stayed around ${formatWeight(currentWeightKg, progress.units)} over ${n} weigh-ins.${goalStr}`;
+    }
+    return `You've gone from ${formatWeight(startWeightKg, progress.units)} to ${formatWeight(currentWeightKg, progress.units)} over ${n} weigh-ins.${goalStr}`;
+  })();
+  const chartSummaryAria = [chartTakeaway, chartRangeSentence].filter(Boolean).join(' ');
 
   return (
     <>
@@ -377,7 +394,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       <section className="app__card" aria-label="Progress, goal timeline, and weight history">
       <h2 className="app__card-title app__card-title--lg">Progress</h2>
-      <figure className="chart-wrap" role="img" aria-label={chartSummary || 'Weight over time with goal line and trend'}>
+      <figure className="chart-wrap" role="img" aria-label={chartSummaryAria || chartTakeaway || 'Weight over time with goal line and trend'}>
         <svg
           viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
@@ -446,16 +463,22 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           ))}
         </svg>
         <figcaption className="progress-text mt-1 text-xs">
-          {chartSummary}
+          {chartTakeaway && <span>{chartTakeaway}</span>}
+          {chartRangeSentence && <span> {chartRangeSentence}</span>}
           {progress?.trend_entries_count != null && progress.trend_entries_count >= 2 && (
-            <span className="chart-figcaption-note">Based on your last {progress.trend_entries_count} weigh-ins.{trendLinePoints ? " Dashed line: where you're headed at your current pace." : ''}</span>
+            <span className="chart-figcaption-note">
+              {' '}
+              {trendLinePoints
+                ? `This trend is based on your last ${progress.trend_entries_count} weigh-ins, and the dashed line shows where you're headed if you keep this pace.`
+                : `This trend is based on your last ${progress.trend_entries_count} weigh-ins.`}
+            </span>
           )}
         </figcaption>
       </figure>
       {progress?.pace_status && (
         <p className="mt-1 mb-2" role="status">
           <span className={`pace-badge pace-badge--${progress.pace_status}`} aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}>
-            {progress.pace_status === 'ahead' ? 'Ahead of pace' : progress.pace_status === 'on_track' ? 'On track' : progress.pace_status === 'slightly_behind' ? 'A bit behind' : 'Behind'}
+            {progress.pace_status === 'ahead' ? copy.paceAhead : progress.pace_status === 'on_track' ? copy.paceOnTrack : progress.pace_status === 'slightly_behind' ? copy.paceSlightlyBehind : copy.paceBehind}
           </span>
         </p>
       )}
@@ -476,7 +499,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {(progress?.messages?.goal_date_message ?? progress?.estimated_goal_date ?? progress?.estimated_goal_message) && (
         <p className="progress-text mt-1 mb-2" role="status">
           {progress.messages?.goal_date_message ?? (progress.estimated_goal_date
-            ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.${progress.estimate_basis ? ` ${progress.estimate_basis}` : ''}`
+            ? `At this pace, you could reach your goal around ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}. That's based on your recent weigh-in trend.`
             : progress.estimated_goal_message ?? '')}
         </p>
       )}
@@ -490,27 +513,29 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           {progress.messages.uncertainty_message}
         </p>
       )}
-      {progress && progress.lean_mass_kg != null && (
-        <p className="progress-text mt-1 mb-2">
-          Lean mass: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? 'we estimated this from your profile' : 'you set'}).
-        </p>
-      )}
-      {progress && progress.estimated_body_fat_percent != null && (
-        <p className="progress-text mt-1 mb-2">
-          Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
-        </p>
-      )}
       {progress && (
         <>
           <details className="progress-text mt-3 text-sm">
-            <summary className="details-summary">How we calculate</summary>
-            <p className="mt-2 mb-0">
-              Goal weight comes from your target body fat % and lean mass (we estimate lean mass from your height, weight, and sex if you don&apos;t set it). The estimated goal date is based on your recent weigh-in trend—more weigh-ins give a more reliable estimate.
-            </p>
+            <summary className="details-summary">{copy.progressDetails}</summary>
+            <div className="mt-2">
+              {progress.lean_mass_kg != null && (
+                <p className="mb-2">
+                  {copy.leanMass}: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? copy.leanMassEstimated : copy.leanMassYouSet}).
+                </p>
+              )}
+              {progress.estimated_body_fat_percent != null && (
+                <p className="mb-2">
+                  {copy.estimatedBodyFatFromWeight(progress.estimated_body_fat_percent)}
+                </p>
+              )}
+              <p className="mb-0">
+                {copy.howWeCalculateFull}
+              </p>
+            </div>
           </details>
           <p className="mt-2 mb-0">
             <Link to="/settings" className="btn btn--secondary btn--sm">
-              Change goal
+              {copy.changeGoalInSettings}
             </Link>
           </p>
         </>
