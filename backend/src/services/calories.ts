@@ -38,9 +38,39 @@ export function computeTDEE(
 /** ~500 kcal/day ≈ 0.5 kg/week */
 const DEFICIT_SURPLUS_KCAL = 500;
 
+/** ~7700 kcal per kg body mass change (approximate). */
+const KCAL_PER_KG = 7700;
+
+const EMPIRICAL_TDEE_MIN = 1000;
+const EMPIRICAL_TDEE_MAX = 4000;
+
 export interface RecommendedCaloriesResult {
   recommended_calories_min: number;
   recommended_calories_max: number;
+}
+
+/**
+ * Compute empirical TDEE from average logged intake and observed weight trend.
+ * For weight loss: deficit = |trend| * 7700/7 kcal/day, so TDEE = avgIntake + deficit.
+ * For weight gain: surplus = trend * 7700/7, so TDEE = avgIntake - surplus.
+ * Returns null if trend is too small (stable weight) or inputs invalid.
+ * Result is clamped to [EMPIRICAL_TDEE_MIN, EMPIRICAL_TDEE_MAX].
+ */
+export function computeEmpiricalTDEE(
+  avgCaloriesPerDay: number,
+  trendKgPerWeek: number,
+  losing: boolean
+): number | null {
+  if (avgCaloriesPerDay <= 0 || avgCaloriesPerDay > 10000) return null;
+  const absTrend = Math.abs(trendKgPerWeek);
+  if (absTrend < 0.01) return null; // effectively stable, can't infer TDEE
+  const deficitOrSurplusPerDay = (absTrend * KCAL_PER_KG) / 7;
+  const tdee =
+    losing
+      ? avgCaloriesPerDay + deficitOrSurplusPerDay
+      : avgCaloriesPerDay - deficitOrSurplusPerDay;
+  const clamped = Math.max(EMPIRICAL_TDEE_MIN, Math.min(EMPIRICAL_TDEE_MAX, Math.round(tdee)));
+  return clamped;
 }
 
 /**

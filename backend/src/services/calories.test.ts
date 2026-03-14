@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTDEE, getRecommendedCalories } from './calories.js';
+import { computeTDEE, computeEmpiricalTDEE, getRecommendedCalories } from './calories.js';
 
 describe('computeTDEE', () => {
   it('returns positive number for valid inputs', () => {
@@ -31,5 +31,36 @@ describe('getRecommendedCalories', () => {
     const result = getRecommendedCalories(2500, 75, 75);
     expect(result.recommended_calories_min).toBeCloseTo(2400, -2);
     expect(result.recommended_calories_max).toBeCloseTo(2600, -2);
+  });
+});
+
+describe('computeEmpiricalTDEE', () => {
+  it('returns TDEE for weight loss: avg intake + deficit from trend', () => {
+    // 0.5 kg/week → deficit = 0.5 * 7700 / 7 ≈ 550 kcal/day → TDEE = 2000 + 550 = 2550
+    const tdee = computeEmpiricalTDEE(2000, -0.5, true);
+    expect(tdee).toBe(2550);
+  });
+
+  it('returns TDEE for weight gain: avg intake - surplus from trend', () => {
+    // 0.5 kg/week → surplus ≈ 550 kcal/day → TDEE = 2500 - 550 = 1950
+    const tdee = computeEmpiricalTDEE(2500, 0.5, false);
+    expect(tdee).toBe(1950);
+  });
+
+  it('returns null when trend is effectively zero', () => {
+    expect(computeEmpiricalTDEE(2000, 0, true)).toBeNull();
+    expect(computeEmpiricalTDEE(2000, 0.005, true)).toBeNull();
+  });
+
+  it('returns null for invalid avg calories', () => {
+    expect(computeEmpiricalTDEE(0, -0.5, true)).toBeNull();
+    expect(computeEmpiricalTDEE(15000, -0.5, true)).toBeNull();
+  });
+
+  it('clamps result to 1000-4000', () => {
+    const low = computeEmpiricalTDEE(500, 1, false); // surplus 1100 → 500 - 1100 < 1000
+    expect(low).toBe(1000);
+    const high = computeEmpiricalTDEE(5000, 0.5, false); // 5000 - 550 = 4450 → 4000
+    expect(high).toBe(4000);
   });
 });

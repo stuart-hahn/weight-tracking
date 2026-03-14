@@ -14,6 +14,7 @@ import {
 } from '../services/progress.js';
 import {
   computeTDEE,
+  computeEmpiricalTDEE,
   getRecommendedCalories,
   type ActivityLevel,
 } from '../services/calories.js';
@@ -21,6 +22,7 @@ import { buildProgressMessages } from '../services/messaging.js';
 import type { ProgressMetrics, WeeklySummary } from '../types/index.js';
 
 const TREND_ENTRIES_LIMIT = 14;
+const MIN_CALORIE_DAYS_FOR_EMPIRICAL = 7;
 const TARGET_KG_PER_WEEK = 0.5;
 const ON_TRACK_TOLERANCE_KG = 0.4;
 
@@ -83,10 +85,17 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     where: { userId },
     orderBy: { date: 'desc' },
     take: TREND_ENTRIES_LIMIT,
-    select: { date: true, weightKg: true },
+    select: { date: true, weightKg: true, calories: true },
   });
-  type TrendRow = { date: Date; weightKg: number };
-  const trendEntries = entriesForTrend.reverse().map((e: TrendRow) => ({ date: e.date, weightKg: e.weightKg }));
+  type TrendRow = { date: Date; weightKg: number; calories: number | null };
+  const trendEntries = entriesForTrend
+    .reverse()
+    .map((e: TrendRow) => ({ date: e.date, weightKg: e.weightKg }));
+  const entriesWithCalories = entriesForTrend.filter((e: TrendRow) => e.calories != null && e.calories > 0);
+  const avgCaloriesPerDay =
+    entriesWithCalories.length >= MIN_CALORIE_DAYS_FOR_EMPIRICAL
+      ? entriesWithCalories.reduce((sum, e) => sum + (e.calories ?? 0), 0) / entriesWithCalories.length
+      : null;
 
   const goalWeightKg = computeGoalWeightKg({
     currentWeightKg: startWeightKg,
@@ -162,13 +171,21 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   const countResult = await prisma.dailyEntry.count({ where: { userId } });
 
   const activityLevel: ActivityLevel = (user.activityLevel as ActivityLevel) ?? 'sedentary';
-  const tdee = computeTDEE(
+  const formulaTdee = computeTDEE(
     currentWeightKg,
     user.heightCm,
     user.age,
     user.sex as 'male' | 'female',
     activityLevel
   );
+  const losing = goalWeightKg < currentWeightKg;
+  const empiricalTdee =
+    avgCaloriesPerDay != null &&
+    weightTrendKgPerWeek != null &&
+    Math.abs(weightTrendKgPerWeek) >= 0.01
+      ? computeEmpiricalTDEE(avgCaloriesPerDay, weightTrendKgPerWeek, losing)
+      : null;
+  const tdee = empiricalTdee ?? formulaTdee;
   const caloriesRange = getRecommendedCalories(tdee, currentWeightKg, goalWeightKg);
 
   const sevenDaysAgo = new Date();
@@ -205,7 +222,11 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   }
 
   if (recovery && caloriesRange.recommended_calories_min != null && caloriesRange.recommended_calories_max != null) {
-    recoveryMessage = `To get back on track, aim for about ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next couple of weeks.`;
+    if (avgCaloriesPerDay != null && empiricalTdee != null) {
+      recoveryMessage = `You're averaging about ${Math.round(avgCaloriesPerDay)} kcal; at your current rate that's a smaller deficit than 0.5 kg/week. To get back on track, aim for about ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next couple of weeks.`;
+    } else {
+      recoveryMessage = `To get back on track, aim for about ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next couple of weeks.`;
+    }
   }
 
   const todayIso = getTodayInTimezone(user.timezone);
