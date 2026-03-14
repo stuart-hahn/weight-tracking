@@ -10,12 +10,18 @@ interface LoginFormProps {
 export default function LoginForm({ onSubmit }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!email.trim() || !password) return;
-      onSubmit({ email: email.trim(), password });
+      setSubmitting(true);
+      try {
+        await onSubmit({ email: email.trim(), password });
+      } finally {
+        setSubmitting(false);
+      }
     },
     [email, password, onSubmit]
   );
@@ -48,8 +54,8 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
         <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
           <Link to="/forgot-password">Forgot password?</Link>
         </p>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
-          Log in
+        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+          {submitting ? 'Logging in…' : 'Log in'}
         </button>
       </form>
     </>

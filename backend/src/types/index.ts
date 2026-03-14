@@ -47,6 +47,7 @@ export interface UserUpdateInput {
   units?: UnitsPreference;
   onboarding_complete?: boolean;
   plan?: string | null;
+  timezone?: string | null;
 }
 
 /** User without sensitive fields for API responses */
@@ -61,6 +62,7 @@ export interface UserProfile {
   activity_level: ActivityLevel | null;
   lean_mass_kg: number | null;
   units: UnitsPreference;
+  timezone: string | null;
   email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
@@ -122,6 +124,7 @@ export interface ProgressMetrics {
   lean_mass_is_estimated?: boolean;
   estimated_body_fat_percent?: number | null;
   body_fat_is_estimated?: boolean;
+  timezone?: string | null;
 }
 
 export interface OptionalMetricCreateInput {

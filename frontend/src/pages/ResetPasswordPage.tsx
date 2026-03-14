@@ -9,6 +9,7 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -26,11 +27,14 @@ export default function ResetPasswordPage() {
         return;
       }
       setError(null);
+      setSubmitting(true);
       try {
         await resetPassword(tokenFromUrl, password);
         setSuccess(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Reset failed');
+      } finally {
+        setSubmitting(false);
       }
     },
     [password, confirmPassword, tokenFromUrl]
@@ -105,8 +109,8 @@ export default function ResetPasswordPage() {
             autoComplete="new-password"
           />
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
-          Reset password
+        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+          {submitting ? 'Resetting…' : 'Reset password'}
         </button>
       </form>
       <p style={{ marginTop: '1.5rem' }}>

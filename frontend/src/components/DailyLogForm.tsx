@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
+import { getTodayInTimezone, getYesterdayInTimezone } from '../utils/date';
 
 export interface OptionalBodyFatSubmit {
   date: string;
@@ -17,18 +18,8 @@ interface DailyLogFormProps {
   refreshTrigger?: number;
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function yesterdayISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
-  const [date, setDate] = useState(todayISO);
+  const [date, setDate] = useState(() => getTodayInTimezone());
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
   const [optionalOpen, setOptionalOpen] = useState(false);
@@ -37,6 +28,8 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [waistCm, setWaistCm] = useState('');
   const [hipCm, setHipCm] = useState('');
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [progressError, setProgressError] = useState(false);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const [weightError, setWeightError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
@@ -45,13 +38,19 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
 
   useEffect(() => {
     let cancelled = false;
+    setProgressError(false);
     getProgress(userId)
       .then((p) => {
-        if (!cancelled) setProgress(p);
+        if (!cancelled) {
+          setProgress(p);
+          setProgressError(false);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setProgressError(true);
+      });
     return () => { cancelled = true; };
-  }, [userId, refreshTrigger]);
+  }, [userId, refreshTrigger, retryTrigger]);
 
   const units = progress?.units ?? 'metric';
   const handleSubmit = useCallback(
@@ -112,11 +111,24 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
 
   const hasEntryToday =
     progress?.latest_entry_date != null &&
-    progress.latest_entry_date === todayISO();
+    progress.latest_entry_date === getTodayInTimezone(progress?.timezone ?? undefined);
 
   return (
     <>
-      {progress === null && (
+      {progress === null && progressError && (
+        <section className="app__card" aria-label="Progress load error" role="alert">
+          <p className="progress-text">Couldn&apos;t load progress. Check your connection and try again.</p>
+          <button
+            type="button"
+            className="btn btn--primary"
+            style={{ marginTop: '0.75rem' }}
+            onClick={() => setRetryTrigger((t) => t + 1)}
+          >
+            Retry
+          </button>
+        </section>
+      )}
+      {progress === null && !progressError && (
         <section className="app__card" aria-label="Loading progress" aria-busy="true">
           <div className="skeleton skeleton-line" style={{ width: '6rem', height: '1rem', marginBottom: '0.75rem' }} aria-hidden />
           <div className="skeleton skeleton-line" style={{ width: '100%', marginBottom: '0.5rem' }} aria-hidden />
@@ -190,7 +202,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             You logged {formatWeight(progress.current_weight_kg, progress.units)} for today.
           </p>
           <p style={{ marginTop: '1rem' }}>
-            <Link to="/progress" state={{ editDate: todayISO() }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
+            <Link to="/progress" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
               Edit today&apos;s entry
             </Link>
           </p>
@@ -198,7 +210,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             type="button"
             className="btn btn--secondary"
             style={{ marginTop: '0.75rem' }}
-            onClick={() => { setShowFormForOtherDate(true); setDate(yesterdayISO()); }}
+            onClick={() => { setShowFormForOtherDate(true); setDate(getYesterdayInTimezone(progress?.timezone ?? undefined)); }}
           >
             Log another date
           </button>
@@ -219,7 +231,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               className="form-input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              max={todayISO()}
+              max={getTodayInTimezone(progress?.timezone ?? undefined)}
               required
             />
           </div>

@@ -405,7 +405,20 @@ function AppContent({
                 )
               }
             />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route
+              path="*"
+              element={
+                <section className="app__card" aria-label="Page not found">
+                  <h2 className="app__card-title" style={{ marginTop: 0 }}>Page not found</h2>
+                  <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
+                  <p style={{ marginTop: '1rem' }}>
+                    <Link to={userId ? '/log' : '/'} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+                      Go home
+                    </Link>
+                  </p>
+                </section>
+              }
+            />
           </Routes>
         </main>
       </div>

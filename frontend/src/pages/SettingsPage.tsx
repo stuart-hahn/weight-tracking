@@ -22,6 +22,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [activityLevel, setActivityLevel] = useState<string>('');
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
+  const [timezone, setTimezone] = useState('');
   const [exporting, setExporting] = useState(false);
   const [localSuccess, setLocalSuccess] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           setActivityLevel(p.activity_level ?? '');
           setLeanMassKg(p.lean_mass_kg != null ? String(p.lean_mass_kg) : '');
           setUnits(p.units ?? 'metric');
+          setTimezone(p.timezone ?? '');
         }
       })
       .catch(() => {
@@ -81,6 +83,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         body.lean_mass_kg = null;
       }
       body.units = units;
+      body.timezone = timezone === '' ? null : timezone;
       if (Object.keys(body).length === 0) {
         setLocalSuccess('No changes to save.');
         return;
@@ -100,7 +103,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         setSaving(false);
       }
     },
-    [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, units, onError, onSuccess]
+    [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, units, timezone, onError, onSuccess]
   );
 
   const handleExport = useCallback(async () => {
@@ -155,6 +158,40 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             <option value="metric">Metric (kg, cm)</option>
             <option value="imperial">Imperial (lb, in)</option>
           </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-timezone">Timezone</label>
+          <select
+            id="settings-timezone"
+            className="form-input"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            <option value="">Use browser default</option>
+            <option value="America/New_York">Eastern Time (America/New_York)</option>
+            <option value="America/Chicago">Central Time (America/Chicago)</option>
+            <option value="America/Denver">Mountain Time (America/Denver)</option>
+            <option value="America/Los_Angeles">Pacific Time (America/Los_Angeles)</option>
+            <option value="America/Toronto">Toronto (America/Toronto)</option>
+            <option value="America/Vancouver">Vancouver (America/Vancouver)</option>
+            <option value="Europe/London">London (Europe/London)</option>
+            <option value="Europe/Paris">Paris (Europe/Paris)</option>
+            <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
+            <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
+            <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
+            <option value="Asia/Kolkata">India (Asia/Kolkata)</option>
+            <option value="UTC">UTC</option>
+            {timezone && ![
+              '', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+              'America/Toronto', 'America/Vancouver', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+              'Australia/Sydney', 'Asia/Tokyo', 'Asia/Kolkata', 'UTC',
+            ].includes(timezone) && (
+              <option value={timezone}>{timezone}</option>
+            )}
+          </select>
+          <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+            Used for &quot;today&quot; when logging weight so dates match your local day.
+          </p>
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-age">Age</label>

@@ -16,9 +16,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [weightKg, setWeightKg] = useState('');
   const [targetBf, setTargetBf] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       setSubmitError(null);
       const ageNum = Number(age);
@@ -39,16 +40,21 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         setSubmitError(errors.join('. '));
         return;
       }
-      onSubmit({
-        email: email.trim(),
-        password,
-        age: ageNum,
-        sex,
-        height_cm: heightNum,
-        current_weight_kg: weightNum,
-        target_body_fat_percent: targetNum,
-        units,
-      });
+      setSubmitting(true);
+      try {
+        await onSubmit({
+          email: email.trim(),
+          password,
+          age: ageNum,
+          sex,
+          height_cm: heightNum,
+          current_weight_kg: weightNum,
+          target_body_fat_percent: targetNum,
+          units,
+        });
+      } finally {
+        setSubmitting(false);
+      }
     },
     [email, password, age, sex, units, heightCm, weightKg, targetBf, onSubmit]
   );
@@ -235,8 +241,8 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           />
           <p className="form-hint">e.g. 15 for 15%</p>
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
-          Create account
+        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
     </>

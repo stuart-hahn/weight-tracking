@@ -39,6 +39,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       age: true,
       activityLevel: true,
       units: true,
+      timezone: true,
     },
   });
   if (!user) {
@@ -170,6 +171,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
           body_fat_is_estimated: true,
         }
       : {}),
+    timezone: user.timezone ?? null,
   };
   res.json(progress);
 });

@@ -60,6 +60,15 @@ export function validateUpdateUser(
   if (body.units !== undefined && body.units !== null && body.units !== 'metric' && body.units !== 'imperial') errors.push('units must be "metric" or "imperial"');
   if (body.onboarding_complete !== undefined && typeof body.onboarding_complete !== 'boolean') errors.push('onboarding_complete must be a boolean');
   if (body.plan !== undefined && body.plan !== null && body.plan !== 'free' && body.plan !== 'premium') errors.push('plan must be "free" or "premium"');
+  if (body.timezone !== undefined) {
+    if (body.timezone !== null && body.timezone !== '') {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: body.timezone });
+      } catch {
+        errors.push('Invalid timezone');
+      }
+    }
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

@@ -53,8 +53,13 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
       {status === 'error' && (
         <>
           <p className="progress-text" style={{ color: 'var(--warn)' }}>{message}</p>
+          <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+            Log in to request a new verification email from the banner at the top of the app.
+          </p>
           <p style={{ marginTop: '1rem' }}>
-            <Link to="/">Back to log in</Link>
+            <Link to="/" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+              Back to log in
+            </Link>
           </p>
         </>
       )}
