@@ -13,6 +13,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import Nav from './components/Nav';
 import Toast from './components/Toast';
+import { copy } from './copy';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -80,7 +81,7 @@ export default function App() {
       setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
-      setSuccess('Welcome back.');
+      setSuccess(copy.welcomeBack);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Log in failed');
     }
@@ -97,7 +98,7 @@ export default function App() {
       setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
-      setSuccess("You're all set. Head to Log to add your first weigh-in.");
+      setSuccess(copy.signupSuccess);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed');
     }
@@ -145,8 +146,8 @@ export default function App() {
       <div className="app" aria-busy="true">
         <a href="#main" className="skip-link">Skip to main content</a>
         <header className="app__header">
-          <h1 className="app__title">Body Fat Tracker</h1>
-          <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
+          <h1 className="app__title">{copy.appTitle}</h1>
+          <p className="app__subtitle">{copy.appSubtitle}</p>
         </header>
         <main id="main" className="app__main" tabIndex={-1}>
           <div className="app__card app__card--compact">
@@ -268,12 +269,12 @@ function AppContent({
       <header className="app__header">
         <h1 className="app__title">
           {userId ? (
-            <Link to="/home" className="app__title-link">Body Fat Tracker</Link>
+            <Link to="/home" className="app__title-link">{copy.appTitle}</Link>
           ) : (
-            'Body Fat Tracker'
+            copy.appTitle
           )}
         </h1>
-        <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
+        <p className="app__subtitle">{copy.appSubtitle}</p>
       </header>
 
       <main id="main" className="app__main" tabIndex={-1} ref={mainRef} aria-label={getPageAriaLabel(location.pathname, userId)}>
@@ -296,18 +297,18 @@ function AppContent({
         {userId && !emailVerifiedAt && (
           <section className="app__card retention-banner" role="status">
             <p className="retention-banner__text">
-              One quick step: verify your email so we can keep your account secure.
+              {copy.verifyEmailPrompt}
             </p>
             <p className="retention-banner__text mt-1">
-              Link not working or expired? You can resend a new one below.
+              {copy.verifyEmailResendHint}
             </p>
             {resendVerificationStatus === 'sent' && (
               <p className="retention-banner__text mt-2">
-                Sent. Check your inbox (and spam folder).
+                {copy.verifyEmailSent}
               </p>
             )}
             {resendVerificationStatus === 'error' && (
-              <p className="form-error mt-2">That didn&apos;t go through. Try again in a moment.</p>
+              <p className="form-error mt-2">{copy.resendFailed}</p>
             )}
             <button
               type="button"
@@ -315,7 +316,7 @@ function AppContent({
               onClick={onResendVerification}
               disabled={resendVerificationStatus === 'sending'}
             >
-              {resendVerificationStatus === 'sending' ? 'Sending…' : 'Resend email'}
+              {resendVerificationStatus === 'sending' ? copy.saving : copy.resendEmail}
             </button>
           </section>
         )}
@@ -448,12 +449,12 @@ function AppContent({
             <Route
               path="*"
               element={
-                <section className="app__card" aria-label="Page not found">
-                  <h2 className="app__card-title app__card-title--first">Page not found</h2>
-                  <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
+                <section className="app__card" aria-label={copy.pageNotFound}>
+                  <h2 className="app__card-title app__card-title--first">{copy.pageNotFound}</h2>
+                  <p className="progress-text">{copy.pageNotFoundDescription}</p>
                   <p className="mt-4">
                     <Link to={userId ? '/home' : '/'} className="btn btn--primary btn--inline">
-                      Go home
+                      {copy.goHome}
                     </Link>
                   </p>
                 </section>

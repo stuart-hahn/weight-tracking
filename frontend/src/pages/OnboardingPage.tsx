@@ -4,6 +4,7 @@ import { getProgress, createEntry, updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import { getTodayInTimezone } from '../utils/date';
+import { copy } from '../copy';
 import PageLoading from '../components/PageLoading';
 import { FieldInput } from '../components/Field';
 
@@ -48,7 +49,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
       let weightKgNum = Number(weight);
       if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
       if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
-        onError('Please enter a valid weight');
+        onError(copy.pleaseEnterValidWeightShort);
         return;
       }
       const date = getTodayInTimezone(progress?.timezone ?? undefined);
@@ -64,7 +65,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         onComplete();
         navigate('/home');
       } catch (err) {
-        onError(err instanceof Error ? err.message : 'Failed to save entry');
+        onError(err instanceof Error ? err.message : copy.failedToSaveEntry);
       }
     },
     [userId, weight, calories, progress, onComplete, onError, navigate]
@@ -79,16 +80,16 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   return (
     <div className="app__card">
       <h2 className="app__card-title" style={{ marginTop: 0 }}>
-        Log your first weigh-in
+        {copy.addFirstWeighIn}
       </h2>
       <p className="progress-text" style={{ marginBottom: '1rem' }}>
-        Your goal: {formatWeight(progress.current_weight_kg, units)} → {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat). You can change this in Settings anytime.
+        {copy.onboardingGoalNote(formatWeight(progress.current_weight_kg, units), formatWeight(progress.goal_weight_kg, units), progress.target_body_fat_percent)}
       </p>
       <p style={{ marginBottom: '1rem' }}>
-        Enter today&apos;s weight to start. You can add calories and other details later.
+        {copy.enterTodaysWeight}
       </p>
       <p className="form-hint" style={{ marginBottom: '1rem' }}>
-        You can switch to lb/in in Settings anytime.
+        {copy.switchUnitsHint}
       </p>
       <form onSubmit={handleLogFirstEntry} noValidate>
         <FieldInput
@@ -114,7 +115,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
           onChange={(e) => setCalories(e.target.value)}
         />
         <button type="submit" className="btn btn--primary form-actions__primary">
-          Save and continue
+          {copy.saveAndContinue}
         </button>
       </form>
       <button
@@ -131,10 +132,10 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
           }
         }}
       >
-        Skip for now
+        {copy.skipForNow}
       </button>
       <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-        You can always add your first weigh-in later from Home.
+        {copy.addFirstWeighInLater}
       </p>
     </div>
   );

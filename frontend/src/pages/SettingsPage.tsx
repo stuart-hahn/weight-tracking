@@ -3,6 +3,7 @@ import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
 import { getStoredTheme, setTheme, type ThemePreference } from '../utils/theme';
+import { copy } from '../copy';
 import PageLoading from '../components/PageLoading';
 import { FieldInput, FieldSelect } from '../components/Field';
 
@@ -88,14 +89,14 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       body.units = units;
       body.timezone = timezone === '' ? null : timezone;
       if (Object.keys(body).length === 0) {
-        setLocalSuccess("You haven't changed anything yet.");
+        setLocalSuccess(copy.nothingChanged);
         return;
       }
       setSaving(true);
       try {
         const updated = await updateUser(userId, body);
         setProfile(updated);
-        setLocalSuccess('Your profile is updated.');
+        setLocalSuccess(copy.profileUpdated);
         onSuccess(null);
         window.setTimeout(() => setLocalSuccess(null), 3000);
       } catch (err) {

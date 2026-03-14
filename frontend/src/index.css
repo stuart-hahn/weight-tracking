@@ -1,13 +1,18 @@
-/* Body Fat Tracker – mobile-first base. Design tokens. */
+/* Body Fat Tracker – mobile-first base. Design tokens (playful identity). */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
 :root {
-  /* Colors – dark theme (default) */
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
+  /* Colors – dark theme (default), warm playful */
+  --bg: #0f1419;
+  --surface: #1a222d;
+  --border: #2d3748;
   --text: #f1f5f9;
   --muted: #94a3b8;
-  --accent: #38bdf8;
-  --accent-hover: #7dd3fc;
+  --accent: #e07c5c;
+  --accent-hover: #eb9a7e;
+  --accent-soft: rgba(224, 124, 92, 0.15);
+  --accent-secondary: #2ec4b6;
+  --accent-secondary-subtle: rgba(46, 196, 182, 0.15);
   --success: #4ade80;
   --warn: #fbbf24;
   --danger: #f87171;
@@ -16,17 +21,19 @@
   --color-text-secondary: var(--muted);
   --color-link: var(--accent);
   --color-link-hover: var(--accent-hover);
-  --color-focus-ring: rgba(56, 189, 248, 0.4);
-  /* Semantic tint backgrounds (replaces hardcoded rgba) */
-  --accent-subtle: rgba(56, 189, 248, 0.1);
+  --color-focus-ring: rgba(224, 124, 92, 0.45);
+  /* Semantic tint backgrounds */
+  --accent-subtle: rgba(224, 124, 92, 0.12);
   --danger-subtle: rgba(248, 113, 113, 0.15);
   --success-subtle: rgba(74, 222, 128, 0.15);
   --warn-subtle: rgba(251, 191, 36, 0.15);
   /* Layout */
   --radius: 12px;
+  --radius-lg: 16px;
   --touch-min: 48px;
   --max-width: 480px;
   --max-width-wide: 720px;
+  --content-inset: var(--space-4);
   /* Breakpoints (use in media queries) */
   --bp-sm: 480px;
   --bp-md: 768px;
@@ -46,6 +53,7 @@
   --duration-fast: 0.15s;
   --duration-normal: 0.25s;
   --duration-slow: 0.3s;
+  --duration-bar: 0.4s;
   --ease-out: ease-out;
   --ease-in-out: ease-in-out;
   /* Elevation */
@@ -54,7 +62,8 @@
   --shadow-modal: 0 4px 20px rgba(0, 0, 0, 0.35);
   --overlay-bg: rgba(0, 0, 0, 0.5);
   /* Typography */
-  --font-family-display: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-display: 'Nunito', system-ui, -apple-system, sans-serif;
+  --font-family-body: 'Source Sans 3', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-size-xs: 0.8rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
@@ -71,66 +80,75 @@
   --line-height-relaxed: 1.625;
 }
 
-/* Light theme – system preference or explicit */
+/* Light theme – system preference or explicit (playful warm) */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #f8fafc;
+    --bg: #faf8f6;
     --surface: #ffffff;
-    --border: #e2e8f0;
-    --text: #0f172a;
-    --muted: #64748b;
-    --accent: #0284c7;
-    --accent-hover: #0369a1;
+    --border: #e8e4e0;
+    --text: #1a1614;
+    --muted: #6b6560;
+    --accent: #c45c3a;
+    --accent-hover: #d97a5a;
+    --accent-soft: #f5d5c8;
+    --accent-secondary: #1ea89a;
+    --accent-secondary-subtle: rgba(30, 168, 154, 0.12);
     --success: #16a34a;
     --warn: #ca8a04;
     --danger: #dc2626;
-    --color-focus-ring: rgba(2, 132, 199, 0.45);
-    --accent-subtle: rgba(2, 132, 199, 0.1);
+    --color-focus-ring: rgba(196, 92, 58, 0.45);
+    --accent-subtle: rgba(196, 92, 58, 0.1);
     --danger-subtle: rgba(220, 38, 38, 0.12);
     --success-subtle: rgba(22, 163, 74, 0.12);
     --warn-subtle: rgba(202, 138, 4, 0.12);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-modal: 0 4px 20px rgba(0, 0, 0, 0.15);
     --overlay-bg: rgba(0, 0, 0, 0.3);
   }
 }
 
 [data-theme="light"] {
-  --bg: #f8fafc;
+  --bg: #faf8f6;
   --surface: #ffffff;
-  --border: #e2e8f0;
-  --text: #0f172a;
-  --muted: #64748b;
-  --accent: #0284c7;
-  --accent-hover: #0369a1;
+  --border: #e8e4e0;
+  --text: #1a1614;
+  --muted: #6b6560;
+  --accent: #c45c3a;
+  --accent-hover: #d97a5a;
+  --accent-soft: #f5d5c8;
+  --accent-secondary: #1ea89a;
+  --accent-secondary-subtle: rgba(30, 168, 154, 0.12);
   --success: #16a34a;
   --warn: #ca8a04;
   --danger: #dc2626;
-  --color-focus-ring: rgba(2, 132, 199, 0.45);
-  --accent-subtle: rgba(2, 132, 199, 0.1);
+  --color-focus-ring: rgba(196, 92, 58, 0.45);
+  --accent-subtle: rgba(196, 92, 58, 0.1);
   --danger-subtle: rgba(220, 38, 38, 0.12);
   --success-subtle: rgba(22, 163, 74, 0.12);
   --warn-subtle: rgba(202, 138, 4, 0.12);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-modal: 0 4px 20px rgba(0, 0, 0, 0.15);
   --overlay-bg: rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
+  --bg: #0f1419;
+  --surface: #1a222d;
+  --border: #2d3748;
   --text: #f1f5f9;
   --muted: #94a3b8;
-  --accent: #38bdf8;
-  --accent-hover: #7dd3fc;
+  --accent: #e07c5c;
+  --accent-hover: #eb9a7e;
+  --accent-soft: rgba(224, 124, 92, 0.15);
+  --accent-secondary: #2ec4b6;
+  --accent-secondary-subtle: rgba(46, 196, 182, 0.15);
   --success: #4ade80;
   --warn: #fbbf24;
   --danger: #f87171;
-  --color-focus-ring: rgba(56, 189, 248, 0.4);
-  --accent-subtle: rgba(56, 189, 248, 0.1);
+  --color-focus-ring: rgba(224, 124, 92, 0.45);
+  --accent-subtle: rgba(224, 124, 92, 0.12);
   --danger-subtle: rgba(248, 113, 113, 0.15);
   --success-subtle: rgba(74, 222, 128, 0.15);
   --warn-subtle: rgba(251, 191, 36, 0.15);
@@ -153,7 +171,7 @@ html {
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-family-body);
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;

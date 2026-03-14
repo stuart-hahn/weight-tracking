@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import LoginForm from '../components/LoginForm';
 import SignupForm from '../components/SignupForm';
+import { copy } from '../copy';
 import type { CreateUserRequest, LoginRequest } from '../types/api';
 
 type AuthMode = 'login' | 'signup';
@@ -51,7 +52,7 @@ export default function LandingPage({
           className={`auth-tabs__tab ${authMode === 'login' ? 'auth-tabs__tab--active' : ''}`}
           onClick={() => onAuthModeChange('login')}
         >
-          Log in
+          {copy.logIn}
         </button>
         <button
           ref={signupTabRef}
@@ -63,7 +64,7 @@ export default function LandingPage({
           className={`auth-tabs__tab ${authMode === 'signup' ? 'auth-tabs__tab--active' : ''}`}
           onClick={() => onAuthModeChange('signup')}
         >
-          Create account
+          {copy.createAccount}
         </button>
       </div>
       <div id="auth-panel" role="tabpanel" aria-labelledby={authMode === 'login' ? 'tab-login' : 'tab-signup'}>

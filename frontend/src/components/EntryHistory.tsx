@@ -4,7 +4,9 @@ import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry, 
 import type { DailyEntryResponse, ProgressResponse, CreateEntryRequest } from '../types/api';
 import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import { getTodayInTimezone } from '../utils/date';
+import { copy } from '../copy';
 import PageLoading from './PageLoading';
+import EmptyStateIllustration from './EmptyStateIllustration';
 import { FieldInput } from './Field';
 
 interface EntryHistoryProps {
@@ -128,7 +130,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       let weightKgNum = Number(addWeight);
       if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
       if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
-        setAddError('Please enter a valid weight.');
+        setAddError(copy.pleaseEnterValidWeight);
         return;
       }
       const body: CreateEntryRequest = {
@@ -166,11 +168,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         }
         setBodyFatByDate(map);
         setShowAddForm(false);
-        setLocalSuccess('Weigh-in added.');
+        setLocalSuccess(copy.weighInAdded);
         window.setTimeout(() => setLocalSuccess(null), 2500);
         onEntryUpdated?.();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to save weigh-in';
+        const msg = err instanceof Error ? err.message : copy.failedToSaveWeighIn;
         if (msg.includes('already exists') || msg.includes('Entry already')) {
           setAddDuplicateDate(addDate);
         } else {
@@ -192,7 +194,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       let weightKg = Number(editWeight);
       if (u === 'imperial') weightKg = lbToKg(weightKg);
       if (Number.isNaN(weightKg) || weightKg <= 0 || weightKg > 500) {
-        setEditError('Please enter a valid weight.');
+        setEditError(copy.pleaseEnterValidWeight);
         return;
       }
       const body: { weight_kg: number; calories: number | null; waist_cm: number | null; hip_cm: number | null } = {
@@ -217,12 +219,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       try {
         await updateEntry(userId, editingEntry.id, body);
         onEntryUpdated?.();
-        setLocalSuccess('Updated.');
+        setLocalSuccess(copy.updated);
         window.setTimeout(() => setLocalSuccess(null), 2500);
       } catch (err) {
         setEntries(prevEntries);
         setEditingEntry(editingEntry);
-        setEditError(err instanceof Error ? err.message : 'Failed to update entry');
+        setEditError(err instanceof Error ? err.message : copy.failedToUpdateEntry);
       } finally {
         setEditSaving(false);
       }
@@ -242,11 +244,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     try {
       await deleteEntry(userId, entryToRemove.id);
       onEntryUpdated?.();
-      setLocalSuccess('Entry removed.');
+      setLocalSuccess(copy.entryRemoved);
       window.setTimeout(() => setLocalSuccess(null), 2500);
     } catch (err) {
       setEntries(prevEntries);
-      setEditError(err instanceof Error ? err.message : 'Failed to delete entry');
+      setEditError(err instanceof Error ? err.message : copy.failedToDeleteEntry);
     } finally {
       setEditSaving(false);
     }
@@ -287,23 +289,19 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   );
 
   if (loading) {
-    return <PageLoading title="Progress" />;
+    return <PageLoading title={copy.progress} />;
   }
 
   if (sortedEntries.length === 0) {
     return (
       <section className="app__card empty-state" aria-label="Progress">
-        <svg className="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="12" cy="9" r="4" />
-          <path d="M6 20h12" />
-          <path d="M12 13v7" />
-        </svg>
-        <h2 className="empty-state__title">No weigh-ins yet</h2>
+        <EmptyStateIllustration />
+        <h2 className="empty-state__title">{copy.emptyHistoryTitle}</h2>
         <p className="empty-state__text">
-          Log your first weigh-in to see your progress and track your trend over time.
+          {copy.emptyHistoryText}
         </p>
         <Link to="/home" className="btn btn--primary btn--inline">
-          Log your first weigh-in
+          {copy.logFirstWeighIn}
         </Link>
       </section>
     );
@@ -527,7 +525,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               className="btn btn--primary btn--sm"
               onClick={() => setShowAddForm(true)}
             >
-              Add weigh-in
+              {copy.addWeighIn}
             </button>
             <p className="history-add-entry-bar__hint">Add a weigh-in for any date.</p>
           </>
@@ -541,7 +539,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             )}
             {addDuplicateDate && (
               <p className="form-error mb-3" role="alert">
-                You already have a weigh-in for {addDuplicateDate}. <button type="button" className="btn btn--sm ml-1" onClick={() => { setEditingEntry(entries.find((e) => e.date === addDuplicateDate) ?? null); setAddDuplicateDate(null); setShowAddForm(false); }}>Edit it instead</button>
+                {copy.alreadyWeighInFor(addDuplicateDate)} <button type="button" className="btn btn--sm ml-1" onClick={() => { setEditingEntry(entries.find((e) => e.date === addDuplicateDate) ?? null); setAddDuplicateDate(null); setShowAddForm(false); }}>{copy.editItInstead}</button>
               </p>
             )}
             <form onSubmit={handleAddSubmit} noValidate>
@@ -645,7 +643,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                 </div>
                 <div className="form-actions mt-4">
                   <button type="submit" className={`btn btn--primary ${addSubmitting ? 'btn--loading' : ''}`} disabled={addSubmitting} aria-busy={addSubmitting}>
-                    {addSubmitting ? 'Saving…' : 'Save weigh-in'}
+                    {addSubmitting ? copy.saving : copy.saveWeighIn}
                   </button>
                   <button
                     type="button"
@@ -653,7 +651,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                     onClick={() => { setShowAddForm(false); setAddError(null); setAddDuplicateDate(null); }}
                     disabled={addSubmitting}
                   >
-                    Cancel
+                    {copy.cancel}
                   </button>
                 </div>
               </fieldset>
@@ -667,8 +665,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </p>
       )}
       {editingEntry && progress && (
-        <section className="app__card mt-4" aria-label="Edit entry">
-          <h4 className="app__card-title app__card-title--sm">Edit entry ({editingEntry.date})</h4>
+        <section className="app__card mt-4" aria-label={copy.editEntry}>
+          <h4 className="app__card-title app__card-title--sm">{copy.editEntry} ({editingEntry.date})</h4>
           {editError && <div className="app__error mb-3" role="alert">{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
             <FieldInput
@@ -713,13 +711,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             />
             <div className="form-actions">
               <button type="submit" className="btn btn--primary" disabled={editSaving}>
-                {editSaving ? 'Saving…' : 'Save'}
+                {editSaving ? copy.saving : 'Save'}
               </button>
               <button type="button" className="btn btn--secondary" onClick={() => setEditingEntry(null)} disabled={editSaving}>
-                Cancel
+                {copy.cancel}
               </button>
               <button type="button" className="btn btn--secondary btn--danger" onClick={() => setShowDeleteConfirm(true)} disabled={editSaving} ref={deleteButtonRef}>
-                Delete
+                {copy.deleteEntry}
               </button>
             </div>
           </form>
@@ -728,16 +726,16 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {showDeleteConfirm && editingEntry && (
         <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc">
           <div className="dialog-overlay__content app__card" ref={dialogContentRef}>
-            <h2 id="delete-dialog-title" className="app__card-title app__card-title--first">Delete entry?</h2>
+            <h2 id="delete-dialog-title" className="app__card-title app__card-title--first">{copy.deleteEntryTitle}</h2>
             <p id="delete-dialog-desc" className="progress-text">
-              Delete this weigh-in for {editingEntry.date}? This can&apos;t be undone.
+              {copy.deleteEntryConfirm(editingEntry.date)}
             </p>
             <div className="form-actions">
               <button type="button" className="btn btn--primary btn--danger" onClick={handleDeleteConfirm} disabled={editSaving}>
-                {editSaving ? 'Deleting…' : 'Delete'}
+                {editSaving ? copy.deleting : copy.deleteEntry}
               </button>
               <button type="button" className="btn btn--secondary" ref={cancelConfirmRef} onClick={() => { setShowDeleteConfirm(false); deleteButtonRef.current?.focus(); }} disabled={editSaving}>
-                Cancel
+                {copy.cancel}
               </button>
             </div>
           </div>
