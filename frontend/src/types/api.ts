@@ -92,6 +92,26 @@ export interface WeeklySummaryResponse {
   message: string;
 }
 
+export type PaceStatus = 'ahead' | 'on_track' | 'slightly_behind' | 'behind';
+
+export interface RecoveryResponse {
+  recovery_weekly_rate_kg: number;
+  recovery_calorie_adjustment_kcal: number | null;
+  message: string;
+}
+
+export interface ProgressMessagesResponse {
+  progress_celebration?: string;
+  trend_message: string;
+  weekly_message: string;
+  goal_date_message?: string;
+  recovery_message?: string;
+  streak_message?: string;
+  retention_message?: string;
+  uncertainty_message?: string;
+  daily_calorie_message?: string;
+}
+
 export interface ProgressResponse {
   user_id: string;
   units: UnitsPreference;
@@ -113,6 +133,16 @@ export interface ProgressResponse {
   estimated_body_fat_percent?: number | null;
   body_fat_is_estimated?: boolean;
   timezone?: string | null;
+  trend_std_error?: number | null;
+  trend_entries_count?: number | null;
+  estimated_goal_date_early?: string | null;
+  estimated_goal_date_late?: string | null;
+  estimate_basis?: string | null;
+  pace_status?: PaceStatus | null;
+  recovery?: RecoveryResponse | null;
+  messages?: ProgressMessagesResponse;
+  logging_streak_days?: number | null;
+  entries_this_week?: number | null;
 }
 
 export interface OptionalMetricResponse {

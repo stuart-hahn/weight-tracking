@@ -141,44 +141,85 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       {progress !== null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
-            You haven&apos;t logged today. Log your weight below to stay on track and see your weekly summary.
+            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? 'You haven\'t logged today. Log your weight below to stay on track and see your weekly summary.'}
           </p>
         </section>
       )}
       {progress !== null && (
-        <section className="app__card" aria-label="Progress summary">
+        <section className="app__card" aria-label="Progress summary, pace, and goal estimate">
           <h2 className="app__card-title">Progress</h2>
           <p className="progress-text">
             Current: {formatWeight(progress.current_weight_kg, progress.units)} · Goal: {formatWeight(progress.goal_weight_kg, progress.units)} ·{' '}
             {progress.entries_count} entries
-            {progress.weight_trend_kg_per_week != null && (
+            {progress.weight_trend_kg_per_week != null && !progress.messages?.trend_message && (
               <> · {formatTrend(progress.weight_trend_kg_per_week, progress.units)}</>
             )}
           </p>
+          {progress.messages?.progress_celebration && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+              {progress.messages.progress_celebration}
+            </p>
+          )}
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
             <div
               className="progress-bar__fill"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          {(progress.recommended_calories_min != null && progress.recommended_calories_max != null) && (
+          {progress.pace_status && (
+            <p style={{ marginTop: '0.5rem' }} role="status">
+              <span className={`pace-badge pace-badge--${progress.pace_status}`} aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}>
+                {progress.pace_status === 'ahead' ? 'Ahead of pace' : progress.pace_status === 'on_track' ? 'On track' : progress.pace_status === 'slightly_behind' ? 'A bit behind' : 'Behind'}
+              </span>
+            </p>
+          )}
+          {progress.messages?.trend_message && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+              {progress.messages.trend_message}
+            </p>
+          )}
+          {(progress.messages?.daily_calorie_message ?? (progress.recommended_calories_min != null && progress.recommended_calories_max != null)) && (
             <p className="progress-text" style={{ marginTop: '0.75rem' }}>
-              Aim for {progress.recommended_calories_min}–{progress.recommended_calories_max} kcal/day
+              {progress.messages?.daily_calorie_message ?? `Aim for ${progress.recommended_calories_min}–${progress.recommended_calories_max} kcal/day`}
             </p>
           )}
-          {progress.weekly_summary && (
+          {(progress.messages?.weekly_message ?? progress.weekly_summary?.message) && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {progress.weekly_summary.weight_change_kg != null
-                ? `This week: ${formatWeightChange(progress.weekly_summary.weight_change_kg, progress.units)}. ${progress.weekly_summary.on_track ? 'On track.' : 'Consider adjusting.'}`
-                : progress.weekly_summary.message}
+              {progress.messages?.weekly_message ?? (progress.weekly_summary!.weight_change_kg != null
+                ? `This week: ${formatWeightChange(progress.weekly_summary!.weight_change_kg, progress.units)}. ${progress.weekly_summary!.on_track ? 'On track.' : 'Consider adjusting.'}`
+                : progress.weekly_summary!.message)}
             </p>
           )}
-          {(progress.estimated_goal_date ?? progress.estimated_goal_message) && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {progress.estimated_goal_date
-                ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.`
-                : progress.estimated_goal_message}
+          {(progress.messages?.goal_date_message ?? progress.estimated_goal_date ?? progress.estimated_goal_message) && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+              {progress.messages?.goal_date_message ?? (progress.estimated_goal_date
+                ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.${progress.estimate_basis ? ` ${progress.estimate_basis}` : ''}`
+                : progress.estimated_goal_message ?? '')}
             </p>
+          )}
+          {progress.messages?.recovery_message && (
+            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
+              {progress.messages.recovery_message}
+            </p>
+          )}
+          {progress.messages?.uncertainty_message && (
+            <p className="progress-text" style={{ marginTop: '0.5rem', fontSize: '0.9rem' }} role="status">
+              {progress.messages.uncertainty_message}
+            </p>
+          )}
+          {progress.estimated_goal_date && progressPercent != null && progressPercent < 100 && (
+            <div className="goal-timeline" role="status" aria-label="Goal timeline">
+              <div className="goal-timeline__bar">
+                <span className="goal-timeline__marker goal-timeline__marker--start" aria-hidden />
+                <span className="goal-timeline__marker goal-timeline__marker--now" style={{ left: `${progressPercent}%` }} aria-hidden />
+                <span className="goal-timeline__marker goal-timeline__marker--goal" aria-hidden />
+              </div>
+              <div className="goal-timeline__labels">
+                <span>Start</span>
+                <span>Now ({Math.round(progressPercent)}%)</span>
+                <span>Goal ~{new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
+              </div>
+            </div>
           )}
           {progress.lean_mass_kg != null && (
             <p className="progress-text" style={{ marginTop: '0.5rem' }}>

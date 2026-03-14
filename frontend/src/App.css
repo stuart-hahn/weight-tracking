@@ -296,6 +296,50 @@
   transition: width 0.3s ease;
 }
 
+.pace-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+.pace-badge--ahead { background: rgba(34, 197, 94, 0.15); color: var(--success, #22c55e); }
+.pace-badge--on_track { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
+.pace-badge--slightly_behind { background: rgba(234, 179, 8, 0.15); color: var(--warn, #eab308); }
+.pace-badge--behind { background: rgba(234, 179, 8, 0.2); color: var(--warn, #eab308); }
+
+.goal-timeline {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.goal-timeline__bar {
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  margin: 0.5rem 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.goal-timeline__marker {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+.goal-timeline__marker--start { left: 0; background: var(--muted); }
+.goal-timeline__marker--now { left: 50%; }
+.goal-timeline__marker--goal { left: 100%; background: var(--warn); }
+.goal-timeline__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+}
+
 .progress-text {
   font-size: 0.875rem;
   color: var(--muted);
