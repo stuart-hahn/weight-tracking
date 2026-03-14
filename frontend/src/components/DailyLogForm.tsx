@@ -1,14 +1,17 @@
 import { useState, useCallback, FormEvent, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getProgress } from '../api/client';
-import type { CreateEntryRequest, ProgressResponse } from '../types/api';
-import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
+import { getProgress, getEntries, updateEntry } from '../api/client';
+import type { CreateEntryRequest, ProgressResponse, DailyEntryResponse } from '../types/api';
+import { formatWeight, formatTrend, formatWeightChange, lbToKg, kgToLb, inToCm } from '../utils/units';
 import { getTodayInTimezone, getYesterdayInTimezone } from '../utils/date';
+import ProgressSummary from './ProgressSummary';
 
 export interface OptionalBodyFatSubmit {
   date: string;
   body_fat_percent: number;
 }
+
+export type DailyLogFormVariant = 'full' | 'home';
 
 interface DailyLogFormProps {
   onSubmit: (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => Promise<void>;
@@ -16,9 +19,11 @@ interface DailyLogFormProps {
   userId: string;
   /** Increment to refetch progress (e.g. after saving an entry) */
   refreshTrigger?: number;
+  /** 'home' = compact progress summary + today; 'full' = full progress card (e.g. on History) */
+  variant?: DailyLogFormVariant;
 }
 
-export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
+export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0, variant = 'full' }: DailyLogFormProps) {
   const [date, setDate] = useState(() => getTodayInTimezone());
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
@@ -35,6 +40,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [showFormForOtherDate, setShowFormForOtherDate] = useState(false);
+  const [showEditTodayForm, setShowEditTodayForm] = useState(false);
+  const [todayEntry, setTodayEntry] = useState<DailyEntryResponse | null>(null);
+  const [editTodayWeight, setEditTodayWeight] = useState('');
+  const [editTodayCalories, setEditTodayCalories] = useState('');
+  const [editTodaySaving, setEditTodaySaving] = useState(false);
+  const [editTodayError, setEditTodayError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,12 +117,64 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
     [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, onSubmit, onError]
   );
 
+  const handleEditTodaySubmit = useCallback(
+    async (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!todayEntry || !progress) return;
+      setEditTodayError(null);
+      const u = progress.units;
+      let weightKgNum = Number(editTodayWeight);
+      if (u === 'imperial') weightKgNum = lbToKg(weightKgNum);
+      if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
+        setEditTodayError('Please enter a valid weight.');
+        return;
+      }
+      const cal = editTodayCalories.trim() !== '' ? Number(editTodayCalories) : null;
+      const caloriesVal = cal != null && !Number.isNaN(cal) && cal >= 0 && cal <= 10000 ? cal : null;
+      setEditTodaySaving(true);
+      try {
+        await updateEntry(userId, todayEntry.id, {
+          weight_kg: weightKgNum,
+          calories: caloriesVal,
+        });
+        const p = await getProgress(userId);
+        setProgress(p);
+        setShowEditTodayForm(false);
+        setTodayEntry(null);
+      } catch (err) {
+        setEditTodayError(err instanceof Error ? err.message : 'Failed to update.');
+      } finally {
+        setEditTodaySaving(false);
+      }
+    },
+    [todayEntry, progress, editTodayWeight, editTodayCalories, userId]
+  );
+
   const progressPercent =
     progress?.progress_percent != null ? progress.progress_percent : 0;
 
   const hasEntryToday =
     progress?.latest_entry_date != null &&
     progress.latest_entry_date === getTodayInTimezone(progress?.timezone ?? undefined);
+
+  const todayIso = progress ? getTodayInTimezone(progress.timezone ?? undefined) : '';
+  useEffect(() => {
+    if (!showEditTodayForm || !userId || !progress || !hasEntryToday || variant !== 'home') return;
+    let cancelled = false;
+    getEntries(userId)
+      .then((entries) => {
+        if (cancelled) return;
+        const today = entries.find((e) => e.date === todayIso);
+        if (today) {
+          setTodayEntry(today);
+          const u = progress.units;
+          setEditTodayWeight(u === 'imperial' ? String(Math.round(kgToLb(today.weight_kg) * 10) / 10) : String(today.weight_kg));
+          setEditTodayCalories(today.calories != null ? String(today.calories) : '');
+        }
+      })
+      .catch(() => { if (!cancelled) setTodayEntry(null); });
+    return () => { cancelled = true; };
+  }, [showEditTodayForm, userId, progress, hasEntryToday, variant, todayIso]);
 
   return (
     <>
@@ -145,7 +208,14 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           </p>
         </section>
       )}
-      {progress !== null && (
+      {progress !== null && variant === 'home' && (
+        <ProgressSummary
+          progress={progress}
+          userId={userId}
+          onGoalUpdated={() => getProgress(userId).then(setProgress)}
+        />
+      )}
+      {progress !== null && variant === 'full' && (
         <section className="app__card" aria-label="Progress summary, pace, and goal estimate">
           <h2 className="app__card-title">Progress</h2>
           <p className="progress-text">
@@ -231,6 +301,17 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
             </p>
           )}
+          <details className="progress-text" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>How we calculate</summary>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+              Goal weight comes from your target body fat % and lean mass (we estimate lean mass from your height, weight, and sex if you don&apos;t set it). The estimated goal date is based on your recent weigh-in trend—more weigh-ins give a more reliable estimate.
+            </p>
+          </details>
+          <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+            <Link to="/settings" className="btn btn--secondary" style={{ display: 'inline-block', width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+              Change goal
+            </Link>
+          </p>
         </section>
       )}
 
@@ -247,16 +328,69 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               You&apos;re off to a good start. Log again when you can to see your trend.
             </p>
           )}
-          <p style={{ marginTop: '1rem' }}>
-            <Link to="/progress" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
-              Edit today&apos;s entry
-            </Link>
-          </p>
+          {variant === 'home' && !showEditTodayForm && (
+            <p style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn btn--primary"
+                style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
+                onClick={() => setShowEditTodayForm(true)}
+              >
+                Update today&apos;s entry
+              </button>
+            </p>
+          )}
+          {variant === 'home' && showEditTodayForm && todayEntry && (
+            <form onSubmit={handleEditTodaySubmit} noValidate style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+              {editTodayError && <p className="form-error" role="alert" style={{ marginBottom: '0.5rem' }}>{editTodayError}</p>}
+              <div className="form-group">
+                <label className="form-label" htmlFor="edit-today-weight">Weight ({units === 'imperial' ? 'lb' : 'kg'})</label>
+                <input
+                  id="edit-today-weight"
+                  type="number"
+                  className="form-input"
+                  min={units === 'imperial' ? 20 : 1}
+                  max={units === 'imperial' ? 1100 : 500}
+                  step={0.1}
+                  value={editTodayWeight}
+                  onChange={(e) => setEditTodayWeight(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="edit-today-calories">Calories (optional)</label>
+                <input
+                  id="edit-today-calories"
+                  type="number"
+                  className="form-input"
+                  min={0}
+                  max={10000}
+                  value={editTodayCalories}
+                  onChange={(e) => setEditTodayCalories(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn--primary" style={{ marginRight: '0.5rem' }} disabled={editTodaySaving}>
+                {editTodaySaving ? 'Saving…' : 'Save'}
+              </button>
+              <button type="button" className="btn btn--secondary" onClick={() => { setShowEditTodayForm(false); setTodayEntry(null); setEditTodayError(null); }} disabled={editTodaySaving}>
+                Cancel
+              </button>
+            </form>
+          )}
+          {variant === 'home' && showEditTodayForm && !todayEntry && (
+            <p className="progress-text" style={{ marginTop: '1rem' }}>Loading…</p>
+          )}
+          {variant !== 'home' && (
+            <p style={{ marginTop: '1rem' }}>
+              <Link to="/history" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
+                Edit today&apos;s entry
+              </Link>
+            </p>
+          )}
           <button
             type="button"
             className="btn btn--secondary"
             style={{ marginTop: '0.75rem' }}
-            onClick={() => { setShowFormForOtherDate(true); setDate(getYesterdayInTimezone(progress?.timezone ?? undefined)); }}
+            onClick={() => { setShowFormForOtherDate(true); setDate(getYesterdayInTimezone(progress?.timezone ?? undefined)); setShowEditTodayForm(false); setTodayEntry(null); }}
           >
             Log another date
           </button>
@@ -301,7 +435,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             {duplicateDate && (
               <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
                 You&apos;ve already logged this date.{' '}
-                <Link to="/progress" state={{ editDate: duplicateDate }}>Edit that entry instead</Link>.
+                <Link to="/history" state={{ editDate: duplicateDate }}>Edit that entry instead</Link>.
               </p>
             )}
           </div>
@@ -411,7 +545,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           {savedMessage && (
             <p className="app__success" style={{ marginTop: '1rem', marginBottom: 0 }} role="status">
               {savedMessage}{' '}
-              <Link to="/progress" className="app__title-link" style={{ fontSize: 'inherit', fontWeight: 600 }}>
+              <Link to="/history" className="app__title-link" style={{ fontSize: 'inherit', fontWeight: 600 }}>
                 View progress
               </Link>
             </p>

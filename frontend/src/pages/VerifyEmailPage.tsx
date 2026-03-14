@@ -44,7 +44,7 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
             You&apos;re verified. You can close this tab or head into the app.
           </p>
           <p style={{ marginTop: '1rem' }}>
-            <Link to="/log" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+            <Link to="/home" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
               Go to Log
             </Link>
           </p>

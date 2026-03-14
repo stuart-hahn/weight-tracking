@@ -14,7 +14,6 @@ interface OnboardingPageProps {
 
 export default function OnboardingPage({ userId, onComplete, onError }: OnboardingPageProps) {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [weight, setWeight] = useState('');
   const [calories, setCalories] = useState('');
@@ -37,8 +36,8 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   }, [userId, onError]);
 
   useEffect(() => {
-    if (step === 1) weightInputRef.current?.focus();
-  }, [step]);
+    weightInputRef.current?.focus();
+  }, [progress]);
 
   const handleLogFirstEntry = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -62,7 +61,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         });
         await updateUser(userId, { onboarding_complete: true });
         onComplete();
-        navigate('/log');
+        navigate('/home');
       } catch (err) {
         onError(err instanceof Error ? err.message : 'Failed to save entry');
       }
@@ -76,53 +75,14 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
 
   const units = progress.units;
 
-  if (step === 0) {
-    return (
-      <div className="app__card">
-        <h2 className="app__card-title" style={{ marginTop: 0 }}>
-          Here&apos;s your first goal
-        </h2>
-        <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
-          We&apos;re using this as your starting point: you&apos;re at {formatWeight(progress.current_weight_kg, units)} now, and your goal is {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat). You can change either in Settings anytime.
-        </p>
-        <p style={{ marginBottom: '1.5rem' }}>
-          When you&apos;re ready, log your first weigh-in below.
-        </p>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => setStep(1)}
-        >
-          Continue
-        </button>
-        <button
-          type="button"
-          className="btn btn--secondary"
-          style={{ marginTop: '0.75rem' }}
-          onClick={async () => {
-            try {
-              await updateUser(userId, { onboarding_complete: true });
-              onComplete();
-              navigate('/log');
-            } catch (err) {
-              onError(err instanceof Error ? err.message : 'Failed to skip');
-            }
-          }}
-        >
-          Skip for now
-        </button>
-        <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-          You can always add your first weigh-in later from the Log page.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="app__card">
       <h2 className="app__card-title" style={{ marginTop: 0 }}>
         Log your first weigh-in
       </h2>
+      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        Your goal: {formatWeight(progress.current_weight_kg, units)} → {formatWeight(progress.goal_weight_kg, units)} ({progress.target_body_fat_percent}% body fat). You can change this in Settings anytime.
+      </p>
       <p style={{ marginBottom: '1rem' }}>
         Enter today&apos;s weight to start. You can add calories and other details later.
       </p>
@@ -166,6 +126,25 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
           Save and continue
         </button>
       </form>
+      <button
+        type="button"
+        className="btn btn--secondary"
+        style={{ marginTop: '1rem' }}
+        onClick={async () => {
+          try {
+            await updateUser(userId, { onboarding_complete: true });
+            onComplete();
+            navigate('/home');
+          } catch (err) {
+            onError(err instanceof Error ? err.message : 'Failed to skip');
+          }
+        }}
+      >
+        Skip for now
+      </button>
+      <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+        You can always add your first weigh-in later from Home.
+      </p>
     </div>
   );
 }

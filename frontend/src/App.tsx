@@ -4,8 +4,8 @@ import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
 import LandingPage from './pages/LandingPage';
-import LogPage from './pages/LogPage';
-import ProgressPage from './pages/ProgressPage';
+import HomePage from './pages/HomePage';
+import HistoryPage from './pages/HistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -249,7 +249,7 @@ function AppContent({
       <header className="app__header">
         <h1 className="app__title">
           {userId ? (
-            <Link to="/log" className="app__title-link">Body Fat Tracker</Link>
+            <Link to="/home" className="app__title-link">Body Fat Tracker</Link>
           ) : (
             'Body Fat Tracker'
           )}
@@ -296,7 +296,7 @@ function AppContent({
                   onboardingComplete === false ? (
                     <Navigate to="/onboarding" replace />
                   ) : (
-                    <Navigate to="/log" replace />
+                    <Navigate to="/home" replace />
                   )
                 ) : (
                   <LandingPage
@@ -312,7 +312,7 @@ function AppContent({
               path="/forgot-password"
               element={
                 userId ? (
-                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/log'} replace />
+                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/home'} replace />
                 ) : (
                   <ForgotPasswordPage />
                 )
@@ -320,7 +320,7 @@ function AppContent({
             />
             <Route
               path="/reset-password"
-              element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />}
+              element={userId ? <Navigate to="/home" replace /> : <ResetPasswordPage />}
             />
             <Route
               path="/verify-email"
@@ -341,19 +341,19 @@ function AppContent({
                     />
                   </>
                 ) : userId ? (
-                  <Navigate to="/log" replace />
+                  <Navigate to="/home" replace />
                 ) : (
                   <Navigate to="/" replace />
                 )
               }
             />
             <Route
-              path="/log"
+              path="/home"
               element={
                 userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} email={userEmail} />
-                    <LogPage
+                    <HomePage
                       userId={userId}
                       refreshTrigger={progressRefreshTrigger}
                       onSubmit={handleEntrySubmit}
@@ -368,12 +368,12 @@ function AppContent({
               }
             />
             <Route
-              path="/progress"
+              path="/history"
               element={
                 userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} email={userEmail} />
-                    <ProgressPage
+                    <HistoryPage
                       userId={userId}
                       refreshTrigger={progressRefreshTrigger}
                       onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
@@ -385,6 +385,14 @@ function AppContent({
                   <Navigate to="/" replace />
                 )
               }
+            />
+            <Route
+              path="/log"
+              element={<Navigate to="/home" replace />}
+            />
+            <Route
+              path="/progress"
+              element={<Navigate to="/history" replace />}
             />
             <Route
               path="/settings"
@@ -412,7 +420,7 @@ function AppContent({
                   <h2 className="app__card-title" style={{ marginTop: 0 }}>Page not found</h2>
                   <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
                   <p style={{ marginTop: '1rem' }}>
-                    <Link to={userId ? '/log' : '/'} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+                    <Link to={userId ? '/home' : '/'} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
                       Go home
                     </Link>
                   </p>

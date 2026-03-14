@@ -7,6 +7,7 @@ interface SignupFormProps {
 }
 
 export default function SignupForm({ onSubmit }: SignupFormProps) {
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [age, setAge] = useState('');
@@ -17,6 +18,23 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [targetBf, setTargetBf] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleStep1 = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setSubmitError(null);
+      if (!email.trim()) {
+        setSubmitError('Email is required');
+        return;
+      }
+      if (password.length < 8) {
+        setSubmitError('Password must be at least 8 characters');
+        return;
+      }
+      setStep(2);
+    },
+    [email, password]
+  );
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -59,47 +77,70 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
     [email, password, age, sex, units, heightCm, weightKg, targetBf, onSubmit]
   );
 
+  if (step === 1) {
+    return (
+      <>
+        <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
+          Create account
+        </h2>
+        <form onSubmit={handleStep1} noValidate>
+          {submitError && (
+            <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+              {submitError}
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label" htmlFor="signup-email">
+              Email
+            </label>
+            <input
+              id="signup-email"
+              type="email"
+              className="form-input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="signup-password">
+              Password (min 8 characters)
+            </label>
+            <input
+              id="signup-password"
+              type="password"
+              className="form-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+          </div>
+          <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+            Continue
+          </button>
+        </form>
+      </>
+    );
+  }
+
   return (
     <>
       <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
-        Create account
+        Add a few details for your goal
       </h2>
+      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        We&apos;ll use these to show your progress toward your target body fat %.
+      </p>
       <form onSubmit={handleSubmit} noValidate>
         {submitError && (
           <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
             {submitError}
           </div>
         )}
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-email">
-            Email
-          </label>
-          <input
-            id="signup-email"
-            type="email"
-            className="form-input"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-password">
-            Password (min 8 characters)
-          </label>
-          <input
-            id="signup-password"
-            type="password"
-            className="form-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-age">
             Age
@@ -241,6 +282,9 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           />
           <p className="form-hint">e.g. 15 for 15%</p>
         </div>
+        <button type="button" className="btn btn--secondary" style={{ marginRight: '0.5rem', marginTop: '1rem' }} onClick={() => setStep(1)}>
+          Back
+        </button>
         <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>

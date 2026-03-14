@@ -172,7 +172,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       <section className="app__card" aria-label="Progress">
         <h2 className="app__card-title">Progress</h2>
         <p className="progress-text">
-          No weigh-ins yet. <Link to="/log">Log your first one to see your progress</Link>.
+          No weigh-ins yet. <Link to="/home">Log your first one to see your progress</Link>.
         </p>
       </section>
     );
@@ -242,7 +242,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       {progress != null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
-            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? <>No weigh-in today yet. <Link to="/log">Log one</Link> to update your trend and weekly summary.</>}
+            {progress.messages?.streak_message ?? progress.messages?.retention_message ?? <>No weigh-in today yet. <Link to="/home">Log one</Link> to update your trend and weekly summary.</>}
           </p>
         </section>
       )}
@@ -370,6 +370,21 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         <p className="progress-text" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
           Estimated body fat: {progress.estimated_body_fat_percent.toFixed(1)}%—based on your current weight and lean mass.
         </p>
+      )}
+      {progress && (
+        <>
+          <details className="progress-text" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>How we calculate</summary>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+              Goal weight comes from your target body fat % and lean mass (we estimate lean mass from your height, weight, and sex if you don&apos;t set it). The estimated goal date is based on your recent weigh-in trend—more weigh-ins give a more reliable estimate.
+            </p>
+          </details>
+          <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+            <Link to="/settings" className="btn btn--secondary" style={{ display: 'inline-block', width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+              Change goal
+            </Link>
+          </p>
+        </>
       )}
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
       {localSuccess && (
