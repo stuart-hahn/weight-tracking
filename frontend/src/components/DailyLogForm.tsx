@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { getProgress, getEntries, updateEntry } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse, DailyEntryResponse } from '../types/api';
-import { formatWeight, formatTrend, formatWeightChange, lbToKg, kgToLb, inToCm } from '../utils/units';
+import { formatWeight, lbToKg, kgToLb, inToCm } from '../utils/units';
 import { getTodayInTimezone, getYesterdayInTimezone } from '../utils/date';
 import { copy } from '../copy';
 import ProgressSummary from './ProgressSummary';
@@ -14,7 +14,7 @@ export interface OptionalBodyFatSubmit {
   body_fat_percent: number;
 }
 
-export type DailyLogFormVariant = 'full' | 'home';
+export type DailyLogFormVariant = 'home';
 
 interface DailyLogFormProps {
   onSubmit: (body: CreateEntryRequest, optionalBodyFat?: OptionalBodyFatSubmit) => Promise<void>;
@@ -26,7 +26,7 @@ interface DailyLogFormProps {
   variant?: DailyLogFormVariant;
 }
 
-export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0, variant = 'full' }: DailyLogFormProps) {
+export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0, variant = 'home' }: DailyLogFormProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [date, setDate] = useState(() => getTodayInTimezone());
@@ -191,9 +191,6 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
     [todayEntry, progress, editTodayWeight, editTodayCalories, userId]
   );
 
-  const progressPercent =
-    progress?.progress_percent != null ? progress.progress_percent : 0;
-
   const hasEntryToday =
     progress?.latest_entry_date != null &&
     progress.latest_entry_date === getTodayInTimezone(progress?.timezone ?? undefined);
@@ -249,112 +246,13 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           </p>
         </section>
       )}
-      {progress !== null && variant === 'home' && (
+      {progress !== null && (
         <ProgressSummary
           progress={progress}
           userId={userId}
           onGoalUpdated={() => getProgress(userId).then(setProgress)}
           hero
         />
-      )}
-      {progress !== null && variant === 'full' && (
-        <section className="app__card" aria-label={copy.fullProgressSummary}>
-          <h2 className="app__card-title app__card-title--lg">{copy.progress}</h2>
-          <p className="progress-text">
-            {copy.current}: {formatWeight(progress.current_weight_kg, progress.units)} · {copy.goal}: {formatWeight(progress.goal_weight_kg, progress.units)} ·{' '}
-            {copy.entriesCount(progress.entries_count)}
-            {progress.weight_trend_kg_per_week != null && !progress.messages?.trend_message && (
-              <> · {formatTrend(progress.weight_trend_kg_per_week, progress.units)}</>
-            )}
-          </p>
-          {progress.messages?.progress_celebration && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
-              {progress.messages.progress_celebration}
-            </p>
-          )}
-          <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
-            <div
-              className="progress-bar__fill"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          {progress.pace_status && (
-            <p style={{ marginTop: '0.5rem' }} role="status">
-              <span className={`pace-badge pace-badge--${progress.pace_status}`} aria-label={`Pace: ${progress.pace_status.replace('_', ' ')}`}>
-                {progress.pace_status === 'ahead' ? copy.paceAhead : progress.pace_status === 'on_track' ? copy.paceOnTrack : progress.pace_status === 'slightly_behind' ? copy.paceSlightlyBehind : copy.paceBehind}
-              </span>
-            </p>
-          )}
-          {progress.messages?.trend_message && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
-              {progress.messages.trend_message}
-            </p>
-          )}
-          {(progress.messages?.daily_calorie_message ?? (progress.recommended_calories_min != null && progress.recommended_calories_max != null)) && (
-            <p className="progress-text" style={{ marginTop: '0.75rem' }}>
-              {progress.messages?.daily_calorie_message ?? (progress.recommended_calories_min != null && progress.recommended_calories_max != null ? copy.stayingAroundCalories(progress.recommended_calories_min, progress.recommended_calories_max) : null)}
-            </p>
-          )}
-          {(progress.messages?.weekly_message ?? progress.weekly_summary?.message) && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {progress.messages?.weekly_message ?? (progress.weekly_summary!.weight_change_kg != null
-                ? `This week: ${formatWeightChange(progress.weekly_summary!.weight_change_kg, progress.units)}. ${progress.weekly_summary!.on_track ? "You're on track." : 'A small change could help—see the suggestion below.'}`
-                : progress.weekly_summary!.message)}
-            </p>
-          )}
-          {(progress.messages?.goal_date_message ?? progress.estimated_goal_date ?? progress.estimated_goal_message) && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
-              {progress.messages?.goal_date_message ?? (progress.estimated_goal_date
-                ? `Estimated to reach goal: ${new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}.${progress.estimate_basis ? ` ${progress.estimate_basis}` : ''}`
-                : progress.estimated_goal_message ?? '')}
-            </p>
-          )}
-          {progress.messages?.recovery_message && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }} role="status">
-              {progress.messages.recovery_message}
-            </p>
-          )}
-          {progress.messages?.uncertainty_message && (
-            <p className="progress-text" style={{ marginTop: '0.5rem', fontSize: '0.9rem' }} role="status">
-              {progress.messages.uncertainty_message}
-            </p>
-          )}
-          {progress.estimated_goal_date && progressPercent != null && progressPercent < 100 && (
-            <div className="goal-timeline" role="status" aria-label="Goal timeline">
-              <div className="goal-timeline__bar">
-                <span className="goal-timeline__marker goal-timeline__marker--start" aria-hidden />
-                <span className="goal-timeline__marker goal-timeline__marker--now" style={{ left: `${progressPercent}%` }} aria-hidden />
-                <span className="goal-timeline__marker goal-timeline__marker--goal" aria-hidden />
-              </div>
-              <div className="goal-timeline__labels">
-                <span>Start</span>
-                <span>Now ({Math.round(progressPercent)}%)</span>
-                <span>Goal ~{new Date(progress.estimated_goal_date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}</span>
-              </div>
-            </div>
-          )}
-          {progress.lean_mass_kg != null && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {copy.leanMass}: {formatWeight(progress.lean_mass_kg, progress.units)} ({progress.lean_mass_is_estimated ? copy.leanMassEstimated : copy.leanMassYouSet}).
-            </p>
-          )}
-          {progress.estimated_body_fat_percent != null && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
-              {copy.estimatedBodyFat}: {progress.estimated_body_fat_percent.toFixed(1)}%{copy.estimatedBodyFatNote}
-            </p>
-          )}
-          <details className="progress-text" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--muted)' }}>{copy.howWeCalculate}</summary>
-            <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-              {copy.howWeCalculateFull}
-            </p>
-          </details>
-          <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-            <Link to="/settings" className="btn btn--secondary btn--sm">
-              {copy.changeGoalInSettings}
-            </Link>
-          </p>
-        </section>
       )}
 
       {progress !== null && hasEntryToday && !showFormForOtherDate ? (

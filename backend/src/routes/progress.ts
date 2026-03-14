@@ -205,7 +205,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   }
 
   if (recovery && caloriesRange.recommended_calories_min != null && caloriesRange.recommended_calories_max != null) {
-    recoveryMessage = `To get back on track, try aiming for ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next 2 weeks.`;
+    recoveryMessage = `To get back on track, aim for about ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next couple of weeks.`;
   }
 
   const todayIso = getTodayInTimezone(user.timezone);

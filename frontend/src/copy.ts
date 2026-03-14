@@ -11,7 +11,7 @@ export const copy = {
   logIn: 'Log in',
   createAccount: 'Create account',
   welcomeBack: 'Welcome back.',
-  signupSuccess: "You're all set. Head to Log to add your first weigh-in.",
+  signupSuccess: "You're all set. Head to Home to add your first weigh-in.",
 
   /* Home / log */
   logToday: 'Log today',
@@ -41,8 +41,10 @@ export const copy = {
   current: 'Current',
   goal: 'Goal',
   ofTheWayThere: 'of the way there',
+  towardGoal: 'toward goal',
   changeGoal: 'Change goal',
   goalUpdated: "Goal updated. You've got this.",
+  viewYourJourney: 'View your journey',
   seeFullProgress: 'View your journey',
   seeYourProgress: 'See your progress',
   howWeCalculate: 'How we calculate',
@@ -68,6 +70,9 @@ export const copy = {
   leanMassYouSet: 'you set',
   estimatedBodyFat: 'Estimated body fat',
   estimatedBodyFatNote: '—based on your current weight and lean mass.',
+  estimatedBodyFatFromWeight: (pct: number) =>
+    `We estimate your body fat at ${pct.toFixed(1)}% from your weight and lean mass.`,
+  progressDetails: 'Details',
   addEntry: 'Add entry',
   addWeighIn: 'Add weigh-in',
   emptyHistoryTitle: 'Your journey starts here',

@@ -15,6 +15,7 @@ export default function LogPage({ userId, refreshTrigger, onSubmit, onError }: L
       userId={userId}
       refreshTrigger={refreshTrigger}
       onSubmit={onSubmit}
+      variant="home"
       {...(onError !== undefined && { onError })}
     />
   );
