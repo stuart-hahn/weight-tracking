@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
-import type { DailyEntryResponse, ProgressResponse } from '../types/api';
+import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry, createEntry, upsertOptionalMetric } from '../api/client';
+import type { DailyEntryResponse, ProgressResponse, CreateEntryRequest } from '../types/api';
 import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import { getTodayInTimezone } from '../utils/date';
 import PageLoading from './PageLoading';
@@ -14,7 +14,7 @@ interface EntryHistoryProps {
 }
 
 const CHART_HEIGHT = 180;
-const CHART_PADDING = { top: 8, right: 8, bottom: 24, left: 36 };
+const CHART_PADDING = { top: 8, right: 44, bottom: 24, left: 36 };
 
 export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdated }: EntryHistoryProps) {
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
@@ -36,6 +36,21 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const editTriggerRef = useRef<HTMLButtonElement | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const cancelConfirmRef = useRef<HTMLButtonElement>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addDate, setAddDate] = useState('');
+  const [addWeight, setAddWeight] = useState('');
+  const [addCalories, setAddCalories] = useState('');
+  const [addBodyFat, setAddBodyFat] = useState('');
+  const [addWaist, setAddWaist] = useState('');
+  const [addHip, setAddHip] = useState('');
+  const [addOptionalOpen, setAddOptionalOpen] = useState(false);
+  const [addBodyFatOpen, setAddBodyFatOpen] = useState(false);
+  const [addSubmitting, setAddSubmitting] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addDuplicateDate, setAddDuplicateDate] = useState<string | null>(null);
+  const addFormFirstInputRef = useRef<HTMLInputElement>(null);
+  const addFormButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +102,87 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     }
   }, [editingEntry]);
 
+  useEffect(() => {
+    if (showAddForm) {
+      setAddDate(getTodayInTimezone(progress?.timezone ?? undefined));
+      setAddWeight('');
+      setAddCalories('');
+      setAddBodyFat('');
+      setAddWaist('');
+      setAddHip('');
+      setAddError(null);
+      setAddDuplicateDate(null);
+      addFormFirstInputRef.current?.focus({ preventScroll: true });
+    } else {
+      addFormButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [showAddForm]);
+
+  const handleAddSubmit = useCallback(
+    async (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!progress) return;
+      setAddError(null);
+      setAddDuplicateDate(null);
+      const units = progress.units;
+      let weightKgNum = Number(addWeight);
+      if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
+      if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
+        setAddError('Please enter a valid weight.');
+        return;
+      }
+      const body: CreateEntryRequest = {
+        date: addDate,
+        weight_kg: weightKgNum,
+      };
+      if (addCalories.trim() !== '') {
+        const cal = Number(addCalories);
+        if (!Number.isNaN(cal) && cal >= 0 && cal <= 10000) body.calories = cal;
+      }
+      if (addOptionalOpen) {
+        let w = Number(addWaist);
+        let h = Number(addHip);
+        if (units === 'imperial') {
+          w = inToCm(w);
+          h = inToCm(h);
+        }
+        if (!Number.isNaN(w) && w > 0 && w <= 200) body.waist_cm = w;
+        if (!Number.isNaN(h) && h > 0 && h <= 200) body.hip_cm = h;
+      }
+      const bf = addBodyFat.trim() !== '' ? Number(addBodyFat) : NaN;
+      const hasBodyFat = !Number.isNaN(bf) && bf >= 0 && bf <= 100;
+      setAddSubmitting(true);
+      try {
+        const newEntry = await createEntry(userId, body);
+        if (hasBodyFat) {
+          await upsertOptionalMetric(userId, addDate, bf);
+        }
+        setEntries((prev) => [...prev, newEntry].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        const [p, om] = await Promise.all([getProgress(userId), getOptionalMetrics(userId)]);
+        setProgress(p);
+        const map: Record<string, number> = {};
+        for (const m of om) {
+          if (m.body_fat_percent != null) map[m.date] = m.body_fat_percent;
+        }
+        setBodyFatByDate(map);
+        setShowAddForm(false);
+        setLocalSuccess('Weigh-in added.');
+        window.setTimeout(() => setLocalSuccess(null), 2500);
+        onEntryUpdated?.();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to save weigh-in';
+        if (msg.includes('already exists') || msg.includes('Entry already')) {
+          setAddDuplicateDate(addDate);
+        } else {
+          setAddError(msg);
+        }
+      } finally {
+        setAddSubmitting(false);
+      }
+    },
+    [userId, progress, addDate, addWeight, addCalories, addOptionalOpen, addWaist, addHip, addBodyFat, onEntryUpdated]
+  );
+
   const handleEditSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -114,19 +210,24 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         if (!Number.isNaN(h) && h > 0 && h <= 200) body.hip_cm = h;
       }
       setEditSaving(true);
+      const prevEntries = entries;
+      const optimisticEntry = { ...editingEntry, weight_kg: body.weight_kg, calories: body.calories, waist_cm: body.waist_cm, hip_cm: body.hip_cm };
+      setEntries((prev) => prev.map((e) => (e.id === editingEntry.id ? optimisticEntry : e)));
+      setEditingEntry(null);
       try {
         await updateEntry(userId, editingEntry.id, body);
         onEntryUpdated?.();
-        setEditingEntry(null);
         setLocalSuccess('Updated.');
         window.setTimeout(() => setLocalSuccess(null), 2500);
       } catch (err) {
+        setEntries(prevEntries);
+        setEditingEntry(editingEntry);
         setEditError(err instanceof Error ? err.message : 'Failed to update entry');
       } finally {
         setEditSaving(false);
       }
     },
-    [editingEntry, progress, editWeight, editCalories, editWaist, editHip, userId, onEntryUpdated]
+    [editingEntry, progress, editWeight, editCalories, editWaist, editHip, userId, onEntryUpdated, entries]
   );
 
   const handleDeleteConfirm = useCallback(async () => {
@@ -134,26 +235,47 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     setEditError(null);
     setEditSaving(true);
     setShowDeleteConfirm(false);
+    const prevEntries = entries;
+    const entryToRemove = editingEntry;
+    setEntries((prev) => prev.filter((e) => e.id !== entryToRemove.id));
+    setEditingEntry(null);
     try {
-      await deleteEntry(userId, editingEntry.id);
+      await deleteEntry(userId, entryToRemove.id);
       onEntryUpdated?.();
-      setEditingEntry(null);
       setLocalSuccess('Entry removed.');
       window.setTimeout(() => setLocalSuccess(null), 2500);
     } catch (err) {
+      setEntries(prevEntries);
       setEditError(err instanceof Error ? err.message : 'Failed to delete entry');
     } finally {
       setEditSaving(false);
     }
-  }, [editingEntry, userId, onEntryUpdated]);
+  }, [editingEntry, userId, onEntryUpdated, entries]);
 
   useEffect(() => {
     if (!showDeleteConfirm) return;
     cancelConfirmRef.current?.focus();
+    const container = dialogContentRef.current;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShowDeleteConfirm(false);
         deleteButtonRef.current?.focus();
+        return;
+      }
+      if (e.key !== 'Tab' || !container) return;
+      const focusable = container.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -171,6 +293,10 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   if (sortedEntries.length === 0) {
     return (
       <section className="app__card empty-state" aria-label="Progress">
+        <svg className="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 6h18M3 12h14M3 18h10" />
+          <path d="M7 6v12M11 9v9M15 12v6" />
+        </svg>
         <h2 className="empty-state__title">No weigh-ins yet</h2>
         <p className="empty-state__text">
           Log your first weigh-in to see your progress and track your trend over time.
@@ -251,8 +377,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </section>
       )}
       <section className="app__card" aria-label="Progress, goal timeline, and weight history">
-      <h2 className="app__card-title">Progress</h2>
-      <figure className="chart-wrap" aria-label="Weight over time with goal line and trend">
+      <h2 className="app__card-title app__card-title--lg">Progress</h2>
+      <figure className="chart-wrap" role="img" aria-label={chartSummary || 'Weight over time with goal line and trend'}>
         <svg
           viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
@@ -390,7 +516,150 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           </p>
         </>
       )}
-      <h3 className="app__card-title app__card-title--sm mt-6">Weight history</h3>
+      <h3 className="app__card-title app__card-title--lg mt-6">Weight history</h3>
+      <section className="history-add-entry-bar mt-2 mb-4" aria-label="Add weigh-in">
+        {!showAddForm ? (
+          <>
+            <button
+              type="button"
+              ref={addFormButtonRef}
+              className="btn btn--primary btn--sm"
+              onClick={() => setShowAddForm(true)}
+            >
+              Add weigh-in
+            </button>
+            <p className="history-add-entry-bar__hint">Add a weigh-in for any date.</p>
+          </>
+        ) : (
+          <div className="history-add-form" style={{ width: '100%' }}>
+            <h4 className="app__card-title app__card-title--sm mb-3">New weigh-in</h4>
+            {addError && (
+              <div className="app__error mb-3" role="alert">
+                {addError}
+              </div>
+            )}
+            {addDuplicateDate && (
+              <p className="form-error mb-3" role="alert">
+                You already have a weigh-in for {addDuplicateDate}. <button type="button" className="btn btn--sm" style={{ marginLeft: '0.25rem' }} onClick={() => { setEditingEntry(entries.find((e) => e.date === addDuplicateDate) ?? null); setAddDuplicateDate(null); setShowAddForm(false); }}>Edit it instead</button>
+              </p>
+            )}
+            <form onSubmit={handleAddSubmit} noValidate>
+              <fieldset disabled={addSubmitting} aria-busy={addSubmitting} style={{ border: 'none', margin: 0, padding: 0 }}>
+                <FieldInput
+                  ref={addFormFirstInputRef}
+                  id="add-entry-date"
+                  label="Date"
+                  type="date"
+                  value={addDate}
+                  onChange={(e) => setAddDate(e.target.value)}
+                  max={getTodayInTimezone(progress?.timezone ?? undefined)}
+                  required
+                />
+                <FieldInput
+                  id="add-entry-weight"
+                  label={`Weight (${progress?.units === 'imperial' ? 'lb' : 'kg'})`}
+                  type="number"
+                  min={progress?.units === 'imperial' ? 20 : 1}
+                  max={progress?.units === 'imperial' ? 1100 : 500}
+                  step={0.1}
+                  placeholder={progress?.units === 'imperial' ? '176.4' : '75.0'}
+                  value={addWeight}
+                  onChange={(e) => setAddWeight(e.target.value)}
+                  required
+                />
+                <FieldInput
+                  id="add-entry-calories"
+                  label="Calories (optional)"
+                  type="number"
+                  min={0}
+                  max={10000}
+                  step={1}
+                  placeholder="2000"
+                  value={addCalories}
+                  onChange={(e) => setAddCalories(e.target.value)}
+                />
+                <p className="form-hint mb-2 text-sm">Optional: body fat %, waist, hip</p>
+                <div className="collapsible">
+                  <button
+                    type="button"
+                    className="collapsible__trigger"
+                    onClick={() => setAddBodyFatOpen(!addBodyFatOpen)}
+                    aria-expanded={addBodyFatOpen}
+                  >
+                    Optional: body fat %
+                    <span className="collapsible__chevron" aria-hidden>▼</span>
+                  </button>
+                  <div className="collapsible__content" hidden={!addBodyFatOpen}>
+                    <div className="collapsible__inner">
+                      <FieldInput
+                        id="add-entry-bodyfat"
+                        label="Body fat (%)"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        placeholder="e.g. 22"
+                        value={addBodyFat}
+                        onChange={(e) => setAddBodyFat(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="collapsible">
+                  <button
+                    type="button"
+                    className="collapsible__trigger"
+                    onClick={() => setAddOptionalOpen(!addOptionalOpen)}
+                    aria-expanded={addOptionalOpen}
+                  >
+                    Optional: waist / hip
+                    <span className="collapsible__chevron" aria-hidden>▼</span>
+                  </button>
+                  <div className="collapsible__content" hidden={!addOptionalOpen}>
+                    <div className="collapsible__inner">
+                      <FieldInput
+                        id="add-entry-waist"
+                        label={`Waist (${progress?.units === 'imperial' ? 'in' : 'cm'})`}
+                        type="number"
+                        min={1}
+                        max={200}
+                        step={0.1}
+                        placeholder="80"
+                        value={addWaist}
+                        onChange={(e) => setAddWaist(e.target.value)}
+                      />
+                      <FieldInput
+                        id="add-entry-hip"
+                        label={`Hip (${progress?.units === 'imperial' ? 'in' : 'cm'})`}
+                        type="number"
+                        min={1}
+                        max={200}
+                        step={0.1}
+                        placeholder="95"
+                        value={addHip}
+                        onChange={(e) => setAddHip(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="form-actions mt-4">
+                  <button type="submit" className={`btn btn--primary ${addSubmitting ? 'btn--loading' : ''}`} disabled={addSubmitting} aria-busy={addSubmitting}>
+                    {addSubmitting ? 'Saving…' : 'Save weigh-in'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => { setShowAddForm(false); setAddError(null); setAddDuplicateDate(null); }}
+                    disabled={addSubmitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+        )}
+      </section>
       {localSuccess && (
         <p className="app__success" role="status" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
           {localSuccess}
@@ -457,7 +726,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       {showDeleteConfirm && editingEntry && (
         <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc">
-          <div className="dialog-overlay__content app__card">
+          <div className="dialog-overlay__content app__card" ref={dialogContentRef}>
             <h2 id="delete-dialog-title" className="app__card-title" style={{ marginTop: 0 }}>Delete entry?</h2>
             <p id="delete-dialog-desc" className="progress-text">
               Delete this weigh-in for {editingEntry.date}? This can&apos;t be undone.
@@ -473,39 +742,31 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           </div>
         </div>
       )}
-      <ul className="entry-list" style={{ listStyle: 'none', margin: 0, padding: 0, marginTop: '0.5rem' }}>
-        {[...sortedEntries].reverse().map((e) => (
+      <div className="entry-list-wrap">
+      <ul className="entry-list">
+        {[...sortedEntries].reverse().map((e) => {
+          const weightStr = progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`;
+          const calStr = e.calories != null ? `${e.calories} kcal` : 'no calories';
+          const bfStr = bodyFatByDate[e.date] != null ? `${bodyFatByDate[e.date]}% body fat` : 'no body fat';
+          const rowLabel = `Weigh-in ${e.date}, ${weightStr}, ${calStr}, ${bfStr}. Click to edit.`;
+          return (
           <li key={e.id}>
             <button
               type="button"
               className="entry-row"
+              aria-label={rowLabel}
               onClick={(ev) => { editTriggerRef.current = ev.currentTarget; setEditingEntry(e); }}
-              style={{
-                width: '100%',
-                display: 'grid',
-                gridTemplateColumns: '1fr minmax(5rem, auto) minmax(5rem, auto) minmax(3.5rem, auto)',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid var(--border)',
-                gap: '1rem',
-                background: 'transparent',
-                borderLeft: 'none',
-                borderRight: 'none',
-                borderTop: 'none',
-                color: 'inherit',
-                font: 'inherit',
-                textAlign: 'left',
-                cursor: 'pointer',
-              }}
             >
               <span>{e.date}</span>
-              <span><strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong></span>
-              <span>{e.calories != null ? `${e.calories} kcal` : '—'}</span>
-              <span>{bodyFatByDate[e.date] != null ? `${bodyFatByDate[e.date]}% BF` : '—'}</span>
+              <span className="entry-row__weight">{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</span>
+              <span className="entry-row__calories">{e.calories != null ? `${e.calories} kcal` : '—'}</span>
+              <span className="entry-row__bf">{bodyFatByDate[e.date] != null ? `${bodyFatByDate[e.date]}% BF` : '—'}</span>
             </button>
           </li>
-        ))}
+          );
+        })}
       </ul>
+      </div>
     </section>
     </>
   );

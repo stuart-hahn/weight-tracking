@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
 import { formatWeight } from '../utils/units';
+import { FieldInput } from './Field';
 
 interface ProgressSummaryProps {
   progress: ProgressResponse;
@@ -49,7 +50,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
 
   return (
     <section className="app__card" aria-label="Progress at a glance">
-      <h2 className="app__card-title">Progress</h2>
+      <h2 className="app__card-title app__card-title--lg">Progress</h2>
       <p className="progress-text">
         Current: {formatWeight(progress.current_weight_kg, progress.units)} · Goal:{' '}
         {formatWeight(progress.goal_weight_kg, progress.units)}
@@ -118,22 +119,17 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         </p>
       ) : (
         <form onSubmit={handleGoalSubmit} noValidate style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-          {error && <p className="form-error" role="alert" style={{ marginBottom: '0.5rem' }}>{error}</p>}
-          <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-            <label className="form-label" htmlFor="progress-summary-target-bf">
-              Target body fat (%)
-            </label>
-            <input
-              id="progress-summary-target-bf"
-              type="number"
-              className="form-input"
-              min={1}
-              max={99}
-              step={0.5}
-              value={targetBf}
-              onChange={(e) => setTargetBf(e.target.value)}
-            />
-          </div>
+          <FieldInput
+            id="progress-summary-target-bf"
+            label="Target body fat (%)"
+            type="number"
+            min={1}
+            max={99}
+            step={0.5}
+            value={targetBf}
+            onChange={(e) => setTargetBf(e.target.value)}
+            error={error}
+          />
           <button type="submit" className="btn btn--primary" style={{ marginRight: '0.5rem' }} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>

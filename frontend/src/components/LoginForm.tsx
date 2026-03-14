@@ -28,10 +28,11 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
 
   return (
     <>
-      <h2 id="login-heading" className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 id="login-heading" className="app__card-title app__card-title--first">
         Log in
       </h2>
       <form onSubmit={handleSubmit} noValidate>
+        <fieldset disabled={submitting} aria-busy={submitting} style={{ border: 'none', margin: 0, padding: 0 }}>
         <FieldInput
           id="login-email"
           label="Email"
@@ -51,12 +52,13 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
           required
           autoComplete="current-password"
         />
-        <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+        <p className="mt-2 text-sm">
           <Link to="/forgot-password">Forgot password?</Link>
         </p>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+        <button type="submit" className={`btn btn--primary mt-4 ${submitting ? 'btn--loading' : ''}`} disabled={submitting} aria-busy={submitting}>
           {submitting ? 'Logging in…' : 'Log in'}
         </button>
+        </fieldset>
       </form>
     </>
   );

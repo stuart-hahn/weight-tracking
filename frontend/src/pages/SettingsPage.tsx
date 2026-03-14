@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
+import { getStoredTheme, setTheme, type ThemePreference } from '../utils/theme';
 import PageLoading from '../components/PageLoading';
 import { FieldInput, FieldSelect } from '../components/Field';
 
@@ -27,6 +28,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [exporting, setExporting] = useState(false);
   const [localSuccess, setLocalSuccess] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => getStoredTheme());
 
   useEffect(() => {
     let cancelled = false;
@@ -135,19 +137,38 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     <section className="app__card" aria-label="Settings">
       <h2 className="app__card-title">Settings</h2>
       {localError && (
-        <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+        <div className="app__error mb-4" role="alert">
           {localError}
         </div>
       )}
       {localSuccess && (
-        <div className="app__success" role="status" style={{ marginBottom: '1rem' }}>
+        <div className="app__success mb-4" role="status">
           {localSuccess}
         </div>
       )}
-      <p className="progress-text" style={{ marginBottom: '1rem' }}>
-        {profile.email}
-      </p>
+      <div className="settings-section">
+        <h3 className="settings-section__title">Appearance</h3>
+        <div className="settings-theme">
+          <FieldSelect
+          id="settings-theme"
+          label="Theme"
+          hint="Choose light, dark, or match your device."
+          value={themePreference}
+          onChange={(e) => {
+            const value = e.target.value as ThemePreference;
+            setThemePreference(value);
+            setTheme(value);
+          }}
+        >
+          <option value="system">System (match device)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          </FieldSelect>
+        </div>
+      </div>
       <form onSubmit={handleSubmit} noValidate>
+        <div className="settings-section">
+          <h3 className="settings-section__title">Units & time</h3>
         <FieldSelect
           id="settings-units"
           label="Units"
@@ -186,6 +207,12 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             <option value={timezone}>{timezone}</option>
           )}
         </FieldSelect>
+        </div>
+        <div className="settings-section">
+          <h3 className="settings-section__title">Profile</h3>
+          <p className="progress-text mb-4">
+            {profile.email}
+          </p>
         <FieldInput
           id="settings-age"
           label="Age"
@@ -273,6 +300,9 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             }
           }}
         />
+        </div>
+        <div className="settings-section">
+          <h3 className="settings-section__title">Goal</h3>
         <FieldInput
           id="settings-target-bf"
           label="Target body fat (%)"
@@ -306,11 +336,13 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           value={leanMassKg}
           onChange={(e) => setLeanMassKg(e.target.value)}
         />
-        <button type="submit" className="btn btn--primary form-actions__primary" disabled={saving}>
+        </div>
+        <button type="submit" className={`btn btn--primary form-actions__primary ${saving ? 'btn--loading' : ''}`} disabled={saving} aria-busy={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </form>
-      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+      <div className="settings-section">
+          <h3 className="settings-section__title">Data</h3>
         <button
           type="button"
           className="btn btn--secondary"
@@ -319,7 +351,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         >
           {exporting ? 'Preparing…' : 'Download my data (export)'}
         </button>
-        <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+        <p className="form-hint mt-2">
           Download your profile, weigh-ins, and optional metrics as a JSON file.
         </p>
       </div>

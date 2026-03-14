@@ -1,5 +1,5 @@
 import { useState, useCallback, FormEvent, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProgress, getEntries, updateEntry } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse, DailyEntryResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, kgToLb, inToCm } from '../utils/units';
@@ -25,6 +25,8 @@ interface DailyLogFormProps {
 }
 
 export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0, variant = 'full' }: DailyLogFormProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [date, setDate] = useState(() => getTodayInTimezone());
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
@@ -48,6 +50,18 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [editTodaySaving, setEditTodaySaving] = useState(false);
   const [editTodayError, setEditTodayError] = useState<string | null>(null);
   const prevProgressRef = useRef<ProgressResponse | null>(null);
+
+  // When navigating from History "Add entry", open the "Log another date" form immediately
+  useEffect(() => {
+    const state = location.state as { openLogForm?: boolean } | null;
+    if (variant === 'home' && state?.openLogForm) {
+      setShowFormForOtherDate(true);
+      setShowEditTodayForm(false);
+      setTodayEntry(null);
+      setDate(getYesterdayInTimezone(progress?.timezone ?? undefined));
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [variant, location.state, location.pathname, navigate, progress?.timezone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,7 +253,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       )}
       {progress !== null && variant === 'full' && (
         <section className="app__card" aria-label="Progress summary, pace, and goal estimate">
-          <h2 className="app__card-title">Progress</h2>
+          <h2 className="app__card-title app__card-title--lg">Progress</h2>
           <p className="progress-text">
             Current: {formatWeight(progress.current_weight_kg, progress.units)} · Goal: {formatWeight(progress.goal_weight_kg, progress.units)} ·{' '}
             {progress.entries_count} entries
@@ -351,16 +365,22 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </p>
           )}
           {variant === 'home' && !showEditTodayForm && (
-            <p style={{ marginTop: '1rem' }}>
+            <div className="form-actions home-card-actions">
               <button
                 type="button"
-                className="btn btn--primary"
-                style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
+                className="btn btn--primary btn--sm"
+                onClick={() => { setShowFormForOtherDate(true); setDate(getYesterdayInTimezone(progress?.timezone ?? undefined)); setShowEditTodayForm(false); setTodayEntry(null); }}
+              >
+                Log another date
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
                 onClick={() => setShowEditTodayForm(true)}
               >
                 Update today&apos;s entry
               </button>
-            </p>
+            </div>
           )}
           {variant === 'home' && showEditTodayForm && todayEntry && (
             <form onSubmit={handleEditTodaySubmit} noValidate style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
@@ -398,27 +418,33 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             <p className="progress-text" style={{ marginTop: '1rem' }}>Loading…</p>
           )}
           {variant !== 'home' && (
-            <p style={{ marginTop: '1rem' }}>
-              <Link to="/history" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', paddingLeft: '1.25rem', paddingRight: '1.25rem' }}>
+            <div className="form-actions home-card-actions">
+              <Link to="/history" state={{ editDate: getTodayInTimezone(progress?.timezone ?? undefined) }} className="btn btn--primary btn--sm">
                 Edit today&apos;s entry
               </Link>
+              <Link to="/home" state={{ openLogForm: true }} className="btn btn--secondary btn--sm">
+                Log another date
+              </Link>
+            </div>
+          )}
+          {variant === 'home' && !showEditTodayForm && (
+            <p className="progress-text mt-4">
+              Missing a day? Use the button above to add a weigh-in for any date.
             </p>
           )}
-          <button
-            type="button"
-            className="btn btn--secondary"
-            style={{ marginTop: '0.75rem' }}
-            onClick={() => { setShowFormForOtherDate(true); setDate(getYesterdayInTimezone(progress?.timezone ?? undefined)); setShowEditTodayForm(false); setTodayEntry(null); }}
-          >
-            Log another date
-          </button>
         </section>
       ) : (
       <section className="app__card" aria-labelledby="log-heading">
         <h2 id="log-heading" className="app__card-title">
           {hasEntryToday && showFormForOtherDate ? 'Log another date' : 'Log today'}
         </h2>
+        {hasEntryToday && showFormForOtherDate && (
+          <p className="progress-text mb-3 text-sm" role="status">
+            Adding a weigh-in for <strong>{date}</strong>. Change the date above if needed.
+          </p>
+        )}
         <form onSubmit={handleSubmit} noValidate>
+          <fieldset disabled={submitting} aria-busy={submitting} style={{ border: 'none', margin: 0, padding: 0 }}>
           <FieldInput
             id="log-date"
             label="Date"
@@ -527,9 +553,10 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </div>
           </div>
 
-          <button type="submit" className="btn btn--primary form-actions__primary" disabled={submitting}>
+          <button type="submit" className={`btn btn--primary form-actions__primary ${submitting ? 'btn--loading' : ''}`} disabled={submitting} aria-busy={submitting}>
             {submitting ? 'Saving…' : 'Save entry'}
           </button>
+          </fieldset>
           {savedMessage && (
             <p className="app__success" style={{ marginTop: '1rem', marginBottom: 0 }} role="status">
               {savedMessage}{' '}

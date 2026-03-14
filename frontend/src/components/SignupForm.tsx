@@ -81,12 +81,12 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   if (step === 1) {
     return (
       <>
-        <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
+        <h2 id="signup-heading" className="app__card-title app__card-title--first">
           Create account
         </h2>
         <form onSubmit={handleStep1} noValidate>
           {submitError && (
-            <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+            <div className="app__error mb-4" role="alert">
               {submitError}
             </div>
           )}
@@ -120,15 +120,16 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
 
   return (
     <>
-      <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 id="signup-heading" className="app__card-title app__card-title--first">
         Add a few details for your goal
       </h2>
-      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+      <p className="progress-text mb-4">
         We&apos;ll use these to show your progress toward your target body fat %.
       </p>
       <form onSubmit={handleSubmit} noValidate>
+        <fieldset disabled={submitting} aria-busy={submitting} style={{ border: 'none', margin: 0, padding: 0 }}>
         {submitError && (
-          <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
+          <div className="app__error mb-4" role="alert">
             {submitError}
           </div>
         )}
@@ -241,10 +242,11 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           <button type="button" className="btn btn--secondary" onClick={() => setStep(1)}>
             Back
           </button>
-          <button type="submit" className="btn btn--primary" disabled={submitting}>
+          <button type="submit" className={`btn btn--primary ${submitting ? 'btn--loading' : ''}`} disabled={submitting} aria-busy={submitting}>
             {submitting ? 'Creating account…' : 'Create account'}
           </button>
         </div>
+        </fieldset>
       </form>
     </>
   );

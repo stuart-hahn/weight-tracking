@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import LoginForm from '../components/LoginForm';
 import SignupForm from '../components/SignupForm';
 import type { CreateUserRequest, LoginRequest } from '../types/api';
@@ -17,10 +18,31 @@ export default function LandingPage({
   onLogin,
   onSignup,
 }: LandingPageProps) {
+  const loginTabRef = useRef<HTMLButtonElement>(null);
+  const signupTabRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const active = authMode === 'login' ? loginTabRef.current : signupTabRef.current;
+    active?.focus({ preventScroll: true });
+  }, [authMode]);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      onAuthModeChange(e.key === 'ArrowRight' ? (authMode === 'login' ? 'signup' : 'login') : (authMode === 'signup' ? 'login' : 'signup'));
+    }
+  };
+
   return (
     <div className="app__card">
-      <div className="auth-tabs" role="tablist" aria-label="Log in or create account">
+      <div
+        className="auth-tabs"
+        role="tablist"
+        aria-label="Log in or create account"
+        onKeyDown={handleTabKeyDown}
+      >
         <button
+          ref={loginTabRef}
           type="button"
           role="tab"
           aria-selected={authMode === 'login'}
@@ -32,6 +54,7 @@ export default function LandingPage({
           Log in
         </button>
         <button
+          ref={signupTabRef}
           type="button"
           role="tab"
           aria-selected={authMode === 'signup'}

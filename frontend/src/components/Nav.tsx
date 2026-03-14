@@ -22,7 +22,7 @@ export default function Nav({ onLogout, email }: NavProps) {
       </div>
       <div className="app__nav-account">
         {displayEmail && (
-          <span className="app__nav-email" style={{ fontSize: '0.8rem', color: 'var(--muted)', marginRight: '0.25rem' }}>
+          <span className="app__nav-email text-xs" style={{ color: 'var(--muted)', marginRight: 'var(--space-1)' }}>
             {displayEmail}
           </span>
         )}

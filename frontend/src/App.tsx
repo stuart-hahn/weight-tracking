@@ -211,6 +211,20 @@ type AppContentProps = {
   onResendVerification: () => Promise<void>;
 };
 
+function getPageAriaLabel(path: string, userId: string | null): string {
+  if (!userId) return 'Landing';
+  switch (path) {
+    case '/onboarding': return 'Onboarding, main content';
+    case '/home': return 'Home, log weight, main content';
+    case '/history': return 'History, main content';
+    case '/settings': return 'Settings, main content';
+    case '/forgot-password': return 'Forgot password, main content';
+    case '/reset-password': return 'Reset password, main content';
+    case '/verify-email': return 'Verify email, main content';
+    default: return 'Main content';
+  }
+}
+
 function AppContent({
   userId,
   userEmail,
@@ -236,6 +250,7 @@ function AppContent({
 }: AppContentProps) {
   const location = useLocation();
   const prevPathRef = React.useRef(location.pathname);
+  const mainRef = React.useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (prevPathRef.current !== location.pathname) {
@@ -243,6 +258,7 @@ function AppContent({
       setError(null);
       setSuccess(null);
       setResendVerificationStatus('idle');
+      mainRef.current?.focus({ preventScroll: true });
     }
   }, [location.pathname, setError, setSuccess, setResendVerificationStatus]);
 
@@ -260,7 +276,7 @@ function AppContent({
         <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
       </header>
 
-      <main id="main" className="app__main" tabIndex={-1}>
+      <main id="main" className="app__main" tabIndex={-1} ref={mainRef} aria-label={getPageAriaLabel(location.pathname, userId)}>
         <div key={location.pathname} className="route-transition">
         {error && (
           <Toast
@@ -282,21 +298,20 @@ function AppContent({
             <p className="retention-banner__text">
               One quick step: verify your email so we can keep your account secure.
             </p>
-            <p className="retention-banner__text" style={{ marginTop: '0.25rem' }}>
+            <p className="retention-banner__text mt-1">
               Link not working or expired? You can resend a new one below.
             </p>
             {resendVerificationStatus === 'sent' && (
-              <p className="retention-banner__text" style={{ marginTop: '0.5rem' }}>
+              <p className="retention-banner__text mt-2">
                 Sent. Check your inbox (and spam folder).
               </p>
             )}
             {resendVerificationStatus === 'error' && (
-              <p className="form-error" style={{ marginTop: '0.5rem' }}>That didn&apos;t go through. Try again in a moment.</p>
+              <p className="form-error mt-2">That didn&apos;t go through. Try again in a moment.</p>
             )}
             <button
               type="button"
-              className="btn btn--secondary btn--sm"
-              style={{ marginTop: '0.75rem' }}
+              className="btn btn--secondary btn--sm mt-3"
               onClick={onResendVerification}
               disabled={resendVerificationStatus === 'sending'}
             >
@@ -436,8 +451,8 @@ function AppContent({
                 <section className="app__card" aria-label="Page not found">
                   <h2 className="app__card-title" style={{ marginTop: 0 }}>Page not found</h2>
                   <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
-                  <p style={{ marginTop: '1rem' }}>
-                    <Link to={userId ? '/home' : '/'} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+                  <p className="mt-4">
+                    <Link to={userId ? '/home' : '/'} className="btn btn--primary btn--inline">
                       Go home
                     </Link>
                   </p>

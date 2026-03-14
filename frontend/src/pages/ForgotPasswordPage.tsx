@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="app__card">
-      <h2 className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 className="app__card-title app__card-title--first">
         Forgot password
       </h2>
       {submitted ? (
@@ -33,13 +33,12 @@ export default function ForgotPasswordPage() {
           <p className="app__success" role="status">
             If we have an account for that email, we&apos;ve sent a reset link. Check your inbox and spam folder.
           </p>
-          <p className="progress-text" style={{ marginTop: '0.75rem' }}>
+          <p className="progress-text mt-3">
             Didn&apos;t get it? Check spam, or try again with the same email.
           </p>
           <button
             type="button"
-            className="btn btn--secondary"
-            style={{ marginTop: '1rem' }}
+            className="btn btn--secondary mt-4"
             onClick={() => setSubmitted(false)}
           >
             Try again
@@ -47,7 +46,7 @@ export default function ForgotPasswordPage() {
         </>
       ) : (
         <>
-          <p style={{ marginBottom: '1rem' }}>
+          <p className="mb-4">
             Enter your email and we&apos;ll send you a link to choose a new password.
           </p>
           <form onSubmit={handleSubmit} noValidate>
@@ -68,7 +67,7 @@ export default function ForgotPasswordPage() {
           </form>
         </>
       )}
-      <p style={{ marginTop: '1.5rem' }}>
+      <p className="mt-6">
         <Link to="/">Back to log in</Link>
       </p>
     </div>
