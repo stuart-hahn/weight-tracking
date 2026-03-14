@@ -82,19 +82,20 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
   if (weight_trend_kg_per_week != null && Math.abs(weight_trend_kg_per_week) >= 0.02) {
     const mag = trendAbs.toFixed(1);
     const unit = units === 'imperial' ? 'lb' : 'kg';
+    const trendVerb = trendWord === 'Losing' ? "You're losing" : "You're gaining";
     if (pace_status === 'on_track') {
-      out.trend_message = `${trendWord} ~${mag} ${unit}/week. Right on target.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit}/week—right on target.`;
     } else if (pace_status === 'ahead') {
-      out.trend_message = `${trendWord} ~${mag} ${unit}/week. You're ahead of pace.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit}/week. Ahead of pace—keep it up.`;
     } else if (pace_status === 'slightly_behind' || pace_status === 'behind') {
-      out.trend_message = `${trendWord} ~${mag} ${unit}/week.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit}/week. A small tweak can get you back on track.`;
     } else {
-      out.trend_message = `${trendWord} ~${mag} ${unit}/week.`;
+      out.trend_message = `${trendVerb} about ${mag} ${unit}/week.`;
     }
   } else if (weight_trend_kg_per_week != null) {
-    out.trend_message = 'Weight is stable. Log consistently to see your trend.';
+    out.trend_message = "Your weight's been stable. A few more weigh-ins will show your trend.";
   } else {
-    out.trend_message = 'Log at least 2 entries to see your trend.';
+    out.trend_message = "Log at least 2 weigh-ins and we'll show your trend.";
   }
 
   if (progress_percent != null) {
@@ -111,7 +112,7 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
 
   if (estimated_goal_date) {
     if (estimated_goal_date_early && estimated_goal_date_late && estimated_goal_date_early !== estimated_goal_date_late) {
-      out.goal_date_message = `At this pace, around ${formatDateShort(estimated_goal_date)} (roughly ${formatDateShort(estimated_goal_date_early)} – ${formatDateShort(estimated_goal_date_late)}).`;
+      out.goal_date_message = `At this pace, you could reach your goal around ${formatDateShort(estimated_goal_date)} (roughly ${formatDateShort(estimated_goal_date_early)} – ${formatDateShort(estimated_goal_date_late)}).`;
     } else {
       out.goal_date_message = `At this pace, you could reach your goal around ${formatDateShort(estimated_goal_date)}.`;
     }
@@ -125,23 +126,23 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
   }
 
   if (recommended_calories_min != null && recommended_calories_max != null) {
-    out.daily_calorie_message = `Aim for ${recommended_calories_min}–${recommended_calories_max} kcal/day to stay on track.`;
+    out.daily_calorie_message = `Staying around ${recommended_calories_min}–${recommended_calories_max} kcal/day can keep you on track.`;
   }
 
   if (logging_streak_days != null && logging_streak_days >= 2 && !has_entry_today) {
-    out.streak_message = `${logging_streak_days}-day logging streak. Log today to keep it.`;
+    out.streak_message = `${logging_streak_days}-day streak. Log today to keep it going.`;
   } else if (entries_this_week != null && entries_this_week >= 5 && !has_entry_today) {
-    out.streak_message = `You've logged ${entries_this_week} days this week. Log today to keep your progress visible.`;
+    out.streak_message = `You've logged ${entries_this_week} days this week. One more keeps your progress up to date.`;
   }
 
   if (!has_entry_today) {
-    out.retention_message = 'Log your weight when you can—it keeps your trend and estimate accurate.';
+    out.retention_message = "When you can, log a weigh-in—it keeps your trend and estimate accurate.";
   }
 
   if (lowConfidence && weight_trend_kg_per_week != null && estimated_goal_date) {
-    out.uncertainty_message = 'Keep logging for a few more days to lock in your estimate.';
+    out.uncertainty_message = "A few more weigh-ins will make your estimate more reliable.";
   } else if (trend_entries_count != null && trend_entries_count < 2) {
-    out.uncertainty_message = 'Log at least 2 entries to see an estimated goal date.';
+    out.uncertainty_message = "Log at least 2 weigh-ins and we'll show an estimated goal date.";
   }
 
   return out;

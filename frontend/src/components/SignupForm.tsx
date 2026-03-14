@@ -1,12 +1,14 @@
 import { useState, useCallback, FormEvent } from 'react';
 import type { CreateUserRequest, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, lbToKg } from '../utils/units';
+import { FieldInput, FieldSelect } from './Field';
 
 interface SignupFormProps {
   onSubmit: (body: CreateUserRequest) => void;
 }
 
 export default function SignupForm({ onSubmit }: SignupFormProps) {
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [age, setAge] = useState('');
@@ -17,6 +19,23 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [targetBf, setTargetBf] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleStep1 = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setSubmitError(null);
+      if (!email.trim()) {
+        setSubmitError('Email is required');
+        return;
+      }
+      if (password.length < 8) {
+        setSubmitError('Password must be at least 8 characters');
+        return;
+      }
+      setStep(2);
+    },
+    [email, password]
+  );
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -59,191 +78,175 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
     [email, password, age, sex, units, heightCm, weightKg, targetBf, onSubmit]
   );
 
-  return (
-    <>
-      <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
-        Create account
-      </h2>
-      <form onSubmit={handleSubmit} noValidate>
-        {submitError && (
-          <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
-            {submitError}
-          </div>
-        )}
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-email">
-            Email
-          </label>
-          <input
+  if (step === 1) {
+    return (
+      <>
+        <h2 id="signup-heading" className="app__card-title app__card-title--first">
+          Create account
+        </h2>
+        <form onSubmit={handleStep1} noValidate>
+          {submitError && (
+            <div className="app__error mb-4" role="alert">
+              {submitError}
+            </div>
+          )}
+          <FieldInput
             id="signup-email"
+            label="Email"
             type="email"
-            className="form-input"
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
           />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-password">
-            Password (min 8 characters)
-          </label>
-          <input
+          <FieldInput
             id="signup-password"
+            label="Password (min 8 characters)"
             type="password"
-            className="form-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
             autoComplete="new-password"
           />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-age">
-            Age
-          </label>
-          <input
-            id="signup-age"
+          <button type="submit" className="btn btn--primary form-actions__primary">
+            Continue
+          </button>
+        </form>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h2 id="signup-heading" className="app__card-title app__card-title--first">
+        Add a few details for your goal
+      </h2>
+      <p className="progress-text mb-4">
+        We&apos;ll use these to show your progress toward your target body fat %.
+      </p>
+      <form onSubmit={handleSubmit} noValidate>
+        <fieldset disabled={submitting} aria-busy={submitting} style={{ border: 'none', margin: 0, padding: 0 }}>
+        {submitError && (
+          <div className="app__error mb-4" role="alert">
+            {submitError}
+          </div>
+        )}
+        <FieldInput
+          id="signup-age"
+          label="Age"
+          type="number"
+          min={10}
+          max={120}
+          placeholder="25"
+          value={age}
+          onChange={(e) => setAge(e.target.value)}
+          required
+        />
+        <FieldSelect
+          id="signup-sex"
+          label="Sex"
+          value={sex}
+          onChange={(e) => setSex(e.target.value as 'male' | 'female')}
+        >
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </FieldSelect>
+        <FieldSelect
+          id="signup-units"
+          label="Units"
+          value={units}
+          onChange={(e) => setUnits(e.target.value as UnitsPreference)}
+        >
+          <option value="metric">Metric (kg, cm)</option>
+          <option value="imperial">Imperial (lb, in)</option>
+        </FieldSelect>
+        {units === 'metric' ? (
+          <FieldInput
+            id="signup-height-cm"
+            label="Height (cm)"
             type="number"
-            className="form-input"
-            min={10}
-            max={120}
-            placeholder="25"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
+            min={1}
+            max={300}
+            step={0.1}
+            placeholder="175"
+            value={heightCm}
+            onChange={(e) => setHeightCm(e.target.value)}
             required
           />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-sex">
-            Sex
-          </label>
-          <select
-            id="signup-sex"
-            className="form-input"
-            value={sex}
-            onChange={(e) => setSex(e.target.value as 'male' | 'female')}
-          >
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-units">
-            Units
-          </label>
-          <select
-            id="signup-units"
-            className="form-input"
-            value={units}
-            onChange={(e) => setUnits(e.target.value as UnitsPreference)}
-          >
-            <option value="metric">Metric (kg, cm)</option>
-            <option value="imperial">Imperial (lb, in)</option>
-          </select>
-        </div>
-        {units === 'metric' ? (
-          <div className="form-group">
-            <label className="form-label" htmlFor="signup-height-cm">
-              Height (cm)
-            </label>
-            <input
-              id="signup-height-cm"
-              type="number"
-              className="form-input"
-              min={1}
-              max={300}
-              step={0.1}
-              placeholder="175"
-              value={heightCm}
-              onChange={(e) => setHeightCm(e.target.value)}
-              required
-            />
-          </div>
         ) : (
           <>
-            <div className="form-group">
-              <label className="form-label" htmlFor="signup-height-ft">Height (feet)</label>
-              <input
-                id="signup-height-ft"
-                type="number"
-                className="form-input"
-                min={2}
-                max={8}
-                step={1}
-                placeholder="5"
-                value={heightCm === '' ? '' : Math.floor(cmToIn(Number(heightCm)) / 12)}
-                onChange={(e) => {
-                  const ft = Number(e.target.value);
-                  const inch = heightCm === '' ? 0 : Math.round(cmToIn(Number(heightCm)) % 12);
-                  if (Number.isNaN(ft)) setHeightCm('');
-                  else setHeightCm(String(inToCm(ft * 12 + inch)));
-                }}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="signup-height-in">Height (inches)</label>
-              <input
-                id="signup-height-in"
-                type="number"
-                className="form-input"
-                min={0}
-                max={11}
-                step={1}
-                placeholder="10"
-                value={heightCm === '' ? '' : Math.round(cmToIn(Number(heightCm)) % 12)}
-                onChange={(e) => {
-                  const inch = Number(e.target.value);
-                  const ft = heightCm === '' ? 0 : Math.floor(cmToIn(Number(heightCm)) / 12);
-                  if (Number.isNaN(inch) || inch < 0 || inch > 11) return;
-                  setHeightCm(String(inToCm(ft * 12 + inch)));
-                }}
-                required
-              />
-            </div>
+            <FieldInput
+              id="signup-height-ft"
+              label="Height (feet)"
+              type="number"
+              min={2}
+              max={8}
+              step={1}
+              placeholder="5"
+              value={heightCm === '' ? '' : Math.floor(cmToIn(Number(heightCm)) / 12)}
+              onChange={(e) => {
+                const ft = Number(e.target.value);
+                const inch = heightCm === '' ? 0 : Math.round(cmToIn(Number(heightCm)) % 12);
+                if (Number.isNaN(ft)) setHeightCm('');
+                else setHeightCm(String(inToCm(ft * 12 + inch)));
+              }}
+              required
+            />
+            <FieldInput
+              id="signup-height-in"
+              label="Height (inches)"
+              type="number"
+              min={0}
+              max={11}
+              step={1}
+              placeholder="10"
+              value={heightCm === '' ? '' : Math.round(cmToIn(Number(heightCm)) % 12)}
+              onChange={(e) => {
+                const inch = Number(e.target.value);
+                const ft = heightCm === '' ? 0 : Math.floor(cmToIn(Number(heightCm)) / 12);
+                if (Number.isNaN(inch) || inch < 0 || inch > 11) return;
+                setHeightCm(String(inToCm(ft * 12 + inch)));
+              }}
+              required
+            />
           </>
         )}
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-weight">
-            Current weight ({units === 'imperial' ? 'lb' : 'kg'})
-          </label>
-          <input
-            id="signup-weight"
-            type="number"
-            className="form-input"
-            min={units === 'imperial' ? 44 : 1}
-            max={units === 'imperial' ? 1100 : 500}
-            step={0.1}
-            placeholder={units === 'imperial' ? '176.4' : '75'}
-            value={weightKg}
-            onChange={(e) => setWeightKg(e.target.value)}
-            required
-          />
+        <FieldInput
+          id="signup-weight"
+          label={`Current weight (${units === 'imperial' ? 'lb' : 'kg'})`}
+          type="number"
+          min={units === 'imperial' ? 44 : 1}
+          max={units === 'imperial' ? 1100 : 500}
+          step={0.1}
+          placeholder={units === 'imperial' ? '176.4' : '75'}
+          value={weightKg}
+          onChange={(e) => setWeightKg(e.target.value)}
+          required
+        />
+        <FieldInput
+          id="signup-target-bf"
+          label="Target body fat (%)"
+          hint="e.g. 15 for 15%"
+          type="number"
+          min={1}
+          max={99}
+          step={0.5}
+          placeholder="15"
+          value={targetBf}
+          onChange={(e) => setTargetBf(e.target.value)}
+          required
+        />
+        <div className="form-actions">
+          <button type="button" className="btn btn--secondary" onClick={() => setStep(1)}>
+            Back
+          </button>
+          <button type="submit" className={`btn btn--primary ${submitting ? 'btn--loading' : ''}`} disabled={submitting} aria-busy={submitting}>
+            {submitting ? 'Creating account…' : 'Create account'}
+          </button>
         </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="signup-target-bf">
-            Target body fat (%)
-          </label>
-          <input
-            id="signup-target-bf"
-            type="number"
-            className="form-input"
-            min={1}
-            max={99}
-            step={0.5}
-            placeholder="15"
-            value={targetBf}
-            onChange={(e) => setTargetBf(e.target.value)}
-            required
-          />
-          <p className="form-hint">e.g. 15 for 15%</p>
-        </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
-          {submitting ? 'Creating account…' : 'Create account'}
-        </button>
+        </fieldset>
       </form>
     </>
   );

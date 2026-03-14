@@ -134,7 +134,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       estimatedGoalMessage = result.message;
     }
   } else {
-    estimatedGoalMessage = 'Log at least 2 entries to see estimated goal date.';
+    estimatedGoalMessage = "Log at least 2 weigh-ins and we'll show an estimated goal date.";
   }
 
   const paceStatus = getPaceStatus(weightTrendKgPerWeek, currentWeightKg, goalWeightKg);
@@ -183,7 +183,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     weekly_summary = {
       weight_change_kg: null,
       on_track: null,
-      message: 'Log at least 2 entries in the last 7 days to see weekly summary.',
+      message: "Add at least 2 weigh-ins in the last 7 days and we'll show your weekly summary.",
     };
   } else {
     const firstW = weeklyEntries[0].weightKg;
@@ -199,13 +199,13 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       on_track: onTrack,
       message:
         weightChangeKg >= 0
-          ? `This week: +${weightChangeKg.toFixed(2)} kg. ${onTrack ? 'On track.' : 'Consider adjusting.'}`
-          : `This week: ${weightChangeKg.toFixed(2)} kg. ${onTrack ? 'On track.' : 'Consider adjusting.'}`,
+          ? `This week: +${weightChangeKg.toFixed(2)} kg. ${onTrack ? "You're on track." : 'A small change could help—see the suggestion below.'}`
+          : `This week: ${weightChangeKg.toFixed(2)} kg. ${onTrack ? "You're on track." : 'A small change could help—see the suggestion below.'}`,
     };
   }
 
   if (recovery && caloriesRange.recommended_calories_min != null && caloriesRange.recommended_calories_max != null) {
-    recoveryMessage = `To get back on track: aim for ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next 2 weeks.`;
+    recoveryMessage = `To get back on track, try aiming for ${caloriesRange.recommended_calories_min}–${caloriesRange.recommended_calories_max} kcal for the next 2 weeks.`;
   }
 
   const todayIso = getTodayInTimezone(user.timezone);

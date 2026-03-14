@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 type InputProps = InputHTMLAttributes<HTMLInputElement>;
@@ -12,42 +13,40 @@ export interface FieldProps {
   required?: boolean;
 }
 
-export function FieldInput({
-  id,
-  label,
-  error,
-  hint,
-  required,
-  className = '',
-  ...inputProps
-}: FieldProps & Omit<InputProps, 'id'>) {
-  return (
-    <div className="form-group">
-      <label className="form-label" htmlFor={id}>
-        {label}
-        {required && ' *'}
-      </label>
-      <input
-        id={id}
-        className={`form-input ${error ? 'form-input--error' : ''} ${className}`.trim()}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-        required={required}
-        {...inputProps}
-      />
-      {hint && !error && (
-        <p id={`${id}-hint`} className="form-hint">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
+export const FieldInput = forwardRef<HTMLInputElement, FieldProps & Omit<InputProps, 'id'>>(
+  function FieldInput(
+    { id, label, error, hint, required, className = '', ...inputProps },
+    ref
+  ) {
+    return (
+      <div className="form-group">
+        <label className="form-label" htmlFor={id}>
+          {label}
+          {required && ' *'}
+        </label>
+        <input
+          ref={ref}
+          id={id}
+          className={`form-input ${error ? 'form-input--error' : ''} ${className}`.trim()}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+          required={required}
+          {...inputProps}
+        />
+        {hint && !error && (
+          <p id={`${id}-hint`} className="form-hint">
+            {hint}
+          </p>
+        )}
+        {error && (
+          <p id={`${id}-error`} className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
 
 export function FieldSelect({
   id,

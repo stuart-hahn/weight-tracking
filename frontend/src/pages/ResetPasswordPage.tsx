@@ -1,6 +1,7 @@
 import { useState, useCallback, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../api/client';
+import { FieldInput } from '../components/Field';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -23,7 +24,7 @@ export default function ResetPasswordPage() {
         return;
       }
       if (!tokenFromUrl) {
-        setError('Invalid reset link. Request a new one.');
+        setError("That link isn't valid or has expired. Use the link from your email or request a new one.");
         return;
       }
       setError(null);
@@ -47,7 +48,7 @@ export default function ResetPasswordPage() {
           Reset password
         </h2>
         <p className="app__error" role="alert">
-          Invalid or missing reset link. Use the link from your email or <Link to="/forgot-password">request a new one</Link>.
+          That link isn&apos;t valid or has expired. Use the link from your email or <Link to="/forgot-password">request a new one</Link>.
         </p>
         <p style={{ marginTop: '1rem' }}>
           <Link to="/">Back to log in</Link>
@@ -63,7 +64,7 @@ export default function ResetPasswordPage() {
           Password reset
         </h2>
         <p className="app__success" role="status">
-          Your password has been reset. You can log in with your new password.
+          Your password&apos;s been updated. You can log in now with your new password.
         </p>
         <p style={{ marginTop: '1.5rem' }}>
           <Link to="/">Log in</Link>
@@ -79,37 +80,27 @@ export default function ResetPasswordPage() {
       </h2>
       <form onSubmit={handleSubmit} noValidate>
         {error && <div className="app__error" role="alert">{error}</div>}
-        <div className="form-group">
-          <label className="form-label" htmlFor="reset-password">
-            New password
-          </label>
-          <input
-            id="reset-password"
-            type="password"
-            className="form-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="reset-confirm">
-            Confirm password
-          </label>
-          <input
-            id="reset-confirm"
-            type="password"
-            className="form-input"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+        <FieldInput
+          id="reset-password"
+          label="New password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+          autoComplete="new-password"
+        />
+        <FieldInput
+          id="reset-confirm"
+          label="Confirm password"
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          minLength={8}
+          autoComplete="new-password"
+        />
+        <button type="submit" className="btn btn--primary form-actions__primary" disabled={submitting}>
           {submitting ? 'Resetting…' : 'Reset password'}
         </button>
       </form>

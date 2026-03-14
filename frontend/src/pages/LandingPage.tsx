@@ -1,5 +1,7 @@
+import { useRef, useEffect } from 'react';
 import LoginForm from '../components/LoginForm';
 import SignupForm from '../components/SignupForm';
+import { copy } from '../copy';
 import type { CreateUserRequest, LoginRequest } from '../types/api';
 
 type AuthMode = 'login' | 'signup';
@@ -17,10 +19,31 @@ export default function LandingPage({
   onLogin,
   onSignup,
 }: LandingPageProps) {
+  const loginTabRef = useRef<HTMLButtonElement>(null);
+  const signupTabRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const active = authMode === 'login' ? loginTabRef.current : signupTabRef.current;
+    active?.focus({ preventScroll: true });
+  }, [authMode]);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      onAuthModeChange(e.key === 'ArrowRight' ? (authMode === 'login' ? 'signup' : 'login') : (authMode === 'signup' ? 'login' : 'signup'));
+    }
+  };
+
   return (
     <div className="app__card">
-      <div className="auth-tabs" role="tablist" aria-label="Log in or create account">
+      <div
+        className="auth-tabs"
+        role="tablist"
+        aria-label="Log in or create account"
+        onKeyDown={handleTabKeyDown}
+      >
         <button
+          ref={loginTabRef}
           type="button"
           role="tab"
           aria-selected={authMode === 'login'}
@@ -29,9 +52,10 @@ export default function LandingPage({
           className={`auth-tabs__tab ${authMode === 'login' ? 'auth-tabs__tab--active' : ''}`}
           onClick={() => onAuthModeChange('login')}
         >
-          Log in
+          {copy.logIn}
         </button>
         <button
+          ref={signupTabRef}
           type="button"
           role="tab"
           aria-selected={authMode === 'signup'}
@@ -40,7 +64,7 @@ export default function LandingPage({
           className={`auth-tabs__tab ${authMode === 'signup' ? 'auth-tabs__tab--active' : ''}`}
           onClick={() => onAuthModeChange('signup')}
         >
-          Create account
+          {copy.createAccount}
         </button>
       </div>
       <div id="auth-panel" role="tabpanel" aria-labelledby={authMode === 'login' ? 'tab-login' : 'tab-signup'}>

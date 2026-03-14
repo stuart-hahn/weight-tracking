@@ -43,7 +43,7 @@ export async function createUser(body: CreateUserRequest): Promise<CreateUserRes
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as CreateUserResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create user'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't create your account. Try again."));
   return data as CreateUserResponse;
 }
 
@@ -54,7 +54,7 @@ export async function login(body: LoginRequest): Promise<CreateUserResponse> {
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as CreateUserResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to log in'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't log you in. Check your email and password."));
   return data as CreateUserResponse;
 }
 
@@ -94,7 +94,7 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
 export async function getUser(id: string): Promise<UserProfile> {
   const res = await fetch(`${API_BASE}/users/${id}`, { headers: getAuthHeaders() });
   const data = (await res.json()) as UserProfile | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch user'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't load your profile. Try again."));
   return data as UserProfile;
 }
 
@@ -104,7 +104,7 @@ export async function resendVerificationEmail(userId: string): Promise<{ message
     headers: getAuthHeaders(),
   });
   const data = (await res.json()) as { message?: string } | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to send verification email'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't send the verification email. Try again."));
   return data as { message: string };
 }
 
@@ -115,7 +115,7 @@ export async function updateUser(userId: string, body: UpdateUserRequest): Promi
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as UserProfile | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update profile'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't update your profile. Try again."));
   return data as UserProfile;
 }
 
@@ -129,7 +129,7 @@ export async function createEntry(
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as DailyEntryResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create entry'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't save that. Try again."));
   return data as DailyEntryResponse;
 }
 
@@ -144,7 +144,7 @@ export async function updateEntry(
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as DailyEntryResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update entry'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't update that entry. Try again."));
   return data as DailyEntryResponse;
 }
 
@@ -155,28 +155,28 @@ export async function deleteEntry(userId: string, entryId: string): Promise<void
   });
   if (!res.ok) {
     const data = (await res.json()) as ApiError;
-    throw new Error(getErrorMessage(res, data, 'Failed to delete entry'));
+    throw new Error(getErrorMessage(res, data, "We couldn't delete that entry. Try again."));
   }
 }
 
 export async function getEntries(userId: string): Promise<DailyEntryResponse[]> {
   const res = await fetch(`${API_BASE}/users/${userId}/entries`, { headers: getAuthHeaders() });
   const data = (await res.json()) as DailyEntryResponse[] | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch entries'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't load your entries. Try again."));
   return data as DailyEntryResponse[];
 }
 
 export async function getProgress(userId: string): Promise<ProgressResponse> {
   const res = await fetch(`${API_BASE}/users/${userId}/progress`, { headers: getAuthHeaders() });
   const data = (await res.json()) as ProgressResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch progress'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't load your progress. Try again."));
   return data as ProgressResponse;
 }
 
 export async function getOptionalMetrics(userId: string): Promise<OptionalMetricResponse[]> {
   const res = await fetch(`${API_BASE}/users/${userId}/optional-metrics`, { headers: getAuthHeaders() });
   const data = (await res.json()) as OptionalMetricResponse[] | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch optional metrics'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't load optional metrics. Try again."));
   return data as OptionalMetricResponse[];
 }
 
@@ -191,7 +191,7 @@ export async function upsertOptionalMetric(
     body: JSON.stringify({ date, body_fat_percent }),
   });
   const data = (await res.json()) as OptionalMetricResponse | ApiError;
-  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to save body fat'));
+  if (!res.ok) throw new Error(getErrorMessage(res, data, "We couldn't save body fat. Try again."));
   return data as OptionalMetricResponse;
 }
 
@@ -199,7 +199,7 @@ export async function exportUserData(userId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/users/${userId}/export`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const data = (await res.json()) as ApiError;
-    throw new Error(getErrorMessage(res, data, 'Failed to export data'));
+    throw new Error(getErrorMessage(res, data, "We couldn't export your data. Try again."));
   }
   const data = await res.json();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

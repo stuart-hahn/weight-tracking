@@ -4,14 +4,16 @@ import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
 import LandingPage from './pages/LandingPage';
-import LogPage from './pages/LogPage';
-import ProgressPage from './pages/ProgressPage';
+import HomePage from './pages/HomePage';
+import HistoryPage from './pages/HistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import Nav from './components/Nav';
+import Toast from './components/Toast';
+import { copy } from './copy';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -79,7 +81,7 @@ export default function App() {
       setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
-      setSuccess('Welcome back.');
+      setSuccess(copy.welcomeBack);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Log in failed');
     }
@@ -96,7 +98,7 @@ export default function App() {
       setUserEmail(res.user.email);
       setOnboardingComplete(res.user.onboarding_complete);
       setEmailVerifiedAt(res.user.email_verified_at ?? null);
-      setSuccess('Account created.');
+      setSuccess(copy.signupSuccess);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed');
     }
@@ -142,13 +144,14 @@ export default function App() {
   if (!tokenReady) {
     return (
       <div className="app" aria-busy="true">
+        <a href="#main" className="skip-link">Skip to main content</a>
         <header className="app__header">
-          <h1 className="app__title">Body Fat Tracker</h1>
-          <p className="app__subtitle">Track weight and body fat toward your goal</p>
+          <h1 className="app__title">{copy.appTitle}</h1>
+          <p className="app__subtitle">{copy.appSubtitle}</p>
         </header>
-        <main className="app__main">
-          <div className="app__card" style={{ padding: '1.5rem' }}>
-            <div className="skeleton skeleton-line" style={{ width: '100%', height: '0.875rem', marginBottom: '0.75rem' }} aria-hidden />
+        <main id="main" className="app__main" tabIndex={-1}>
+          <div className="app__card app__card--compact">
+            <div className="skeleton skeleton-line w-full mb-3" aria-hidden />
             <div className="skeleton skeleton-line skeleton-line--short" aria-hidden />
           </div>
         </main>
@@ -209,6 +212,20 @@ type AppContentProps = {
   onResendVerification: () => Promise<void>;
 };
 
+function getPageAriaLabel(path: string, userId: string | null): string {
+  if (!userId) return 'Landing';
+  switch (path) {
+    case '/onboarding': return 'Onboarding, main content';
+    case '/home': return 'Home, log weight, main content';
+    case '/history': return 'History, main content';
+    case '/settings': return 'Settings, main content';
+    case '/forgot-password': return 'Forgot password, main content';
+    case '/reset-password': return 'Reset password, main content';
+    case '/verify-email': return 'Verify email, main content';
+    default: return 'Main content';
+  }
+}
+
 function AppContent({
   userId,
   userEmail,
@@ -234,6 +251,7 @@ function AppContent({
 }: AppContentProps) {
   const location = useLocation();
   const prevPathRef = React.useRef(location.pathname);
+  const mainRef = React.useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (prevPathRef.current !== location.pathname) {
@@ -241,49 +259,64 @@ function AppContent({
       setError(null);
       setSuccess(null);
       setResendVerificationStatus('idle');
+      mainRef.current?.focus({ preventScroll: true });
     }
   }, [location.pathname, setError, setSuccess, setResendVerificationStatus]);
 
   return (
     <div className="app">
+      <a href="#main" className="skip-link">Skip to main content</a>
       <header className="app__header">
         <h1 className="app__title">
           {userId ? (
-            <Link to="/log" className="app__title-link">Body Fat Tracker</Link>
+            <Link to="/home" className="app__title-link">{copy.appTitle}</Link>
           ) : (
-            'Body Fat Tracker'
+            copy.appTitle
           )}
         </h1>
-        <p className="app__subtitle">Track weight and body fat toward your goal</p>
+        <p className="app__subtitle">{copy.appSubtitle}</p>
       </header>
 
-      <main className="app__main">
-        {error && <div className="app__error" role="alert">{error}</div>}
-        {success && <div className="app__success" role="status">{success}</div>}
+      <main id="main" className="app__main" tabIndex={-1} ref={mainRef} aria-label={getPageAriaLabel(location.pathname, userId)}>
+        <div key={location.pathname} className="route-transition">
+        {error && (
+          <Toast
+            message={error}
+            variant="error"
+            onDismiss={() => setError(null)}
+            duration={5000}
+          />
+        )}
+        {success && (
+          <Toast
+            message={success}
+            variant="success"
+            onDismiss={() => setSuccess(null)}
+          />
+        )}
         {userId && !emailVerifiedAt && (
           <section className="app__card retention-banner" role="status">
             <p className="retention-banner__text">
-              Verify your email to secure your account.
+              {copy.verifyEmailPrompt}
             </p>
-            <p className="retention-banner__text" style={{ marginTop: '0.25rem' }}>
-              If your link expired or didn&apos;t work, you can resend a new verification email below.
+            <p className="retention-banner__text mt-1">
+              {copy.verifyEmailResendHint}
             </p>
             {resendVerificationStatus === 'sent' && (
-              <p className="retention-banner__text" style={{ marginTop: '0.5rem' }}>
-                Email sent. Check your inbox.
+              <p className="retention-banner__text mt-2">
+                {copy.verifyEmailSent}
               </p>
             )}
             {resendVerificationStatus === 'error' && (
-              <p className="form-error" style={{ marginTop: '0.5rem' }}>Send failed. Try again.</p>
+              <p className="form-error mt-2">{copy.resendFailed}</p>
             )}
             <button
               type="button"
-              className="btn btn--secondary"
-              style={{ marginTop: '0.75rem' }}
+              className="btn btn--secondary btn--sm mt-3"
               onClick={onResendVerification}
               disabled={resendVerificationStatus === 'sending'}
             >
-              {resendVerificationStatus === 'sending' ? 'Sending…' : 'Resend email'}
+              {resendVerificationStatus === 'sending' ? copy.saving : copy.resendEmail}
             </button>
           </section>
         )}
@@ -296,7 +329,7 @@ function AppContent({
                   onboardingComplete === false ? (
                     <Navigate to="/onboarding" replace />
                   ) : (
-                    <Navigate to="/log" replace />
+                    <Navigate to="/home" replace />
                   )
                 ) : (
                   <LandingPage
@@ -312,7 +345,7 @@ function AppContent({
               path="/forgot-password"
               element={
                 userId ? (
-                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/log'} replace />
+                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/home'} replace />
                 ) : (
                   <ForgotPasswordPage />
                 )
@@ -320,7 +353,7 @@ function AppContent({
             />
             <Route
               path="/reset-password"
-              element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />}
+              element={userId ? <Navigate to="/home" replace /> : <ResetPasswordPage />}
             />
             <Route
               path="/verify-email"
@@ -341,19 +374,19 @@ function AppContent({
                     />
                   </>
                 ) : userId ? (
-                  <Navigate to="/log" replace />
+                  <Navigate to="/home" replace />
                 ) : (
                   <Navigate to="/" replace />
                 )
               }
             />
             <Route
-              path="/log"
+              path="/home"
               element={
                 userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} email={userEmail} />
-                    <LogPage
+                    <HomePage
                       userId={userId}
                       refreshTrigger={progressRefreshTrigger}
                       onSubmit={handleEntrySubmit}
@@ -368,12 +401,12 @@ function AppContent({
               }
             />
             <Route
-              path="/progress"
+              path="/history"
               element={
                 userId && onboardingComplete !== false ? (
                   <>
                     <Nav onLogout={handleLogout} email={userEmail} />
-                    <ProgressPage
+                    <HistoryPage
                       userId={userId}
                       refreshTrigger={progressRefreshTrigger}
                       onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
@@ -385,6 +418,14 @@ function AppContent({
                   <Navigate to="/" replace />
                 )
               }
+            />
+            <Route
+              path="/log"
+              element={<Navigate to="/home" replace />}
+            />
+            <Route
+              path="/progress"
+              element={<Navigate to="/history" replace />}
             />
             <Route
               path="/settings"
@@ -408,18 +449,19 @@ function AppContent({
             <Route
               path="*"
               element={
-                <section className="app__card" aria-label="Page not found">
-                  <h2 className="app__card-title" style={{ marginTop: 0 }}>Page not found</h2>
-                  <p className="progress-text">The page you’re looking for doesn’t exist or has been moved.</p>
-                  <p style={{ marginTop: '1rem' }}>
-                    <Link to={userId ? '/log' : '/'} className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
-                      Go home
+                <section className="app__card" aria-label={copy.pageNotFound}>
+                  <h2 className="app__card-title app__card-title--first">{copy.pageNotFound}</h2>
+                  <p className="progress-text">{copy.pageNotFoundDescription}</p>
+                  <p className="mt-4">
+                    <Link to={userId ? '/home' : '/'} className="btn btn--primary btn--inline">
+                      {copy.goHome}
                     </Link>
                   </p>
                 </section>
               }
             />
           </Routes>
+        </div>
         </main>
       </div>
   );
