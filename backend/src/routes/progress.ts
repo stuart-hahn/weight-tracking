@@ -233,14 +233,14 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   const messages = buildProgressMessages({
     progress_percent: progressPercent,
     weight_trend_kg_per_week: weightTrendKgPerWeek,
-    trend_std_error: trendStdError ?? undefined,
-    trend_entries_count: trendEntriesCount ?? undefined,
+    trend_std_error: trendStdError ?? null,
+    trend_entries_count: trendEntriesCount ?? null,
     weekly_summary,
     estimated_goal_date: estimatedGoalDate,
-    estimated_goal_date_early: estimatedGoalDateEarly ?? undefined,
-    estimated_goal_date_late: estimatedGoalDateLate ?? undefined,
-    estimate_basis: estimateBasis ?? undefined,
-    pace_status: paceStatus ?? undefined,
+    estimated_goal_date_early: estimatedGoalDateEarly ?? null,
+    estimated_goal_date_late: estimatedGoalDateLate ?? null,
+    estimate_basis: estimateBasis ?? null,
+    pace_status: paceStatus ?? null,
     recovery_message: recoveryMessage,
     recommended_calories_min: caloriesRange.recommended_calories_min,
     recommended_calories_max: caloriesRange.recommended_calories_max,
@@ -248,7 +248,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     current_weight_kg: currentWeightKg,
     goal_weight_kg: goalWeightKg,
     units,
-    logging_streak_days: loggingStreakDays ?? undefined,
+    ...(loggingStreakDays != null ? { logging_streak_days: loggingStreakDays } : {}),
     entries_this_week: entriesThisWeek,
   });
 
@@ -282,7 +282,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     ...(estimatedGoalDateEarly != null ? { estimated_goal_date_early: estimatedGoalDateEarly } : {}),
     ...(estimatedGoalDateLate != null ? { estimated_goal_date_late: estimatedGoalDateLate } : {}),
     ...(estimateBasis != null ? { estimate_basis: estimateBasis } : {}),
-    ...(paceStatus != null ? { pace_status: paceStatus } : {}),
+    ...(paceStatus != null ? { pace_status: paceStatus } : { pace_status: null }),
     ...(recovery != null
       ? {
           recovery: {

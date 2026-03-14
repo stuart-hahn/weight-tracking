@@ -64,14 +64,11 @@ export function buildProgressMessages(input: ProgressMessagesInput): ProgressMes
     recommended_calories_min,
     recommended_calories_max,
     has_entry_today,
-    current_weight_kg,
-    goal_weight_kg,
     units,
     logging_streak_days,
     entries_this_week,
   } = input;
 
-  const losing = goal_weight_kg < current_weight_kg;
   const trendAbs = weight_trend_kg_per_week != null ? Math.abs(weight_trend_kg_per_week) : 0;
   const trendWord = weight_trend_kg_per_week != null && weight_trend_kg_per_week < 0 ? 'Losing' : 'Gaining';
   const lowConfidence = (trend_entries_count != null && trend_entries_count < 5) ||
