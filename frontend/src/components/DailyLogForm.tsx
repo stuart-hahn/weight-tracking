@@ -1,10 +1,11 @@
-import { useState, useCallback, FormEvent, useEffect } from 'react';
+import { useState, useCallback, FormEvent, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getProgress, getEntries, updateEntry } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse, DailyEntryResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, kgToLb, inToCm } from '../utils/units';
 import { getTodayInTimezone, getYesterdayInTimezone } from '../utils/date';
 import ProgressSummary from './ProgressSummary';
+import { FieldInput } from './Field';
 
 export interface OptionalBodyFatSubmit {
   date: string;
@@ -46,6 +47,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [editTodayCalories, setEditTodayCalories] = useState('');
   const [editTodaySaving, setEditTodaySaving] = useState(false);
   const [editTodayError, setEditTodayError] = useState<string | null>(null);
+  const prevProgressRef = useRef<ProgressResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,11 +100,31 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       setDuplicateDate(null);
       setSavedMessage(null);
       setSubmitting(true);
+      if (progress) {
+        prevProgressRef.current = progress;
+        const goalKg = progress.goal_weight_kg;
+        const startKg = progress.start_weight_kg;
+        const newPercent =
+          goalKg != null && startKg !== goalKg
+            ? Math.min(100, Math.max(0, ((weightKgNum - startKg) / (goalKg - startKg)) * 100))
+            : progress.progress_percent;
+        setProgress({
+          ...progress,
+          current_weight_kg: weightKgNum,
+          latest_entry_date: date,
+          entries_count: progress.entries_count + 1,
+          progress_percent: newPercent ?? 0,
+        });
+      }
       try {
         await onSubmit(body, optionalBodyFat);
         setSavedMessage('Got it. Your progress is updated.');
         window.setTimeout(() => setSavedMessage(null), 3000);
       } catch (err) {
+        if (prevProgressRef.current) {
+          setProgress(prevProgressRef.current);
+          prevProgressRef.current = null;
+        }
         const msg = err instanceof Error ? err.message : 'Failed to save entry';
         if (msg.includes('already exists') || msg.includes('Entry already')) {
           setDuplicateDate(date);
@@ -114,7 +136,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
         setSubmitting(false);
       }
     },
-    [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, onSubmit, onError]
+    [date, weightKg, calories, optionalOpen, waistCm, hipCm, bodyFatPercent, units, progress, onSubmit, onError]
   );
 
   const handleEditTodaySubmit = useCallback(
@@ -308,7 +330,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </p>
           </details>
           <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-            <Link to="/settings" className="btn btn--secondary" style={{ display: 'inline-block', width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+            <Link to="/settings" className="btn btn--secondary btn--sm">
               Change goal
             </Link>
           </p>
@@ -343,37 +365,33 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           {variant === 'home' && showEditTodayForm && todayEntry && (
             <form onSubmit={handleEditTodaySubmit} noValidate style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
               {editTodayError && <p className="form-error" role="alert" style={{ marginBottom: '0.5rem' }}>{editTodayError}</p>}
-              <div className="form-group">
-                <label className="form-label" htmlFor="edit-today-weight">Weight ({units === 'imperial' ? 'lb' : 'kg'})</label>
-                <input
-                  id="edit-today-weight"
-                  type="number"
-                  className="form-input"
-                  min={units === 'imperial' ? 20 : 1}
-                  max={units === 'imperial' ? 1100 : 500}
-                  step={0.1}
-                  value={editTodayWeight}
-                  onChange={(e) => setEditTodayWeight(e.target.value)}
-                />
+              <FieldInput
+                id="edit-today-weight"
+                label={`Weight (${units === 'imperial' ? 'lb' : 'kg'})`}
+                type="number"
+                min={units === 'imperial' ? 20 : 1}
+                max={units === 'imperial' ? 1100 : 500}
+                step={0.1}
+                value={editTodayWeight}
+                onChange={(e) => setEditTodayWeight(e.target.value)}
+              />
+              <FieldInput
+                id="edit-today-calories"
+                label="Calories (optional)"
+                type="number"
+                min={0}
+                max={10000}
+                value={editTodayCalories}
+                onChange={(e) => setEditTodayCalories(e.target.value)}
+              />
+              <div className="form-actions">
+                <button type="submit" className="btn btn--primary" disabled={editTodaySaving}>
+                  {editTodaySaving ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" className="btn btn--secondary" onClick={() => { setShowEditTodayForm(false); setTodayEntry(null); setEditTodayError(null); }} disabled={editTodaySaving}>
+                  Cancel
+                </button>
               </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="edit-today-calories">Calories (optional)</label>
-                <input
-                  id="edit-today-calories"
-                  type="number"
-                  className="form-input"
-                  min={0}
-                  max={10000}
-                  value={editTodayCalories}
-                  onChange={(e) => setEditTodayCalories(e.target.value)}
-                />
-              </div>
-              <button type="submit" className="btn btn--primary" style={{ marginRight: '0.5rem' }} disabled={editTodaySaving}>
-                {editTodaySaving ? 'Saving…' : 'Save'}
-              </button>
-              <button type="button" className="btn btn--secondary" onClick={() => { setShowEditTodayForm(false); setTodayEntry(null); setEditTodayError(null); }} disabled={editTodaySaving}>
-                Cancel
-              </button>
             </form>
           )}
           {variant === 'home' && showEditTodayForm && !todayEntry && (
@@ -401,60 +419,45 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
           {hasEntryToday && showFormForOtherDate ? 'Log another date' : 'Log today'}
         </h2>
         <form onSubmit={handleSubmit} noValidate>
-          <div className="form-group">
-            <label className="form-label" htmlFor="log-date">
-              Date
-            </label>
-            <input
-              id="log-date"
-              type="date"
-              className="form-input"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              max={getTodayInTimezone(progress?.timezone ?? undefined)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="log-weight">
-              Weight ({units === 'imperial' ? 'lb' : 'kg'})
-            </label>
-            <input
-              id="log-weight"
-              type="number"
-              className="form-input"
-              min={units === 'imperial' ? 20 : 1}
-              max={units === 'imperial' ? 1100 : 500}
-              step={0.1}
-              placeholder={units === 'imperial' ? '176.4' : '75.0'}
-              value={weightKg}
-              onChange={(e) => { setWeightKg(e.target.value); setWeightError(null); }}
-              required
-            />
-            {weightError && <p className="form-error" role="alert">{weightError}</p>}
-            {duplicateDate && (
-              <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
-                You&apos;ve already logged this date.{' '}
-                <Link to="/history" state={{ editDate: duplicateDate }}>Edit that entry instead</Link>.
-              </p>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="log-calories">
-              Calories (optional)
-            </label>
-            <input
-              id="log-calories"
-              type="number"
-              className="form-input"
-              min={0}
-              max={10000}
-              step={1}
-              placeholder="2000"
-              value={calories}
-              onChange={(e) => setCalories(e.target.value)}
-            />
-          </div>
+          <FieldInput
+            id="log-date"
+            label="Date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            max={getTodayInTimezone(progress?.timezone ?? undefined)}
+            required
+          />
+          <FieldInput
+            id="log-weight"
+            label={`Weight (${units === 'imperial' ? 'lb' : 'kg'})`}
+            type="number"
+            min={units === 'imperial' ? 20 : 1}
+            max={units === 'imperial' ? 1100 : 500}
+            step={0.1}
+            placeholder={units === 'imperial' ? '176.4' : '75.0'}
+            value={weightKg}
+            onChange={(e) => { setWeightKg(e.target.value); setWeightError(null); }}
+            error={weightError}
+            required
+          />
+          {duplicateDate && (
+            <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
+              You&apos;ve already logged this date.{' '}
+              <Link to="/history" state={{ editDate: duplicateDate }}>Edit that entry instead</Link>.
+            </p>
+          )}
+          <FieldInput
+            id="log-calories"
+            label="Calories (optional)"
+            type="number"
+            min={0}
+            max={10000}
+            step={1}
+            placeholder="2000"
+            value={calories}
+            onChange={(e) => setCalories(e.target.value)}
+          />
 
           <p className="form-hint" style={{ marginBottom: '0.75rem' }}>
             Optional: body fat %, waist, hip. Expand below if you track these.
@@ -471,22 +474,17 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </button>
             <div className="collapsible__content" hidden={!bodyFatOpen}>
               <div className="collapsible__inner">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="log-bodyfat">
-                    Body fat (%)
-                  </label>
-                  <input
-                    id="log-bodyfat"
-                    type="number"
-                    className="form-input"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    placeholder="e.g. 22"
-                    value={bodyFatPercent}
-                    onChange={(e) => setBodyFatPercent(e.target.value)}
-                  />
-                </div>
+                <FieldInput
+                  id="log-bodyfat"
+                  label="Body fat (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  placeholder="e.g. 22"
+                  value={bodyFatPercent}
+                  onChange={(e) => setBodyFatPercent(e.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -503,43 +501,33 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </button>
             <div className="collapsible__content" hidden={!optionalOpen}>
               <div className="collapsible__inner">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="log-waist">
-                    Waist ({units === 'imperial' ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    id="log-waist"
-                    type="number"
-                    className="form-input"
-                    min={1}
-                    max={200}
-                    step={0.1}
-                    placeholder="80"
-                    value={waistCm}
-                    onChange={(e) => setWaistCm(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="log-hip">
-                    Hip ({units === 'imperial' ? 'in' : 'cm'})
-                  </label>
-                  <input
-                    id="log-hip"
-                    type="number"
-                    className="form-input"
-                    min={1}
-                    max={200}
-                    step={0.1}
-                    placeholder="95"
-                    value={hipCm}
-                    onChange={(e) => setHipCm(e.target.value)}
-                  />
-                </div>
+                <FieldInput
+                  id="log-waist"
+                  label={`Waist (${units === 'imperial' ? 'in' : 'cm'})`}
+                  type="number"
+                  min={1}
+                  max={200}
+                  step={0.1}
+                  placeholder="80"
+                  value={waistCm}
+                  onChange={(e) => setWaistCm(e.target.value)}
+                />
+                <FieldInput
+                  id="log-hip"
+                  label={`Hip (${units === 'imperial' ? 'in' : 'cm'})`}
+                  type="number"
+                  min={1}
+                  max={200}
+                  step={0.1}
+                  placeholder="95"
+                  value={hipCm}
+                  onChange={(e) => setHipCm(e.target.value)}
+                />
               </div>
             </div>
           </div>
 
-          <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+          <button type="submit" className="btn btn--primary form-actions__primary" disabled={submitting}>
             {submitting ? 'Saving…' : 'Save entry'}
           </button>
           {savedMessage && (

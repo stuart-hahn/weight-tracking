@@ -5,6 +5,7 @@ import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrendMagnitude, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import { getTodayInTimezone } from '../utils/date';
 import PageLoading from './PageLoading';
+import { FieldInput } from './Field';
 
 interface EntryHistoryProps {
   userId: string;
@@ -169,11 +170,14 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
 
   if (sortedEntries.length === 0) {
     return (
-      <section className="app__card" aria-label="Progress">
-        <h2 className="app__card-title">Progress</h2>
-        <p className="progress-text">
-          No weigh-ins yet. <Link to="/home">Log your first one to see your progress</Link>.
+      <section className="app__card empty-state" aria-label="Progress">
+        <h2 className="empty-state__title">No weigh-ins yet</h2>
+        <p className="empty-state__text">
+          Log your first weigh-in to see your progress and track your trend over time.
         </p>
+        <Link to="/home" className="btn btn--primary" style={{ width: 'auto' }}>
+          Log your first weigh-in
+        </Link>
       </section>
     );
   }
@@ -248,7 +252,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       <section className="app__card" aria-label="Progress, goal timeline, and weight history">
       <h2 className="app__card-title">Progress</h2>
-      <figure className="chart-wrap" style={{ width: '100%', maxWidth: width, margin: '0 auto 1rem' }} aria-label="Weight over time with goal line and trend">
+      <figure className="chart-wrap" aria-label="Weight over time with goal line and trend">
         <svg
           viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
@@ -380,13 +384,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             </p>
           </details>
           <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-            <Link to="/settings" className="btn btn--secondary" style={{ display: 'inline-block', width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}>
+            <Link to="/settings" className="btn btn--secondary btn--sm">
               Change goal
             </Link>
           </p>
         </>
       )}
-      <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
+      <h3 className="app__card-title app__card-title--sm mt-6">Weight history</h3>
       {localSuccess && (
         <p className="app__success" role="status" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
           {localSuccess}
@@ -394,66 +398,57 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       )}
       {editingEntry && progress && (
         <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
-          <h4 className="app__card-title" style={{ fontSize: '0.9rem' }}>Edit entry ({editingEntry.date})</h4>
+          <h4 className="app__card-title app__card-title--sm">Edit entry ({editingEntry.date})</h4>
           {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-entry-weight">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
-              <input
-                ref={editFirstInputRef}
-                id="edit-entry-weight"
-                type="number"
-                className="form-input"
-                min={progress.units === 'imperial' ? 20 : 1}
-                max={progress.units === 'imperial' ? 1100 : 500}
-                step={0.1}
-                value={editWeight}
-                onChange={(e) => setEditWeight(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Calories (optional)</label>
-              <input
-                type="number"
-                className="form-input"
-                min={0}
-                max={10000}
-                value={editCalories}
-                onChange={(e) => setEditCalories(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Waist ({progress.units === 'imperial' ? 'in' : 'cm'})</label>
-              <input
-                type="number"
-                className="form-input"
-                min={1}
-                max={200}
-                step={0.1}
-                value={editWaist}
-                onChange={(e) => setEditWaist(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Hip ({progress.units === 'imperial' ? 'in' : 'cm'})</label>
-              <input
-                type="number"
-                className="form-input"
-                min={1}
-                max={200}
-                step={0.1}
-                value={editHip}
-                onChange={(e) => setEditHip(e.target.value)}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-              <button type="submit" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} disabled={editSaving}>
+            <FieldInput
+              ref={editFirstInputRef}
+              id="edit-entry-weight"
+              label={`Weight (${progress.units === 'imperial' ? 'lb' : 'kg'})`}
+              type="number"
+              min={progress.units === 'imperial' ? 20 : 1}
+              max={progress.units === 'imperial' ? 1100 : 500}
+              step={0.1}
+              value={editWeight}
+              onChange={(e) => setEditWeight(e.target.value)}
+            />
+            <FieldInput
+              id="edit-entry-calories"
+              label="Calories (optional)"
+              type="number"
+              min={0}
+              max={10000}
+              value={editCalories}
+              onChange={(e) => setEditCalories(e.target.value)}
+            />
+            <FieldInput
+              id="edit-entry-waist"
+              label={`Waist (${progress.units === 'imperial' ? 'in' : 'cm'})`}
+              type="number"
+              min={1}
+              max={200}
+              step={0.1}
+              value={editWaist}
+              onChange={(e) => setEditWaist(e.target.value)}
+            />
+            <FieldInput
+              id="edit-entry-hip"
+              label={`Hip (${progress.units === 'imperial' ? 'in' : 'cm'})`}
+              type="number"
+              min={1}
+              max={200}
+              step={0.1}
+              value={editHip}
+              onChange={(e) => setEditHip(e.target.value)}
+            />
+            <div className="form-actions">
+              <button type="submit" className="btn btn--primary" disabled={editSaving}>
                 {editSaving ? 'Saving…' : 'Save'}
               </button>
               <button type="button" className="btn btn--secondary" onClick={() => setEditingEntry(null)} disabled={editSaving}>
                 Cancel
               </button>
-              <button type="button" className="btn btn--secondary" onClick={() => setShowDeleteConfirm(true)} disabled={editSaving} style={{ color: 'var(--danger)' }} ref={deleteButtonRef}>
+              <button type="button" className="btn btn--secondary btn--danger" onClick={() => setShowDeleteConfirm(true)} disabled={editSaving} ref={deleteButtonRef}>
                 Delete
               </button>
             </div>
@@ -461,14 +456,14 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </section>
       )}
       {showDeleteConfirm && editingEntry && (
-        <div role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc" style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }}>
-          <div className="app__card" style={{ maxWidth: '320px', width: '100%' }}>
+        <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-desc">
+          <div className="dialog-overlay__content app__card">
             <h2 id="delete-dialog-title" className="app__card-title" style={{ marginTop: 0 }}>Delete entry?</h2>
             <p id="delete-dialog-desc" className="progress-text">
               Delete this weigh-in for {editingEntry.date}? This can&apos;t be undone.
             </p>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-              <button type="button" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} onClick={handleDeleteConfirm} disabled={editSaving}>
+            <div className="form-actions">
+              <button type="button" className="btn btn--primary btn--danger" onClick={handleDeleteConfirm} disabled={editSaving}>
                 {editSaving ? 'Deleting…' : 'Delete'}
               </button>
               <button type="button" className="btn btn--secondary" ref={cancelConfirmRef} onClick={() => { setShowDeleteConfirm(false); deleteButtonRef.current?.focus(); }} disabled={editSaving}>

@@ -5,6 +5,7 @@ import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import { getTodayInTimezone } from '../utils/date';
 import PageLoading from '../components/PageLoading';
+import { FieldInput } from '../components/Field';
 
 interface OnboardingPageProps {
   userId: string;
@@ -90,39 +91,29 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         You can switch to lb/in in Settings anytime.
       </p>
       <form onSubmit={handleLogFirstEntry} noValidate>
-        <div className="form-group">
-          <label className="form-label" htmlFor="onboarding-weight">
-            Weight ({units === 'imperial' ? 'lb' : 'kg'})
-          </label>
-          <input
-            ref={weightInputRef}
-            id="onboarding-weight"
-            type="number"
-            step={units === 'imperial' ? 1 : 0.1}
-            min={units === 'imperial' ? 50 : 20}
-            max={units === 'imperial' ? 700 : 500}
-            className="form-input"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="onboarding-calories">
-            Calories (optional)
-          </label>
-          <input
-            id="onboarding-calories"
-            type="number"
-            min={0}
-            max={10000}
-            className="form-input"
-            placeholder="Optional"
-            value={calories}
-            onChange={(e) => setCalories(e.target.value)}
-          />
-        </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+        <FieldInput
+          ref={weightInputRef}
+          id="onboarding-weight"
+          label={`Weight (${units === 'imperial' ? 'lb' : 'kg'})`}
+          type="number"
+          step={units === 'imperial' ? 1 : 0.1}
+          min={units === 'imperial' ? 50 : 20}
+          max={units === 'imperial' ? 700 : 500}
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          required
+        />
+        <FieldInput
+          id="onboarding-calories"
+          label="Calories (optional)"
+          type="number"
+          min={0}
+          max={10000}
+          placeholder="Optional"
+          value={calories}
+          onChange={(e) => setCalories(e.target.value)}
+        />
+        <button type="submit" className="btn btn--primary form-actions__primary">
           Save and continue
         </button>
       </form>

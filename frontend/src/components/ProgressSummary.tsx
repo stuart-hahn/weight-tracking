@@ -110,8 +110,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         <p style={{ marginTop: '0.75rem', marginBottom: 0 }}>
           <button
             type="button"
-            className="btn btn--secondary"
-            style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+            className="btn btn--secondary btn--sm"
             onClick={() => setShowEditGoal(true)}
           >
             Change goal
@@ -144,7 +143,7 @@ export default function ProgressSummary({ progress, userId, onGoalUpdated }: Pro
         </form>
       )}
       <p style={{ marginTop: '1rem', marginBottom: 0 }}>
-        <Link to="/history" className="btn btn--secondary" style={{ display: 'inline-block', width: 'auto', padding: '0.5rem 1rem', fontSize: '0.9rem' }}>
+        <Link to="/history" className="btn btn--secondary btn--sm">
           See full progress
         </Link>
       </p>

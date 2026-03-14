@@ -12,6 +12,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import Nav from './components/Nav';
+import Toast from './components/Toast';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -142,12 +143,13 @@ export default function App() {
   if (!tokenReady) {
     return (
       <div className="app" aria-busy="true">
+        <a href="#main" className="skip-link">Skip to main content</a>
         <header className="app__header">
           <h1 className="app__title">Body Fat Tracker</h1>
           <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
         </header>
-        <main className="app__main">
-          <div className="app__card" style={{ padding: '1.5rem' }}>
+        <main id="main" className="app__main" tabIndex={-1}>
+          <div className="app__card app__card--compact">
             <div className="skeleton skeleton-line" style={{ width: '100%', height: '0.875rem', marginBottom: '0.75rem' }} aria-hidden />
             <div className="skeleton skeleton-line skeleton-line--short" aria-hidden />
           </div>
@@ -246,6 +248,7 @@ function AppContent({
 
   return (
     <div className="app">
+      <a href="#main" className="skip-link">Skip to main content</a>
       <header className="app__header">
         <h1 className="app__title">
           {userId ? (
@@ -257,9 +260,23 @@ function AppContent({
         <p className="app__subtitle">Track your weight and body fat—and see your progress toward your goal.</p>
       </header>
 
-      <main className="app__main">
-        {error && <div className="app__error" role="alert">{error}</div>}
-        {success && <div className="app__success" role="status">{success}</div>}
+      <main id="main" className="app__main" tabIndex={-1}>
+        <div key={location.pathname} className="route-transition">
+        {error && (
+          <Toast
+            message={error}
+            variant="error"
+            onDismiss={() => setError(null)}
+            duration={5000}
+          />
+        )}
+        {success && (
+          <Toast
+            message={success}
+            variant="success"
+            onDismiss={() => setSuccess(null)}
+          />
+        )}
         {userId && !emailVerifiedAt && (
           <section className="app__card retention-banner" role="status">
             <p className="retention-banner__text">
@@ -278,7 +295,7 @@ function AppContent({
             )}
             <button
               type="button"
-              className="btn btn--secondary"
+              className="btn btn--secondary btn--sm"
               style={{ marginTop: '0.75rem' }}
               onClick={onResendVerification}
               disabled={resendVerificationStatus === 'sending'}
@@ -428,6 +445,7 @@ function AppContent({
               }
             />
           </Routes>
+        </div>
         </main>
       </div>
   );

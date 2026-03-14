@@ -1,6 +1,7 @@
 import { useState, useCallback, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api/client';
+import { FieldInput } from '../components/Field';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -51,22 +52,17 @@ export default function ForgotPasswordPage() {
           </p>
           <form onSubmit={handleSubmit} noValidate>
             {error && <div className="app__error" role="alert">{error}</div>}
-            <div className="form-group">
-              <label className="form-label" htmlFor="forgot-email">
-                Email
-              </label>
-              <input
-                id="forgot-email"
-                type="email"
-                className="form-input"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-            <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+            <FieldInput
+              id="forgot-email"
+              label="Email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+            <button type="submit" className="btn btn--primary form-actions__primary">
               Send reset link
             </button>
           </form>
