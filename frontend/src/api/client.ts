@@ -10,6 +10,18 @@ import type {
   ProgressResponse,
   OptionalMetricResponse,
   ApiError,
+  ExerciseListItem,
+  ExerciseInsightsResponse,
+  WorkoutListItem,
+  WorkoutDetailResponse,
+  CreateWorkoutRequest,
+  PatchWorkoutRequest,
+  CreateExerciseRequest,
+  AddWorkoutExerciseRequest,
+  PatchWorkoutExerciseRequest,
+  PatchWorkoutSetRequest,
+  WorkoutExerciseNested,
+  WorkoutSetResponse,
 } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -183,6 +195,209 @@ export async function upsertOptionalMetric(
   const data = (await res.json()) as OptionalMetricResponse | ApiError;
   if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to save body fat'));
   return data as OptionalMetricResponse;
+}
+
+export async function listExercises(
+  userId: string,
+  params?: { q?: string; favorites_only?: boolean }
+): Promise<ExerciseListItem[]> {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set('q', params.q);
+  if (params?.favorites_only) sp.set('favorites_only', 'true');
+  const q = sp.toString();
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises${q ? `?${q}` : ''}`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as ExerciseListItem[] | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercises'));
+  return data as ExerciseListItem[];
+}
+
+export async function createExercise(userId: string, body: CreateExerciseRequest): Promise<ExerciseListItem> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as ExerciseListItem | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create exercise'));
+  return data as ExerciseListItem;
+}
+
+export async function getExerciseInsights(userId: string, exerciseId: string): Promise<ExerciseInsightsResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/insights`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as ExerciseInsightsResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercise insights'));
+  return data as ExerciseInsightsResponse;
+}
+
+export async function addExerciseFavorite(userId: string, exerciseId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/favorite`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to add favorite'));
+  }
+}
+
+export async function removeExerciseFavorite(userId: string, exerciseId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/favorite`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to remove favorite'));
+  }
+}
+
+export async function listWorkouts(
+  userId: string,
+  params?: { status?: 'in_progress' | 'completed'; limit?: number }
+): Promise<WorkoutListItem[]> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set('status', params.status);
+  if (params?.limit != null) sp.set('limit', String(params.limit));
+  const q = sp.toString();
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts${q ? `?${q}` : ''}`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as WorkoutListItem[] | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch workouts'));
+  return data as WorkoutListItem[];
+}
+
+export async function createWorkout(userId: string, body: CreateWorkoutRequest = {}): Promise<WorkoutDetailResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create workout'));
+  return data as WorkoutDetailResponse;
+}
+
+export async function getWorkout(userId: string, workoutId: string): Promise<WorkoutDetailResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as WorkoutDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch workout'));
+  return data as WorkoutDetailResponse;
+}
+
+export async function patchWorkout(
+  userId: string,
+  workoutId: string,
+  body: PatchWorkoutRequest
+): Promise<WorkoutDetailResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update workout'));
+  return data as WorkoutDetailResponse;
+}
+
+export async function deleteWorkout(userId: string, workoutId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete workout'));
+  }
+}
+
+export async function addWorkoutExercise(
+  userId: string,
+  workoutId: string,
+  body: AddWorkoutExerciseRequest
+): Promise<WorkoutExerciseNested> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutExerciseNested | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add exercise'));
+  return data as WorkoutExerciseNested;
+}
+
+export async function patchWorkoutExercise(
+  userId: string,
+  workoutId: string,
+  lineId: string,
+  body: PatchWorkoutExerciseRequest
+): Promise<WorkoutExerciseNested> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises/${lineId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutExerciseNested | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update exercise line'));
+  return data as WorkoutExerciseNested;
+}
+
+export async function deleteWorkoutExercise(userId: string, workoutId: string, lineId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises/${lineId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to remove exercise'));
+  }
+}
+
+export async function addWorkoutSet(
+  userId: string,
+  workoutId: string,
+  lineId: string,
+  body: PatchWorkoutSetRequest = {}
+): Promise<WorkoutSetResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises/${lineId}/sets`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutSetResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add set'));
+  return data as WorkoutSetResponse;
+}
+
+export async function patchWorkoutSet(
+  userId: string,
+  workoutId: string,
+  lineId: string,
+  setId: string,
+  body: PatchWorkoutSetRequest
+): Promise<WorkoutSetResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises/${lineId}/sets/${setId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutSetResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update set'));
+  return data as WorkoutSetResponse;
+}
+
+export async function deleteWorkoutSet(
+  userId: string,
+  workoutId: string,
+  lineId: string,
+  setId: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/workouts/${workoutId}/exercises/${lineId}/sets/${setId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete set'));
+  }
 }
 
 export async function exportUserData(userId: string): Promise<void> {

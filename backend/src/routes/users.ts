@@ -85,7 +85,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
     res.status(404).json({ error: 'User not found' });
     return;
   }
-  const [entries, optionalMetrics] = await Promise.all([
+  const [entries, optionalMetrics, workouts] = await Promise.all([
     prisma.dailyEntry.findMany({
       where: { userId: id },
       orderBy: { date: 'desc' },
@@ -103,6 +103,19 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       where: { userId: id },
       orderBy: { date: 'desc' },
       select: { date: true, bodyFatPercent: true, createdAt: true },
+    }),
+    prisma.workout.findMany({
+      where: { userId: id },
+      orderBy: { startedAt: 'desc' },
+      include: {
+        exercises: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            exercise: { select: { id: true, name: true, kind: true, userId: true } },
+            sets: { orderBy: { setIndex: 'asc' } },
+          },
+        },
+      },
     }),
   ]);
   const exportData = {
@@ -135,6 +148,36 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       date: m.date.toISOString().slice(0, 10),
       body_fat_percent: m.bodyFatPercent,
       created_at: m.createdAt.toISOString(),
+    })),
+    workouts: workouts.map((w) => ({
+      id: w.id,
+      name: w.name,
+      notes: w.notes,
+      started_at: w.startedAt.toISOString(),
+      completed_at: w.completedAt?.toISOString() ?? null,
+      created_at: w.createdAt.toISOString(),
+      exercises: w.exercises.map((we) => ({
+        id: we.id,
+        exercise_id: we.exerciseId,
+        order_index: we.orderIndex,
+        notes: we.notes,
+        default_rest_seconds: we.defaultRestSeconds,
+        exercise: {
+          id: we.exercise.id,
+          name: we.exercise.name,
+          kind: we.exercise.kind,
+          user_id: we.exercise.userId,
+        },
+        sets: we.sets.map((s) => ({
+          id: s.id,
+          set_index: s.setIndex,
+          weight_kg: s.weightKg,
+          reps: s.reps,
+          duration_sec: s.durationSec,
+          notes: s.notes,
+          rest_seconds_after: s.restSecondsAfter,
+        })),
+      })),
     })),
   };
   res.json(exportData);

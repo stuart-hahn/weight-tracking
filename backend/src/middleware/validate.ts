@@ -1,11 +1,57 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { UserCreateInput, UserUpdateInput, DailyEntryCreateInput, DailyEntryUpdateInput, OptionalMetricCreateInput } from '../types/index.js';
+import type {
+  UserCreateInput,
+  UserUpdateInput,
+  DailyEntryCreateInput,
+  DailyEntryUpdateInput,
+  OptionalMetricCreateInput,
+  ExerciseCreateInput,
+  ExerciseUpdateInput,
+  WorkoutCreateInput,
+  WorkoutUpdateInput,
+  WorkoutExerciseCreateInput,
+  WorkoutExerciseUpdateInput,
+  WorkoutSetCreateInput,
+  WorkoutSetUpdateInput,
+} from '../types/index.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidDate(s: string): boolean {
   const d = new Date(s);
   return !Number.isNaN(d.getTime()) && s === d.toISOString().slice(0, 10);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(s: string): boolean {
+  return typeof s === 'string' && UUID_RE.test(s);
+}
+
+const EXERCISE_KINDS = ['weight_reps', 'bodyweight_reps', 'time'] as const;
+
+function validWeightKg(v: unknown): boolean {
+  return typeof v === 'number' && v > 0 && v <= 500;
+}
+
+function validOptionalWeightKg(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && v > 0 && v <= 500;
+}
+
+function validReps(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1000;
+}
+
+function validDurationSec(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 86400;
+}
+
+function validRestSec(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 3600;
 }
 
 export function validateCreateUser(
@@ -125,6 +171,270 @@ export function validateOptionalMetric(
   const errors: string[] = [];
   if (typeof body.date !== 'string' || !isValidDate(body.date)) errors.push('Valid date (YYYY-MM-DD) required');
   if (typeof body.body_fat_percent !== 'number' || body.body_fat_percent < 0 || body.body_fat_percent > 100) errors.push('body_fat_percent must be a number between 0 and 100');
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateCreateExercise(
+  req: Request<{ id: string }, unknown, ExerciseCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120) {
+    errors.push('name must be 1–120 characters');
+  }
+  if (!EXERCISE_KINDS.includes(body.kind as (typeof EXERCISE_KINDS)[number])) {
+    errors.push(`kind must be one of: ${EXERCISE_KINDS.join(', ')}`);
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateUpdateExercise(
+  req: Request<{ id: string; exerciseId: string }, unknown, ExerciseUpdateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim().length < 1 || body.name.length > 120)) {
+    errors.push('name must be 1–120 characters');
+  }
+  if (body.kind !== undefined && !EXERCISE_KINDS.includes(body.kind as (typeof EXERCISE_KINDS)[number])) {
+    errors.push(`kind must be one of: ${EXERCISE_KINDS.join(', ')}`);
+  }
+  if (body.name === undefined && body.kind === undefined) {
+    errors.push('At least one of name, kind required');
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateCreateWorkout(
+  req: Request<{ id: string }, unknown, WorkoutCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.name != null && body.name !== undefined && (typeof body.name !== 'string' || body.name.length > 200)) {
+    errors.push('name must be at most 200 characters or null');
+  }
+  if (body.notes != null && body.notes !== undefined && (typeof body.notes !== 'string' || body.notes.length > 8000)) {
+    errors.push('notes too long');
+  }
+  if (body.clone_from_workout_id != null && body.clone_from_workout_id !== undefined) {
+    if (typeof body.clone_from_workout_id !== 'string' || !isUuid(body.clone_from_workout_id)) {
+      errors.push('clone_from_workout_id must be a valid UUID');
+    }
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateUpdateWorkout(
+  req: Request<{ id: string; workoutId: string }, unknown, WorkoutUpdateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.name !== undefined && body.name !== null && (typeof body.name !== 'string' || body.name.length > 200)) {
+    errors.push('Invalid name');
+  }
+  if (body.notes !== undefined && body.notes !== null && (typeof body.notes !== 'string' || body.notes.length > 8000)) {
+    errors.push('notes too long');
+  }
+  if (body.completed_at !== undefined && body.completed_at !== null) {
+    if (typeof body.completed_at !== 'string' || Number.isNaN(Date.parse(body.completed_at))) {
+      errors.push('completed_at must be a valid ISO datetime');
+    }
+  }
+  if (
+    body.name === undefined &&
+    body.notes === undefined &&
+    body.completed_at === undefined
+  ) {
+    errors.push('At least one of name, notes, completed_at required');
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateCreateWorkoutExercise(
+  req: Request<{ id: string; workoutId: string }, unknown, WorkoutExerciseCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (typeof body.exercise_id !== 'string' || !isUuid(body.exercise_id)) {
+    errors.push('exercise_id must be a valid UUID');
+  }
+  if (body.notes != null && body.notes !== undefined && (typeof body.notes !== 'string' || body.notes.length > 2000)) {
+    errors.push('notes too long');
+  }
+  if (body.default_rest_seconds != null && body.default_rest_seconds !== undefined && !validRestSec(body.default_rest_seconds)) {
+    errors.push('default_rest_seconds must be 0–3600 or null');
+  }
+  if (body.sets !== undefined) {
+    if (!Array.isArray(body.sets)) {
+      errors.push('sets must be an array');
+    } else if (body.sets.length > 50) {
+      errors.push('At most 50 sets');
+    } else {
+      for (const s of body.sets) {
+        if (!s || typeof s !== 'object') {
+          errors.push('Each set must be an object');
+          break;
+        }
+        const set = s as WorkoutSetCreateInput;
+        if (!validOptionalWeightKg(set.weight_kg)) errors.push('Invalid weight_kg in sets');
+        if (!validReps(set.reps)) errors.push('Invalid reps in sets');
+        if (!validDurationSec(set.duration_sec)) errors.push('Invalid duration_sec in sets');
+        if (set.notes != null && set.notes !== undefined && (typeof set.notes !== 'string' || set.notes.length > 500)) {
+          errors.push('Invalid set notes');
+        }
+        if (!validRestSec(set.rest_seconds_after)) errors.push('Invalid rest_seconds_after in sets');
+      }
+    }
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateUpdateWorkoutExercise(
+  req: Request<{ id: string; workoutId: string; lineId: string }, unknown, WorkoutExerciseUpdateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.notes !== undefined && body.notes !== null && (typeof body.notes !== 'string' || body.notes.length > 2000)) {
+    errors.push('Invalid notes');
+  }
+  if (body.default_rest_seconds !== undefined && body.default_rest_seconds !== null && !validRestSec(body.default_rest_seconds)) {
+    errors.push('default_rest_seconds must be 0–3600 or null');
+  }
+  if (body.order_index !== undefined && (!Number.isInteger(body.order_index) || body.order_index < 0 || body.order_index > 500)) {
+    errors.push('order_index must be an integer 0–500');
+  }
+  if (body.notes === undefined && body.default_rest_seconds === undefined && body.order_index === undefined) {
+    errors.push('At least one of notes, default_rest_seconds, order_index required');
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateCreateWorkoutSet(
+  req: Request<{ id: string; workoutId: string; lineId: string }, unknown, WorkoutSetCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (!validOptionalWeightKg(body.weight_kg)) errors.push('Invalid weight_kg');
+  if (!validReps(body.reps)) errors.push('Invalid reps');
+  if (!validDurationSec(body.duration_sec)) errors.push('Invalid duration_sec');
+  if (body.notes != null && body.notes !== undefined && (typeof body.notes !== 'string' || body.notes.length > 500)) {
+    errors.push('Invalid notes');
+  }
+  if (!validRestSec(body.rest_seconds_after)) errors.push('Invalid rest_seconds_after');
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+export function validateUpdateWorkoutSet(
+  req: Request<{ id: string; workoutId: string; lineId: string; setId: string }, unknown, WorkoutSetUpdateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (body.weight_kg !== undefined) {
+    if (body.weight_kg !== null && !validWeightKg(body.weight_kg)) {
+      errors.push('weight_kg must be > 0 and ≤ 500, or null');
+    }
+  }
+  if (body.reps !== undefined && body.reps !== null && (!Number.isInteger(body.reps) || body.reps < 0 || body.reps > 1000)) {
+    errors.push('Invalid reps');
+  }
+  if (body.duration_sec !== undefined && body.duration_sec !== null && (!Number.isInteger(body.duration_sec) || body.duration_sec < 0 || body.duration_sec > 86400)) {
+    errors.push('Invalid duration_sec');
+  }
+  if (body.notes !== undefined && body.notes !== null && (typeof body.notes !== 'string' || body.notes.length > 500)) {
+    errors.push('Invalid notes');
+  }
+  if (body.rest_seconds_after !== undefined && body.rest_seconds_after !== null && !validRestSec(body.rest_seconds_after)) {
+    errors.push('Invalid rest_seconds_after');
+  }
+  if (
+    body.weight_kg === undefined &&
+    body.reps === undefined &&
+    body.duration_sec === undefined &&
+    body.notes === undefined &&
+    body.rest_seconds_after === undefined
+  ) {
+    errors.push('At least one field to update required');
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

@@ -7,6 +7,8 @@ import LandingPage from './pages/LandingPage';
 import LogPage from './pages/LogPage';
 import ProgressPage from './pages/ProgressPage';
 import SettingsPage from './pages/SettingsPage';
+import WorkoutsPage from './pages/WorkoutsPage';
+import WorkoutSessionPage from './pages/WorkoutSessionPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -334,6 +336,36 @@ function AppContent({
                       refreshTrigger={progressRefreshTrigger}
                       onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
                     />
+                  </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/workouts"
+              element={
+                userId && onboardingComplete !== false ? (
+                  <>
+                    <Nav onLogout={handleLogout} email={userEmail} />
+                    <WorkoutsPage userId={userId} onError={setError} />
+                  </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/workouts/:workoutId"
+              element={
+                userId && onboardingComplete !== false ? (
+                  <>
+                    <Nav onLogout={handleLogout} email={userEmail} />
+                    <WorkoutSessionPage userId={userId} onError={setError} onSuccess={setSuccess} />
                   </>
                 ) : userId ? (
                   <Navigate to="/onboarding" replace />

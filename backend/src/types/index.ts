@@ -129,3 +129,58 @@ export interface OptionalMetrics {
   body_fat_percent: number | null;
   created_at: Date;
 }
+
+/** Exercise kind for API and validation */
+export type ExerciseKind = 'weight_reps' | 'bodyweight_reps' | 'time';
+
+export interface ExerciseCreateInput {
+  name: string;
+  kind: ExerciseKind;
+}
+
+export interface ExerciseUpdateInput {
+  name?: string;
+  kind?: ExerciseKind;
+}
+
+export interface WorkoutCreateInput {
+  name?: string | null;
+  notes?: string | null;
+  clone_from_workout_id?: string | null;
+}
+
+export interface WorkoutUpdateInput {
+  name?: string | null;
+  notes?: string | null;
+  completed_at?: string | null; // ISO datetime; set to mark complete (use "now" convention: non-null string)
+}
+
+export interface WorkoutExerciseCreateInput {
+  exercise_id: string;
+  notes?: string | null;
+  default_rest_seconds?: number | null;
+  /** Pre-fill sets (e.g. from template); otherwise one empty set is created */
+  sets?: WorkoutSetCreateInput[];
+}
+
+export interface WorkoutExerciseUpdateInput {
+  notes?: string | null;
+  default_rest_seconds?: number | null;
+  order_index?: number;
+}
+
+export interface WorkoutSetCreateInput {
+  weight_kg?: number | null;
+  reps?: number | null;
+  duration_sec?: number | null;
+  notes?: string | null;
+  rest_seconds_after?: number | null;
+}
+
+export interface WorkoutSetUpdateInput {
+  weight_kg?: number | null;
+  reps?: number | null;
+  duration_sec?: number | null;
+  notes?: string | null;
+  rest_seconds_after?: number | null;
+}

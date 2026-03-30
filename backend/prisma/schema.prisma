@@ -33,6 +33,90 @@ model User {
 
   dailyEntries    DailyEntry[]
   optionalMetrics OptionalMetric[]
+  exercises       Exercise[]
+  exerciseFavorites UserExerciseFavorite[]
+  workouts        Workout[]
+}
+
+/// Global catalog (userId null) or user-created custom exercise
+model Exercise {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  name      String
+  kind      String   // weight_reps | bodyweight_reps | time
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user              User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites         UserExerciseFavorite[]
+  workoutExercises  WorkoutExercise[]
+
+  @@index([userId])
+  @@index([name])
+  @@unique([userId, name])
+  @@map("exercises")
+}
+
+model UserExerciseFavorite {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  exerciseId String   @map("exercise_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, exerciseId])
+  @@index([userId])
+  @@map("user_exercise_favorites")
+}
+
+model Workout {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  name        String?
+  notes       String?
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises WorkoutExercise[]
+
+  @@index([userId, startedAt])
+  @@index([userId, completedAt])
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id                  String   @id @default(uuid())
+  workoutId           String   @map("workout_id")
+  exerciseId          String   @map("exercise_id")
+  orderIndex          Int      @map("order_index")
+  notes               String?
+  defaultRestSeconds  Int?     @map("default_rest_seconds")
+
+  workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets     WorkoutSet[]
+
+  @@index([workoutId, orderIndex])
+  @@map("workout_exercises")
+}
+
+model WorkoutSet {
+  id                String   @id @default(uuid())
+  workoutExerciseId String   @map("workout_exercise_id")
+  setIndex          Int      @map("set_index")
+  weightKg          Float?   @map("weight_kg")
+  reps              Int?
+  durationSec       Int?     @map("duration_sec")
+  notes             String?
+  restSecondsAfter  Int?     @map("rest_seconds_after")
+
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([workoutExerciseId, setIndex])
+  @@map("workout_sets")
 }
 
 model DailyEntry {

@@ -117,3 +117,122 @@ export interface OptionalMetricResponse {
 export interface ApiError {
   error: string;
 }
+
+export type WorkoutExerciseKind = 'weight_reps' | 'bodyweight_reps' | 'time';
+
+export interface ExerciseListItem {
+  id: string;
+  user_id: string | null;
+  name: string;
+  kind: WorkoutExerciseKind;
+  is_custom: boolean;
+  is_favorite: boolean;
+  created_at: string;
+}
+
+export interface ExerciseInsightsResponse {
+  exercise_id: string;
+  last_performance: {
+    workout_id: string;
+    completed_at: string;
+    sets: { weight_kg: number | null; reps: number | null; duration_sec: number | null }[];
+  } | null;
+  suggestion: {
+    suggested_weight_kg: number | null;
+    suggested_reps: number | null;
+    hint: string;
+  };
+}
+
+export interface WorkoutSetResponse {
+  id: string;
+  set_index: number;
+  weight_kg: number | null;
+  reps: number | null;
+  duration_sec: number | null;
+  notes: string | null;
+  rest_seconds_after: number | null;
+}
+
+export interface WorkoutExerciseNested {
+  id: string;
+  exercise_id: string;
+  order_index: number;
+  notes: string | null;
+  default_rest_seconds: number | null;
+  exercise: {
+    id: string;
+    user_id: string | null;
+    name: string;
+    kind: WorkoutExerciseKind;
+    is_custom: boolean;
+    created_at: string;
+  };
+  sets: WorkoutSetResponse[];
+}
+
+export interface WorkoutListItem {
+  id: string;
+  user_id: string;
+  name: string | null;
+  notes: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  exercise_count: number;
+}
+
+export interface WorkoutDetailResponse {
+  id: string;
+  user_id: string;
+  name: string | null;
+  notes: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  exercises: WorkoutExerciseNested[];
+}
+
+export interface CreateWorkoutRequest {
+  name?: string | null;
+  notes?: string | null;
+  clone_from_workout_id?: string | null;
+}
+
+export interface PatchWorkoutRequest {
+  name?: string | null;
+  notes?: string | null;
+  completed_at?: string | null;
+}
+
+export interface CreateExerciseRequest {
+  name: string;
+  kind: WorkoutExerciseKind;
+}
+
+export interface AddWorkoutExerciseRequest {
+  exercise_id: string;
+  notes?: string | null;
+  default_rest_seconds?: number | null;
+  sets?: {
+    weight_kg?: number | null;
+    reps?: number | null;
+    duration_sec?: number | null;
+    notes?: string | null;
+    rest_seconds_after?: number | null;
+  }[];
+}
+
+export interface PatchWorkoutExerciseRequest {
+  notes?: string | null;
+  default_rest_seconds?: number | null;
+  order_index?: number;
+}
+
+export interface PatchWorkoutSetRequest {
+  weight_kg?: number | null;
+  reps?: number | null;
+  duration_sec?: number | null;
+  notes?: string | null;
+  rest_seconds_after?: number | null;
+}

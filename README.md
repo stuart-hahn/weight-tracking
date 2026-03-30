@@ -126,7 +126,29 @@ Do not use in production.
 - `GET /api/users/:id/progress` – progress metrics (computed goal, current from latest entry, trend, % toward goal)
 - `POST /api/users/:id/optional-metrics` – upsert body fat % for a date
 - `GET /api/users/:id/optional-metrics` – list optional metrics (body fat by date)
-- `GET /api/users/:id/export` – export user data (profile + entries + optional metrics) as JSON (Bearer token)
+- `GET /api/users/:id/export` – export user data (profile + entries + optional metrics + workouts) as JSON (Bearer token)
+
+**Workouts (all Bearer, `:id` must match token user):**
+
+- `GET /api/users/:id/exercises` – list exercises (`q`, `favorites_only`); global catalog + user custom
+- `POST /api/users/:id/exercises` – create custom exercise (`name`, `kind`: `weight_reps` \| `bodyweight_reps` \| `time`)
+- `GET /api/users/:id/exercises/:exerciseId` – exercise detail
+- `GET /api/users/:id/exercises/:exerciseId/insights` – last performance + suggestion
+- `POST /api/users/:id/exercises/:exerciseId/favorite` – add favorite
+- `DELETE /api/users/:id/exercises/:exerciseId/favorite` – remove favorite
+- `PATCH /api/users/:id/exercises/:exerciseId` – update custom exercise
+- `DELETE /api/users/:id/exercises/:exerciseId` – delete custom exercise
+- `GET /api/users/:id/workouts` – list workouts (`status=in_progress` \| `completed`, `limit`)
+- `POST /api/users/:id/workouts` – start workout (optional `clone_from_workout_id`, `name`, `notes`)
+- `GET /api/users/:id/workouts/:workoutId` – workout detail with exercises and sets
+- `PATCH /api/users/:id/workouts/:workoutId` – update (e.g. `notes`, `completed_at`)
+- `DELETE /api/users/:id/workouts/:workoutId` – delete workout
+- `POST /api/users/:id/workouts/:workoutId/exercises` – add line (`exercise_id`, optional `sets[]`)
+- `PATCH /api/users/:id/workouts/:workoutId/exercises/:lineId` – line notes, `default_rest_seconds`, `order_index`
+- `DELETE /api/users/:id/workouts/:workoutId/exercises/:lineId` – remove line
+- `POST /api/users/:id/workouts/:workoutId/exercises/:lineId/sets` – add set
+- `PATCH /api/users/:id/workouts/:workoutId/exercises/:lineId/sets/:setId` – update set
+- `DELETE /api/users/:id/workouts/:workoutId/exercises/:lineId/sets/:setId` – delete set (weights in kg in JSON)
 
 **Weight semantics:** In progress, "current weight" = latest entry's weight when the user has entries, otherwise the profile (starting) weight. Profile "current weight" is the reference/starting value and is editable via PATCH.
 

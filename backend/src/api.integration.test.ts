@@ -129,7 +129,7 @@ describe('API integration', () => {
     expect(res.body.body_fat_percent).toBe(22);
   });
 
-  it('GET /api/users/:id/export returns profile, entries, optional_metrics', async () => {
+  it('GET /api/users/:id/export returns profile, entries, optional_metrics, workouts', async () => {
     const res = await request(app)
       .get(`/api/users/${userId}/export`)
       .set('Authorization', `Bearer ${token}`);
@@ -141,6 +141,69 @@ describe('API integration', () => {
     expect(Array.isArray(res.body.entries)).toBe(true);
     expect(res.body).toHaveProperty('optional_metrics');
     expect(Array.isArray(res.body.optional_metrics)).toBe(true);
+    expect(res.body).toHaveProperty('workouts');
+    expect(Array.isArray(res.body.workouts)).toBe(true);
+  });
+
+  it('workouts: create exercise, workout, line, set, complete, clone', async () => {
+    const ex = await request(app)
+      .post(`/api/users/${userId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: 'Integration Press', kind: 'weight_reps' });
+    expect(ex.status).toBe(201);
+    const exerciseId = ex.body.id as string;
+
+    const wo = await request(app)
+      .post(`/api/users/${userId}/workouts`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: 'Test day' });
+    expect(wo.status).toBe(201);
+    const workoutId = wo.body.id as string;
+
+    const line = await request(app)
+      .post(`/api/users/${userId}/workouts/${workoutId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ exercise_id: exerciseId });
+    expect(line.status).toBe(201);
+    const lineId = line.body.id as string;
+    const setId = line.body.sets[0].id as string;
+
+    const patchSet = await request(app)
+      .patch(`/api/users/${userId}/workouts/${workoutId}/exercises/${lineId}/sets/${setId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ weight_kg: 50, reps: 10 });
+    expect(patchSet.status).toBe(200);
+    expect(patchSet.body.weight_kg).toBe(50);
+    expect(patchSet.body.reps).toBe(10);
+
+    const done = await request(app)
+      .patch(`/api/users/${userId}/workouts/${workoutId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ completed_at: new Date().toISOString() });
+    expect(done.status).toBe(200);
+    expect(done.body.completed_at).not.toBeNull();
+
+    const ins = await request(app)
+      .get(`/api/users/${userId}/exercises/${exerciseId}/insights`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(ins.status).toBe(200);
+    expect(ins.body.last_performance).not.toBeNull();
+    expect(ins.body.last_performance.sets.length).toBeGreaterThanOrEqual(1);
+
+    const clone = await request(app)
+      .post(`/api/users/${userId}/workouts`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ clone_from_workout_id: workoutId });
+    expect(clone.status).toBe(201);
+    expect(clone.body.completed_at).toBeNull();
+    expect(clone.body.exercises.length).toBeGreaterThanOrEqual(1);
+    expect(clone.body.exercises[0].sets[0].weight_kg).toBe(50);
   });
 
   it('POST /api/auth/verify-email verifies with valid token', async () => {

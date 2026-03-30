@@ -88,6 +88,39 @@ async function main(): Promise<void> {
   }
 
   console.log('Seeded', days, 'daily entries for test user.');
+
+  const globalExercises: { name: string; kind: string }[] = [
+    { name: 'Barbell back squat', kind: 'weight_reps' },
+    { name: 'Barbell bench press', kind: 'weight_reps' },
+    { name: 'Deadlift', kind: 'weight_reps' },
+    { name: 'Overhead press', kind: 'weight_reps' },
+    { name: 'Barbell row', kind: 'weight_reps' },
+    { name: 'Romanian deadlift', kind: 'weight_reps' },
+    { name: 'Leg press', kind: 'weight_reps' },
+    { name: 'Lat pulldown', kind: 'weight_reps' },
+    { name: 'Dumbbell curl', kind: 'weight_reps' },
+    { name: 'Tricep pushdown', kind: 'weight_reps' },
+    { name: 'Pull-up', kind: 'bodyweight_reps' },
+    { name: 'Push-up', kind: 'bodyweight_reps' },
+    { name: 'Plank', kind: 'time' },
+    { name: 'Treadmill run', kind: 'time' },
+    { name: 'Bike', kind: 'time' },
+  ];
+  let addedEx = 0;
+  for (const ex of globalExercises) {
+    const exists = await prisma.exercise.findFirst({
+      where: { userId: null, name: ex.name },
+    });
+    if (!exists) {
+      await prisma.exercise.create({
+        data: { userId: null, name: ex.name, kind: ex.kind },
+      });
+      addedEx += 1;
+    }
+  }
+  if (addedEx > 0) {
+    console.log('Seeded', addedEx, 'global exercises.');
+  }
 }
 
 main()

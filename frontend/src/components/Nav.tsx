@@ -12,6 +12,9 @@ export default function Nav({ onLogout, email }: NavProps) {
       <NavLink to="/log" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`} end>
         Log
       </NavLink>
+      <NavLink to="/workouts" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
+        Workouts
+      </NavLink>
       <NavLink to="/progress" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
         Progress
       </NavLink>
