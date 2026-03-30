@@ -3,12 +3,12 @@
  */
 
 import { prisma } from '../config/db.js';
-import type { SetSnapshot } from './workoutProgression.js';
+import type { LoggedSetSnapshot } from './workoutProgressionStrategies.js';
 
 export interface LastPerformanceResult {
   workout_id: string;
   completed_at: string;
-  sets: SetSnapshot[];
+  sets: LoggedSetSnapshot[];
 }
 
 export async function cloneWorkoutForUser(userId: string, templateId: string): Promise<string | null> {
@@ -54,6 +54,13 @@ export async function cloneWorkoutForUser(userId: string, templateId: string): P
             durationSec: s.durationSec,
             notes: s.notes,
             restSecondsAfter: s.restSecondsAfter,
+            rir: s.rir,
+            setRole: s.setRole,
+            targetRepsMin: s.targetRepsMin,
+            targetRepsMax: s.targetRepsMax,
+            targetRirMin: s.targetRirMin,
+            targetRirMax: s.targetRirMax,
+            calibrationToFailure: s.calibrationToFailure,
           },
         });
       }
@@ -88,6 +95,8 @@ export async function getLastPerformanceForExercise(
         weight_kg: s.weightKg,
         reps: s.reps,
         duration_sec: s.durationSec,
+        rir: s.rir,
+        set_role: s.setRole,
       })),
     };
   }

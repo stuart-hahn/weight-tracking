@@ -217,7 +217,7 @@ This creates a migration from the current schema. For an existing production SQL
 - **Date/time:** Prisma maps `DateTime` to `timestamp with time zone` on PostgreSQL. The app stores dates in UTC; ensure your connection timezone or app logic is consistent.
 - **Backup:** Use PostgreSQL backup tools (e.g. `pg_dump`, managed backups) instead of file copies.
 - **Migrations:** For production, run `prisma migrate deploy` in your deploy pipeline after setting `DATABASE_URL`; do not use `migrate dev` in production.
-- **Optional: CI against Postgres:** You can add a CI job that runs tests against a PostgreSQL service container (e.g. `postgres:16`) and `DATABASE_URL` pointing to it, to catch provider-specific issues.
+- **CI / integration tests:** This repo’s GitHub Actions job uses a `postgres:16` service with `POSTGRES_DB=body_fat_tracker_test` and runs `npm run test:integration` in `backend/`. For local runs, create that database once (see **README → Quick Start §6**); the default URL matches `postgresql://postgres:postgres@localhost:5432/body_fat_tracker_test`.
 
 ## Checklist
 

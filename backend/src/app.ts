@@ -9,6 +9,7 @@ import progressRouter from './routes/progress.js';
 import optionalMetricsRouter from './routes/optionalMetrics.js';
 import exercisesRouter from './routes/exercises.js';
 import workoutsRouter from './routes/workouts.js';
+import programsRouter from './routes/programs.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const app = express();
@@ -33,6 +34,7 @@ app.use('/api/users/:id/progress', progressRouter);
 app.use('/api/users/:id/optional-metrics', optionalMetricsRouter);
 app.use('/api/users/:id/exercises', exercisesRouter);
 app.use('/api/users/:id/workouts', workoutsRouter);
+app.use('/api/users/:id/programs', programsRouter);
 app.use('/api/users', usersRouter);
 
 app.get('/health', (_req, res) => {

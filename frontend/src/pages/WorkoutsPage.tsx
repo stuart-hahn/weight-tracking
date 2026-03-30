@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { listWorkouts, createWorkout } from '../api/client';
-import type { WorkoutListItem } from '../types/api';
+import { listWorkouts, createWorkout, listWorkoutPrograms, getWorkoutProgram } from '../api/client';
+import type { WorkoutListItem, WorkoutProgramListItem, WorkoutProgramDetailResponse } from '../types/api';
 import PageLoading from '../components/PageLoading';
 
 interface WorkoutsPageProps {
@@ -23,6 +23,10 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   const [inProgress, setInProgress] = useState<WorkoutListItem[]>([]);
   const [completed, setCompleted] = useState<WorkoutListItem[]>([]);
   const [starting, setStarting] = useState(false);
+  const [programPickerOpen, setProgramPickerOpen] = useState(false);
+  const [programs, setPrograms] = useState<WorkoutProgramListItem[]>([]);
+  const [programDetail, setProgramDetail] = useState<WorkoutProgramDetailResponse | null>(null);
+  const [programLoading, setProgramLoading] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -56,6 +60,50 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
     }
   };
 
+  const openProgramPicker = async () => {
+    setProgramPickerOpen(true);
+    setProgramDetail(null);
+    setProgramLoading(true);
+    try {
+      const list = await listWorkoutPrograms(userId);
+      setPrograms(list);
+      onError?.(null);
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : 'Failed to load programs');
+      setPrograms([]);
+    } finally {
+      setProgramLoading(false);
+    }
+  };
+
+  const selectProgramForStart = async (programId: string) => {
+    setProgramLoading(true);
+    try {
+      const p = await getWorkoutProgram(userId, programId);
+      setProgramDetail(p);
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : 'Failed to load program');
+      setProgramDetail(null);
+    } finally {
+      setProgramLoading(false);
+    }
+  };
+
+  const startFromProgramDay = async (programDayId: string) => {
+    setStarting(true);
+    try {
+      const w = await createWorkout(userId, { program_day_id: programDayId });
+      setProgramPickerOpen(false);
+      setProgramDetail(null);
+      navigate(`/workouts/${w.id}`);
+      onError?.(null);
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : 'Failed to start from program');
+    } finally {
+      setStarting(false);
+    }
+  };
+
   if (loading) {
     return <PageLoading />;
   }
@@ -67,9 +115,84 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
         <p className="progress-text" style={{ marginBottom: '1rem' }}>
           Log strength sessions, see last time&apos;s performance, and repeat past workouts for progressive overload.
         </p>
-        <button type="button" className="btn btn--primary" disabled={starting} onClick={() => void startNew()}>
-          {starting ? 'Starting…' : 'Start new workout'}
-        </button>
+        <div className="workout-start-actions">
+          <button type="button" className="btn btn--primary" disabled={starting} onClick={() => void startNew()}>
+            {starting ? 'Starting…' : 'Start new workout'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            disabled={starting}
+            onClick={() => void openProgramPicker()}
+          >
+            Start from program
+          </button>
+        </div>
+        {programPickerOpen && (
+          <div className="app__card program-start-modal" style={{ marginTop: '1rem' }}>
+            <h3 className="app__card-title">Choose program day</h3>
+            {programLoading && !programDetail && <p className="progress-text">Loading…</p>}
+            {!programDetail && programs.length > 0 && (
+              <ul className="workout-history-list">
+                {programs.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="workout-history-list__link"
+                      style={{ border: 'none', cursor: 'pointer', font: 'inherit', width: '100%', textAlign: 'left' }}
+                      onClick={() => void selectProgramForStart(p.id)}
+                    >
+                      <span>{p.name}</span>
+                      <span className="workout-history-list__meta">{p.day_count} days</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!programLoading && programs.length === 0 && (
+              <p className="progress-text">
+                No programs yet. <Link to="/workouts/programs">Create one under Programs</Link>.
+              </p>
+            )}
+            {programDetail && (
+              <>
+                <button type="button" className="btn btn--secondary btn--sm" style={{ marginBottom: '0.75rem' }} onClick={() => setProgramDetail(null)}>
+                  ← Back to programs
+                </button>
+                <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+                  Pick a day for <strong>{programDetail.name}</strong>:
+                </p>
+                <div className="program-day-tabs">
+                  {programDetail.days.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      className="btn btn--secondary"
+                      disabled={starting}
+                      onClick={() => void startFromProgramDay(d.id)}
+                    >
+                      {d.name} ({d.exercises.length} ex.)
+                    </button>
+                  ))}
+                </div>
+                {programDetail.days.length === 0 && (
+                  <p className="progress-text">This program has no days yet. Edit it under Programs.</p>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              style={{ marginTop: '0.75rem' }}
+              onClick={() => {
+                setProgramPickerOpen(false);
+                setProgramDetail(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </section>
 
       {inProgress.length > 0 && (

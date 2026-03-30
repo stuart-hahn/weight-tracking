@@ -47,6 +47,9 @@ export interface UserUpdateInput {
   units?: UnitsPreference;
   onboarding_complete?: boolean;
   plan?: string | null;
+  /** ISO date (YYYY-MM-DD) or datetime; null clears block start */
+  training_block_started_at?: string | null;
+  last_calibration_week_index?: number | null;
 }
 
 /** User without sensitive fields for API responses */
@@ -64,6 +67,8 @@ export interface UserProfile {
   email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
+  training_block_started_at: string | null;
+  last_calibration_week_index: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -147,6 +152,7 @@ export interface WorkoutCreateInput {
   name?: string | null;
   notes?: string | null;
   clone_from_workout_id?: string | null;
+  program_day_id?: string | null;
 }
 
 export interface WorkoutUpdateInput {
@@ -175,6 +181,13 @@ export interface WorkoutSetCreateInput {
   duration_sec?: number | null;
   notes?: string | null;
   rest_seconds_after?: number | null;
+  rir?: number | null;
+  set_role?: string | null;
+  target_reps_min?: number | null;
+  target_reps_max?: number | null;
+  target_rir_min?: number | null;
+  target_rir_max?: number | null;
+  calibration_to_failure?: boolean;
 }
 
 export interface WorkoutSetUpdateInput {
@@ -183,4 +196,17 @@ export interface WorkoutSetUpdateInput {
   duration_sec?: number | null;
   notes?: string | null;
   rest_seconds_after?: number | null;
+  rir?: number | null;
+  set_role?: string | null;
+  target_reps_min?: number | null;
+  target_reps_max?: number | null;
+  target_rir_min?: number | null;
+  target_rir_max?: number | null;
+  calibration_to_failure?: boolean;
+}
+
+/** POST /exercises/batch-insights */
+export interface ExerciseBatchInsightsInput {
+  exercise_ids: string[];
+  progression_variant_by_exercise_id?: Record<string, string>;
 }

@@ -18,6 +18,7 @@ import type {
   WorkoutSetUpdateInput,
 } from '../types/index.js';
 import { cloneWorkoutForUser } from '../services/workoutDb.js';
+import { instantiateWorkoutFromProgramDay } from '../services/programWorkout.js';
 
 const router = Router({ mergeParams: true });
 
@@ -47,7 +48,22 @@ async function loadWorkoutFull(userId: string, workoutId: string) {
   });
 }
 
-function serializeSet(s: { id: string; setIndex: number; weightKg: number | null; reps: number | null; durationSec: number | null; notes: string | null; restSecondsAfter: number | null }) {
+function serializeSet(s: {
+  id: string;
+  setIndex: number;
+  weightKg: number | null;
+  reps: number | null;
+  durationSec: number | null;
+  notes: string | null;
+  restSecondsAfter: number | null;
+  rir: number | null;
+  setRole: string | null;
+  targetRepsMin: number | null;
+  targetRepsMax: number | null;
+  targetRirMin: number | null;
+  targetRirMax: number | null;
+  calibrationToFailure: boolean;
+}) {
   return {
     id: s.id,
     set_index: s.setIndex,
@@ -56,6 +72,13 @@ function serializeSet(s: { id: string; setIndex: number; weightKg: number | null
     duration_sec: s.durationSec,
     notes: s.notes,
     rest_seconds_after: s.restSecondsAfter,
+    rir: s.rir,
+    set_role: s.setRole,
+    target_reps_min: s.targetRepsMin,
+    target_reps_max: s.targetRepsMax,
+    target_rir_min: s.targetRirMin,
+    target_rir_max: s.targetRirMax,
+    calibration_to_failure: s.calibrationToFailure,
   };
 }
 
@@ -91,6 +114,10 @@ function serializeWorkoutFull(w: WorkoutWithNested) {
     started_at: w.startedAt.toISOString(),
     completed_at: w.completedAt?.toISOString() ?? null,
     created_at: w.createdAt.toISOString(),
+    program_id: w.programId,
+    program_day_id: w.programDayId,
+    training_week_index: w.trainingWeekIndex,
+    is_deload_week: w.isDeloadWeek,
     exercises: w.exercises.map(serializeLine),
   };
 }
@@ -121,6 +148,8 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
       started_at: w.startedAt.toISOString(),
       completed_at: w.completedAt?.toISOString() ?? null,
       created_at: w.createdAt.toISOString(),
+      program_id: w.programId,
+      program_day_id: w.programDayId,
       exercise_count: w._count.exercises,
     }))
   );
@@ -140,6 +169,20 @@ router.post('/', requireAuth, validateCreateWorkout, async (req: AuthRequest, re
       const w = await loadWorkoutFull(userId, newId);
       if (!w) {
         res.status(500).json({ error: 'Failed to load cloned workout' });
+        return;
+      }
+      res.status(201).json(serializeWorkoutFull(w));
+      return;
+    }
+    if (body.program_day_id) {
+      const newId = await instantiateWorkoutFromProgramDay(userId, body.program_day_id);
+      if (!newId) {
+        res.status(404).json({ error: 'Program day not found' });
+        return;
+      }
+      const w = await loadWorkoutFull(userId, newId);
+      if (!w) {
+        res.status(500).json({ error: 'Failed to load workout from program' });
         return;
       }
       res.status(201).json(serializeWorkoutFull(w));
@@ -281,6 +324,13 @@ router.post('/:workoutId/exercises', requireAuth, validateCreateWorkoutExercise,
             durationSec: si.duration_sec ?? null,
             notes: si.notes ?? null,
             restSecondsAfter: si.rest_seconds_after ?? null,
+            rir: si.rir ?? null,
+            setRole: si.set_role ?? null,
+            targetRepsMin: si.target_reps_min ?? null,
+            targetRepsMax: si.target_reps_max ?? null,
+            targetRirMin: si.target_rir_min ?? null,
+            targetRirMax: si.target_rir_max ?? null,
+            calibrationToFailure: si.calibration_to_failure ?? false,
           },
         });
         idx += 1;
@@ -418,6 +468,13 @@ router.post('/:workoutId/exercises/:lineId/sets', requireAuth, validateCreateWor
         durationSec: body.duration_sec ?? null,
         notes: body.notes ?? null,
         restSecondsAfter: body.rest_seconds_after ?? null,
+        rir: body.rir ?? null,
+        setRole: body.set_role ?? null,
+        targetRepsMin: body.target_reps_min ?? null,
+        targetRepsMax: body.target_reps_max ?? null,
+        targetRirMin: body.target_rir_min ?? null,
+        targetRirMax: body.target_rir_max ?? null,
+        calibrationToFailure: body.calibration_to_failure ?? false,
       },
     });
     res.status(201).json(serializeSet(set));
@@ -449,12 +506,26 @@ router.patch('/:workoutId/exercises/:lineId/sets/:setId', requireAuth, validateU
       durationSec?: number | null;
       notes?: string | null;
       restSecondsAfter?: number | null;
+      rir?: number | null;
+      setRole?: string | null;
+      targetRepsMin?: number | null;
+      targetRepsMax?: number | null;
+      targetRirMin?: number | null;
+      targetRirMax?: number | null;
+      calibrationToFailure?: boolean;
     } = {};
     if (body.weight_kg !== undefined) data.weightKg = body.weight_kg;
     if (body.reps !== undefined) data.reps = body.reps;
     if (body.duration_sec !== undefined) data.durationSec = body.duration_sec;
     if (body.notes !== undefined) data.notes = body.notes === null ? null : body.notes;
     if (body.rest_seconds_after !== undefined) data.restSecondsAfter = body.rest_seconds_after === null ? null : body.rest_seconds_after;
+    if (body.rir !== undefined) data.rir = body.rir;
+    if (body.set_role !== undefined) data.setRole = body.set_role;
+    if (body.target_reps_min !== undefined) data.targetRepsMin = body.target_reps_min;
+    if (body.target_reps_max !== undefined) data.targetRepsMax = body.target_reps_max;
+    if (body.target_rir_min !== undefined) data.targetRirMin = body.target_rir_min;
+    if (body.target_rir_max !== undefined) data.targetRirMax = body.target_rir_max;
+    if (body.calibration_to_failure !== undefined) data.calibrationToFailure = body.calibration_to_failure;
 
     await prisma.workoutSet.update({
       where: { id: setId },

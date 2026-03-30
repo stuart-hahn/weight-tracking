@@ -218,13 +218,256 @@
   width: auto;
 }
 
+.workout-session__back {
+  margin-bottom: 0.5rem;
+}
+
+.workout-session-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -0.5rem 1rem;
+  padding: 0.5rem 0.5rem 0.65rem;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.workout-session-chrome__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workout-session-chrome__title-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.workout-session-chrome__title {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.workout-session-chrome__progress {
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.workout-session-chrome__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.workout-session__meta-card {
+  margin-bottom: 1rem;
+}
+
+.workout-session__week-hint,
+.workout-session__started {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.workout-session__picker {
+  margin-top: 1rem;
+}
+
+.workout-session__fav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.workout-session__search {
+  margin-top: 0.5rem;
+}
+
+.workout-session__ex-list {
+  margin-top: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+
+.workout-session__new-ex {
+  margin-top: 1rem;
+}
+
+.workout-session__program-hint {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.workout-session__ex-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.workout-session__ex-title {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.workout-session__remove-ex {
+  margin-left: auto;
+}
+
+.workout-session__insight {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.workout-session__add-set {
+  margin-top: 0.5rem;
+}
+
+.program-day-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.program-day-tabs .btn {
+  width: auto;
+}
+
+.program-exercise-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.program-exercise-block__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.program-template-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.program-template-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.program-template-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.program-template-form .form-input {
+  flex: 1 1 5rem;
+  max-width: 8rem;
+}
+
+.program-template-form .btn {
+  width: auto;
+}
+
+.workout-start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.workout-start-actions .btn {
+  width: auto;
+}
+
+.btn--touch {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.75rem;
+}
+
 .workout-set-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.workout-set-row:last-of-type {
+  border-bottom: none;
+}
+
+.workout-set-row__targets {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.workout-set-row__grid {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: flex-end;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+}
+
+.workout-set-field {
+  margin-bottom: 0;
+  min-width: 5rem;
+  flex: 1 1 6rem;
+}
+
+.workout-set-field--grow {
+  flex: 2 1 10rem;
+  min-width: 8rem;
+}
+
+.workout-set-field__label {
+  font-size: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .workout-set-row--stack-sm .workout-set-row__grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workout-set-row--stack-sm .workout-set-field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .workout-set-row--stack-sm .workout-set-input {
+    width: 100%;
+    max-width: 12rem;
+  }
+
+  .workout-set-row--stack-sm .workout-set-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
 }
 
 .workout-set-row:last-of-type {

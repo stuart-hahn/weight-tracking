@@ -36,6 +36,9 @@ model User {
   exercises       Exercise[]
   exerciseFavorites UserExerciseFavorite[]
   workouts        Workout[]
+  workoutPrograms WorkoutProgram[]
+  trainingBlockStartedAt DateTime? @map("training_block_started_at")
+  lastCalibrationWeekIndex Int? @map("last_calibration_week_index")
 }
 
 /// Global catalog (userId null) or user-created custom exercise
@@ -49,6 +52,7 @@ model Exercise {
   user              User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   favorites         UserExerciseFavorite[]
   workoutExercises  WorkoutExercise[]
+  programDayExercises ProgramDayExercise[]
 
   @@index([userId])
   @@index([name])
@@ -70,20 +74,92 @@ model UserExerciseFavorite {
   @@map("user_exercise_favorites")
 }
 
-model Workout {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  name        String?
-  notes       String?
-  startedAt   DateTime  @map("started_at")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+model WorkoutProgram {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercises WorkoutExercise[]
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days     ProgramDay[]
+  workouts Workout[]
+
+  @@index([userId])
+  @@map("workout_programs")
+}
+
+model ProgramDay {
+  id        String   @id @default(uuid())
+  programId String   @map("program_id")
+  name      String
+  orderIndex Int     @map("order_index")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  program   WorkoutProgram         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  exercises ProgramDayExercise[]
+  workouts  Workout[]
+
+  @@index([programId, orderIndex])
+  @@map("program_days")
+}
+
+model ProgramDayExercise {
+  id                 String   @id @default(uuid())
+  programDayId       String   @map("program_day_id")
+  exerciseId         String   @map("exercise_id")
+  orderIndex         Int      @map("order_index")
+  progressionVariant String   @default("general_double") @map("progression_variant")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  programDay   ProgramDay            @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  exercise     Exercise              @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  setTemplates ProgramDaySetTemplate[]
+
+  @@index([programDayId, orderIndex])
+  @@map("program_day_exercises")
+}
+
+model ProgramDaySetTemplate {
+  id                   String   @id @default(uuid())
+  programDayExerciseId String   @map("program_day_exercise_id")
+  setIndex             Int      @map("set_index")
+  setRole              String   @map("set_role") // top | backoff | working
+  targetRepsMin        Int?     @map("target_reps_min")
+  targetRepsMax        Int?     @map("target_reps_max")
+  targetRirMin         Int?     @map("target_rir_min")
+  targetRirMax         Int?     @map("target_rir_max")
+  percentOfTop         Float?   @map("percent_of_top")
+
+  programDayExercise ProgramDayExercise @relation(fields: [programDayExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([programDayExerciseId, setIndex])
+  @@map("program_day_set_templates")
+}
+
+model Workout {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  name               String?
+  notes              String?
+  startedAt          DateTime  @map("started_at")
+  completedAt        DateTime? @map("completed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  programId          String?   @map("program_id")
+  programDayId       String?   @map("program_day_id")
+  trainingWeekIndex  Int?      @map("training_week_index")
+  isDeloadWeek       Boolean   @default(false) @map("is_deload_week")
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program     WorkoutProgram?   @relation(fields: [programId], references: [id], onDelete: SetNull)
+  programDay  ProgramDay?       @relation(fields: [programDayId], references: [id], onDelete: SetNull)
+  exercises   WorkoutExercise[]
 
   @@index([userId, startedAt])
   @@index([userId, completedAt])
+  @@index([programDayId])
   @@map("workouts")
 }
 
@@ -104,14 +180,21 @@ model WorkoutExercise {
 }
 
 model WorkoutSet {
-  id                String   @id @default(uuid())
-  workoutExerciseId String   @map("workout_exercise_id")
-  setIndex          Int      @map("set_index")
-  weightKg          Float?   @map("weight_kg")
-  reps              Int?
-  durationSec       Int?     @map("duration_sec")
-  notes             String?
-  restSecondsAfter  Int?     @map("rest_seconds_after")
+  id                   String   @id @default(uuid())
+  workoutExerciseId    String   @map("workout_exercise_id")
+  setIndex             Int      @map("set_index")
+  weightKg             Float?   @map("weight_kg")
+  reps                 Int?
+  durationSec          Int?     @map("duration_sec")
+  notes                String?
+  restSecondsAfter     Int?     @map("rest_seconds_after")
+  rir                  Int?     @map("rir")
+  setRole              String?  @map("set_role")
+  targetRepsMin        Int?     @map("target_reps_min")
+  targetRepsMax        Int?     @map("target_reps_max")
+  targetRirMin         Int?     @map("target_rir_min")
+  targetRirMax         Int?     @map("target_rir_max")
+  calibrationToFailure Boolean  @default(false) @map("calibration_to_failure")
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
 

@@ -79,13 +79,15 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       emailVerifiedAt: true,
       createdAt: true,
       updatedAt: true,
+      trainingBlockStartedAt: true,
+      lastCalibrationWeekIndex: true,
     },
   });
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
-  const [entries, optionalMetrics, workouts] = await Promise.all([
+  const [entries, optionalMetrics, workouts, workoutPrograms] = await Promise.all([
     prisma.dailyEntry.findMany({
       where: { userId: id },
       orderBy: { date: 'desc' },
@@ -117,6 +119,24 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
         },
       },
     }),
+    prisma.workoutProgram.findMany({
+      where: { userId: id },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        days: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            exercises: {
+              orderBy: { orderIndex: 'asc' },
+              include: {
+                exercise: { select: { id: true, name: true, kind: true, userId: true } },
+                setTemplates: { orderBy: { setIndex: 'asc' } },
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
   const exportData = {
     exported_at: new Date().toISOString(),
@@ -134,6 +154,8 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString(),
+      training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
+      last_calibration_week_index: user.lastCalibrationWeekIndex,
     },
     entries: entries.map((e: { id: string; date: Date; weightKg: number; calories: number | null; waistCm: number | null; hipCm: number | null; createdAt: Date }) => ({
       id: e.id,
@@ -156,6 +178,10 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       started_at: w.startedAt.toISOString(),
       completed_at: w.completedAt?.toISOString() ?? null,
       created_at: w.createdAt.toISOString(),
+      program_id: w.programId,
+      program_day_id: w.programDayId,
+      training_week_index: w.trainingWeekIndex,
+      is_deload_week: w.isDeloadWeek,
       exercises: w.exercises.map((we) => ({
         id: we.id,
         exercise_id: we.exerciseId,
@@ -176,6 +202,47 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
           duration_sec: s.durationSec,
           notes: s.notes,
           rest_seconds_after: s.restSecondsAfter,
+          rir: s.rir,
+          set_role: s.setRole,
+          target_reps_min: s.targetRepsMin,
+          target_reps_max: s.targetRepsMax,
+          target_rir_min: s.targetRirMin,
+          target_rir_max: s.targetRirMax,
+          calibration_to_failure: s.calibrationToFailure,
+        })),
+      })),
+    })),
+    workout_programs: workoutPrograms.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      created_at: p.createdAt.toISOString(),
+      updated_at: p.updatedAt.toISOString(),
+      days: p.days.map((d) => ({
+        id: d.id,
+        name: d.name,
+        order_index: d.orderIndex,
+        exercises: d.exercises.map((e) => ({
+          id: e.id,
+          exercise_id: e.exerciseId,
+          order_index: e.orderIndex,
+          progression_variant: e.progressionVariant,
+          exercise: {
+            id: e.exercise.id,
+            name: e.exercise.name,
+            kind: e.exercise.kind,
+            user_id: e.exercise.userId,
+          },
+          set_templates: e.setTemplates.map((t) => ({
+            id: t.id,
+            set_index: t.setIndex,
+            set_role: t.setRole,
+            target_reps_min: t.targetRepsMin,
+            target_reps_max: t.targetRepsMax,
+            target_rir_min: t.targetRirMin,
+            target_rir_max: t.targetRirMax,
+            percent_of_top: t.percentOfTop,
+          })),
         })),
       })),
     })),
@@ -208,6 +275,8 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
       plan: true,
       createdAt: true,
       updatedAt: true,
+      trainingBlockStartedAt: true,
+      lastCalibrationWeekIndex: true,
     },
   });
   if (!user) {
@@ -228,6 +297,8 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: user.onboardingComplete,
     plan: user.plan,
+    training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
+    last_calibration_week_index: user.lastCalibrationWeekIndex,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
   };
@@ -253,6 +324,8 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     units?: string;
     onboardingComplete?: boolean;
     plan?: string | null;
+    trainingBlockStartedAt?: Date | null;
+    lastCalibrationWeekIndex?: number | null;
   } = {};
   if (body.age !== undefined) data.age = body.age;
   if (body.sex !== undefined) data.sex = body.sex;
@@ -264,6 +337,13 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
   if (body.units !== undefined) data.units = body.units;
   if (body.onboarding_complete !== undefined) data.onboardingComplete = body.onboarding_complete;
   if (body.plan !== undefined) data.plan = body.plan ?? null;
+  if (body.training_block_started_at !== undefined) {
+    data.trainingBlockStartedAt =
+      body.training_block_started_at === null ? null : new Date(body.training_block_started_at);
+  }
+  if (body.last_calibration_week_index !== undefined) {
+    data.lastCalibrationWeekIndex = body.last_calibration_week_index;
+  }
   const selectFields = {
     id: true,
     email: true,
@@ -280,6 +360,8 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     plan: true,
     createdAt: true,
     updatedAt: true,
+    trainingBlockStartedAt: true,
+    lastCalibrationWeekIndex: true,
   };
   if (Object.keys(data).length === 0) {
     const user = await prisma.user.findUnique({
@@ -304,6 +386,8 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
       email_verified_at: user.emailVerifiedAt?.toISOString() ?? null,
       onboarding_complete: user.onboardingComplete,
       plan: user.plan,
+      training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
+      last_calibration_week_index: user.lastCalibrationWeekIndex,
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString(),
     };
@@ -329,6 +413,8 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     email_verified_at: updatedUser.emailVerifiedAt?.toISOString() ?? null,
     onboarding_complete: updatedUser.onboardingComplete,
     plan: updatedUser.plan,
+    training_block_started_at: updatedUser.trainingBlockStartedAt?.toISOString() ?? null,
+    last_calibration_week_index: updatedUser.lastCalibrationWeekIndex,
     created_at: updatedUser.createdAt.toISOString(),
     updated_at: updatedUser.updatedAt.toISOString(),
   };

@@ -13,6 +13,7 @@ import type {
   WorkoutExerciseUpdateInput,
   WorkoutSetCreateInput,
   WorkoutSetUpdateInput,
+  ExerciseBatchInsightsInput,
 } from '../types/index.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +53,23 @@ function validDurationSec(v: unknown): boolean {
 function validRestSec(v: unknown): boolean {
   if (v === undefined || v === null) return true;
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 3600;
+}
+
+function validOptionalRir(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 30;
+}
+
+const SET_ROLES = ['top', 'backoff', 'working'] as const;
+
+function validOptionalSetRole(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'string' && SET_ROLES.includes(v as (typeof SET_ROLES)[number]);
+}
+
+function validOptionalTargetInt(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1000;
 }
 
 export function validateCreateUser(
@@ -106,6 +124,18 @@ export function validateUpdateUser(
   if (body.units !== undefined && body.units !== null && body.units !== 'metric' && body.units !== 'imperial') errors.push('units must be "metric" or "imperial"');
   if (body.onboarding_complete !== undefined && typeof body.onboarding_complete !== 'boolean') errors.push('onboarding_complete must be a boolean');
   if (body.plan !== undefined && body.plan !== null && body.plan !== 'free' && body.plan !== 'premium') errors.push('plan must be "free" or "premium"');
+  if (body.training_block_started_at !== undefined && body.training_block_started_at !== null) {
+    if (typeof body.training_block_started_at !== 'string' || Number.isNaN(Date.parse(body.training_block_started_at))) {
+      errors.push('training_block_started_at must be a valid ISO date or datetime, or null');
+    }
+  }
+  if (
+    body.last_calibration_week_index !== undefined &&
+    body.last_calibration_week_index !== null &&
+    (!Number.isInteger(body.last_calibration_week_index) || body.last_calibration_week_index < 0 || body.last_calibration_week_index > 10000)
+  ) {
+    errors.push('last_calibration_week_index must be a non-negative integer or null');
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
@@ -251,6 +281,16 @@ export function validateCreateWorkout(
       errors.push('clone_from_workout_id must be a valid UUID');
     }
   }
+  if (body.program_day_id != null && body.program_day_id !== undefined) {
+    if (typeof body.program_day_id !== 'string' || !isUuid(body.program_day_id)) {
+      errors.push('program_day_id must be a valid UUID');
+    }
+  }
+  const hasClone = body.clone_from_workout_id != null && body.clone_from_workout_id !== undefined;
+  const hasProgram = body.program_day_id != null && body.program_day_id !== undefined;
+  if (hasClone && hasProgram) {
+    errors.push('Use only one of clone_from_workout_id or program_day_id');
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
@@ -333,6 +373,15 @@ export function validateCreateWorkoutExercise(
           errors.push('Invalid set notes');
         }
         if (!validRestSec(set.rest_seconds_after)) errors.push('Invalid rest_seconds_after in sets');
+        if (!validOptionalRir(set.rir)) errors.push('Invalid rir in sets');
+        if (!validOptionalSetRole(set.set_role)) errors.push('Invalid set_role in sets');
+        if (!validOptionalTargetInt(set.target_reps_min)) errors.push('Invalid target_reps_min in sets');
+        if (!validOptionalTargetInt(set.target_reps_max)) errors.push('Invalid target_reps_max in sets');
+        if (!validOptionalRir(set.target_rir_min)) errors.push('Invalid target_rir_min in sets');
+        if (!validOptionalRir(set.target_rir_max)) errors.push('Invalid target_rir_max in sets');
+        if (set.calibration_to_failure !== undefined && typeof set.calibration_to_failure !== 'boolean') {
+          errors.push('calibration_to_failure must be boolean');
+        }
       }
     }
   }
@@ -391,6 +440,15 @@ export function validateCreateWorkoutSet(
     errors.push('Invalid notes');
   }
   if (!validRestSec(body.rest_seconds_after)) errors.push('Invalid rest_seconds_after');
+  if (!validOptionalRir(body.rir)) errors.push('Invalid rir');
+  if (!validOptionalSetRole(body.set_role)) errors.push('Invalid set_role');
+  if (!validOptionalTargetInt(body.target_reps_min)) errors.push('Invalid target_reps_min');
+  if (!validOptionalTargetInt(body.target_reps_max)) errors.push('Invalid target_reps_max');
+  if (!validOptionalRir(body.target_rir_min)) errors.push('Invalid target_rir_min');
+  if (!validOptionalRir(body.target_rir_max)) errors.push('Invalid target_rir_max');
+  if (body.calibration_to_failure !== undefined && typeof body.calibration_to_failure !== 'boolean') {
+    errors.push('calibration_to_failure must be boolean');
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
@@ -426,14 +484,94 @@ export function validateUpdateWorkoutSet(
   if (body.rest_seconds_after !== undefined && body.rest_seconds_after !== null && !validRestSec(body.rest_seconds_after)) {
     errors.push('Invalid rest_seconds_after');
   }
+  if (body.rir !== undefined && body.rir !== null && !validOptionalRir(body.rir)) {
+    errors.push('Invalid rir');
+  }
+  if (body.set_role !== undefined && body.set_role !== null && !validOptionalSetRole(body.set_role)) {
+    errors.push('Invalid set_role');
+  }
+  if (body.target_reps_min !== undefined && body.target_reps_min !== null && !validOptionalTargetInt(body.target_reps_min)) {
+    errors.push('Invalid target_reps_min');
+  }
+  if (body.target_reps_max !== undefined && body.target_reps_max !== null && !validOptionalTargetInt(body.target_reps_max)) {
+    errors.push('Invalid target_reps_max');
+  }
+  if (body.target_rir_min !== undefined && body.target_rir_min !== null && !validOptionalRir(body.target_rir_min)) {
+    errors.push('Invalid target_rir_min');
+  }
+  if (body.target_rir_max !== undefined && body.target_rir_max !== null && !validOptionalRir(body.target_rir_max)) {
+    errors.push('Invalid target_rir_max');
+  }
+  if (body.calibration_to_failure !== undefined && typeof body.calibration_to_failure !== 'boolean') {
+    errors.push('calibration_to_failure must be boolean');
+  }
   if (
     body.weight_kg === undefined &&
     body.reps === undefined &&
     body.duration_sec === undefined &&
     body.notes === undefined &&
-    body.rest_seconds_after === undefined
+    body.rest_seconds_after === undefined &&
+    body.rir === undefined &&
+    body.set_role === undefined &&
+    body.target_reps_min === undefined &&
+    body.target_reps_max === undefined &&
+    body.target_rir_min === undefined &&
+    body.target_rir_max === undefined &&
+    body.calibration_to_failure === undefined
   ) {
     errors.push('At least one field to update required');
+  }
+  if (errors.length > 0) {
+    res.status(400).json({ error: errors.join('; ') });
+    return;
+  }
+  next();
+}
+
+const PROGRESSION_VARIANTS = new Set([
+  'general_double',
+  'primary_smith_incline',
+  'primary_rdl',
+  'primary_lat_pulldown_upper_b',
+  'primary_squat_or_hack',
+  'isolation_calibration_candidate',
+  'custom',
+]);
+
+export function validateBatchExerciseInsights(
+  req: Request<{ id: string }, unknown, ExerciseBatchInsightsInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const errors: string[] = [];
+  if (!Array.isArray(body.exercise_ids) || body.exercise_ids.length === 0) {
+    errors.push('exercise_ids must be a non-empty array');
+  } else if (body.exercise_ids.length > 50) {
+    errors.push('At most 50 exercise_ids');
+  } else {
+    for (const id of body.exercise_ids) {
+      if (typeof id !== 'string' || !isUuid(id)) {
+        errors.push('Each exercise_id must be a UUID');
+        break;
+      }
+    }
+  }
+  if (body.progression_variant_by_exercise_id !== undefined && body.progression_variant_by_exercise_id !== null) {
+    if (typeof body.progression_variant_by_exercise_id !== 'object' || Array.isArray(body.progression_variant_by_exercise_id)) {
+      errors.push('progression_variant_by_exercise_id must be an object');
+    } else {
+      for (const [k, v] of Object.entries(body.progression_variant_by_exercise_id)) {
+        if (!isUuid(k) || typeof v !== 'string' || !PROGRESSION_VARIANTS.has(v)) {
+          errors.push('Invalid progression_variant_by_exercise_id entry');
+          break;
+        }
+      }
+    }
   }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });

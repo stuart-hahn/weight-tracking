@@ -23,6 +23,8 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
   const [exporting, setExporting] = useState(false);
+  const [blockStart, setBlockStart] = useState('');
+  const [savingBlock, setSavingBlock] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +40,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           setActivityLevel(p.activity_level ?? '');
           setLeanMassKg(p.lean_mass_kg != null ? String(p.lean_mass_kg) : '');
           setUnits(p.units ?? 'metric');
+          setBlockStart(p.training_block_started_at ? p.training_block_started_at.slice(0, 10) : '');
         }
       })
       .catch(() => {
@@ -94,6 +97,23 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     },
     [profile, userId, age, sex, heightCm, currentWeightKg, targetBodyFatPercent, activityLevel, leanMassKg, units, onError, onSuccess]
   );
+
+  const saveTrainingBlock = useCallback(async () => {
+    onError(null);
+    onSuccess(null);
+    setSavingBlock(true);
+    try {
+      const updated = await updateUser(userId, {
+        training_block_started_at: blockStart.trim() === '' ? null : blockStart.trim(),
+      });
+      setProfile(updated);
+      onSuccess('Training block start saved.');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSavingBlock(false);
+    }
+  }, [userId, blockStart, onError, onSuccess]);
 
   const handleExport = useCallback(async () => {
     onError(null);
@@ -254,6 +274,30 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         </button>
       </form>
       <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+        <h3 className="app__card-title" style={{ fontSize: '1rem' }}>
+          Strength training block
+        </h3>
+        <p className="progress-text" style={{ marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+          Set the start date of your current mesocycle. Week index (for deload on week 6 and calibration cues) is computed as
+          full weeks since this date. Leave empty to default to week 1 behavior.
+        </p>
+        <div className="form-group">
+          <label className="form-label" htmlFor="settings-block-start">
+            Block started (date)
+          </label>
+          <input
+            id="settings-block-start"
+            type="date"
+            className="form-input"
+            value={blockStart}
+            onChange={(e) => setBlockStart(e.target.value)}
+          />
+        </div>
+        <button type="button" className="btn btn--secondary" disabled={savingBlock} onClick={() => void saveTrainingBlock()}>
+          {savingBlock ? 'Saving…' : 'Save block start'}
+        </button>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
         <button
           type="button"
           className="btn btn--secondary"
@@ -263,7 +307,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           {exporting ? 'Preparing…' : 'Download my data (export)'}
         </button>
         <p className="form-hint" style={{ marginTop: '0.5rem' }}>
-          Export your profile, entries, and optional metrics as JSON.
+          Export your profile, entries, workouts, programs, and optional metrics as JSON.
         </p>
       </div>
     </section>

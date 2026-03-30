@@ -18,6 +18,8 @@ export interface UserProfile {
   email_verified_at: string | null;
   onboarding_complete: boolean;
   plan: string | null;
+  training_block_started_at: string | null;
+  last_calibration_week_index: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +58,8 @@ export interface UpdateUserRequest {
   units?: UnitsPreference;
   onboarding_complete?: boolean;
   plan?: string | null;
+  training_block_started_at?: string | null;
+  last_calibration_week_index?: number | null;
 }
 
 export interface DailyEntryResponse {
@@ -130,18 +134,43 @@ export interface ExerciseListItem {
   created_at: string;
 }
 
+export type ProgressionVariant =
+  | 'general_double'
+  | 'primary_smith_incline'
+  | 'primary_rdl'
+  | 'primary_lat_pulldown_upper_b'
+  | 'primary_squat_or_hack'
+  | 'isolation_calibration_candidate'
+  | 'custom';
+
 export interface ExerciseInsightsResponse {
   exercise_id: string;
   last_performance: {
     workout_id: string;
     completed_at: string;
-    sets: { weight_kg: number | null; reps: number | null; duration_sec: number | null }[];
+    sets: {
+      weight_kg: number | null;
+      reps: number | null;
+      duration_sec: number | null;
+      rir: number | null;
+      set_role: string | null;
+    }[];
   } | null;
   suggestion: {
     suggested_weight_kg: number | null;
     suggested_reps: number | null;
     hint: string;
   };
+  progression_variant: ProgressionVariant;
+}
+
+export interface BatchExerciseInsightsRequest {
+  exercise_ids: string[];
+  progression_variant_by_exercise_id?: Record<string, ProgressionVariant>;
+}
+
+export interface BatchExerciseInsightsResponse {
+  insights: Record<string, ExerciseInsightsResponse>;
 }
 
 export interface WorkoutSetResponse {
@@ -152,6 +181,13 @@ export interface WorkoutSetResponse {
   duration_sec: number | null;
   notes: string | null;
   rest_seconds_after: number | null;
+  rir: number | null;
+  set_role: string | null;
+  target_reps_min: number | null;
+  target_reps_max: number | null;
+  target_rir_min: number | null;
+  target_rir_max: number | null;
+  calibration_to_failure: boolean;
 }
 
 export interface WorkoutExerciseNested {
@@ -180,6 +216,8 @@ export interface WorkoutListItem {
   completed_at: string | null;
   created_at: string;
   exercise_count: number;
+  program_id: string | null;
+  program_day_id: string | null;
 }
 
 export interface WorkoutDetailResponse {
@@ -190,6 +228,10 @@ export interface WorkoutDetailResponse {
   started_at: string;
   completed_at: string | null;
   created_at: string;
+  program_id: string | null;
+  program_day_id: string | null;
+  training_week_index: number | null;
+  is_deload_week: boolean;
   exercises: WorkoutExerciseNested[];
 }
 
@@ -197,6 +239,7 @@ export interface CreateWorkoutRequest {
   name?: string | null;
   notes?: string | null;
   clone_from_workout_id?: string | null;
+  program_day_id?: string | null;
 }
 
 export interface PatchWorkoutRequest {
@@ -235,4 +278,56 @@ export interface PatchWorkoutSetRequest {
   duration_sec?: number | null;
   notes?: string | null;
   rest_seconds_after?: number | null;
+  rir?: number | null;
+  set_role?: string | null;
+  target_reps_min?: number | null;
+  target_reps_max?: number | null;
+  target_rir_min?: number | null;
+  target_rir_max?: number | null;
+  calibration_to_failure?: boolean;
+}
+
+export interface WorkoutProgramListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  day_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgramSetTemplateResponse {
+  id: string;
+  set_index: number;
+  set_role: string;
+  target_reps_min: number | null;
+  target_reps_max: number | null;
+  target_rir_min: number | null;
+  target_rir_max: number | null;
+  percent_of_top: number | null;
+}
+
+export interface ProgramDayExerciseNested {
+  id: string;
+  exercise_id: string;
+  order_index: number;
+  progression_variant: string;
+  exercise: { id: string; name: string; kind: WorkoutExerciseKind };
+  set_templates: ProgramSetTemplateResponse[];
+}
+
+export interface ProgramDayNested {
+  id: string;
+  name: string;
+  order_index: number;
+  exercises: ProgramDayExerciseNested[];
+}
+
+export interface WorkoutProgramDetailResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  days: ProgramDayNested[];
 }

@@ -19,6 +19,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          # Creates body_fat_tracker_test automatically (same name as local integration default in backend/package.json).
           POSTGRES_DB: body_fat_tracker_test
         ports:
           - 5432:5432

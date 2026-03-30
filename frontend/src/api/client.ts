@@ -22,6 +22,10 @@ import type {
   PatchWorkoutSetRequest,
   WorkoutExerciseNested,
   WorkoutSetResponse,
+  BatchExerciseInsightsRequest,
+  BatchExerciseInsightsResponse,
+  WorkoutProgramListItem,
+  WorkoutProgramDetailResponse,
 } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
@@ -229,6 +233,20 @@ export async function getExerciseInsights(userId: string, exerciseId: string): P
   return data as ExerciseInsightsResponse;
 }
 
+export async function postBatchExerciseInsights(
+  userId: string,
+  body: BatchExerciseInsightsRequest
+): Promise<BatchExerciseInsightsResponse> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/batch-insights`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as BatchExerciseInsightsResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercise insights'));
+  return data as BatchExerciseInsightsResponse;
+}
+
 export async function addExerciseFavorite(userId: string, exerciseId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/favorite`, {
     method: 'POST',
@@ -397,6 +415,195 @@ export async function deleteWorkoutSet(
   if (!res.ok) {
     const data = (await res.json()) as ApiError;
     throw new Error(getErrorMessage(res, data, 'Failed to delete set'));
+  }
+}
+
+const programsBase = (userId: string) => `${API_BASE}/users/${userId}/programs`;
+
+export async function listWorkoutPrograms(userId: string): Promise<WorkoutProgramListItem[]> {
+  const res = await fetch(programsBase(userId), { headers: getAuthHeaders() });
+  const data = (await res.json()) as WorkoutProgramListItem[] | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to load programs'));
+  return data as WorkoutProgramListItem[];
+}
+
+export async function createWorkoutProgram(
+  userId: string,
+  body: { name: string; description?: string | null }
+): Promise<WorkoutProgramDetailResponse> {
+  const res = await fetch(programsBase(userId), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutProgramDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create program'));
+  return data as WorkoutProgramDetailResponse;
+}
+
+export async function getWorkoutProgram(userId: string, programId: string): Promise<WorkoutProgramDetailResponse> {
+  const res = await fetch(`${programsBase(userId)}/${programId}`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as WorkoutProgramDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to load program'));
+  return data as WorkoutProgramDetailResponse;
+}
+
+export async function patchWorkoutProgram(
+  userId: string,
+  programId: string,
+  body: { name?: string; description?: string | null }
+): Promise<WorkoutProgramDetailResponse> {
+  const res = await fetch(`${programsBase(userId)}/${programId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutProgramDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update program'));
+  return data as WorkoutProgramDetailResponse;
+}
+
+export async function deleteWorkoutProgram(userId: string, programId: string): Promise<void> {
+  const res = await fetch(`${programsBase(userId)}/${programId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete program'));
+  }
+}
+
+export async function createProgramDay(
+  userId: string,
+  programId: string,
+  body: { name: string; order_index?: number }
+): Promise<{ id: string; name: string; order_index: number; exercises: [] }> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as { id: string; name: string; order_index: number; exercises: [] } | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add day'));
+  return data as { id: string; name: string; order_index: number; exercises: [] };
+}
+
+export async function patchProgramDay(
+  userId: string,
+  programId: string,
+  dayId: string,
+  body: { name?: string; order_index?: number }
+): Promise<WorkoutProgramDetailResponse> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutProgramDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update day'));
+  return data as WorkoutProgramDetailResponse;
+}
+
+export async function deleteProgramDay(userId: string, programId: string, dayId: string): Promise<void> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete day'));
+  }
+}
+
+export async function addProgramDayExercise(
+  userId: string,
+  programId: string,
+  dayId: string,
+  body: { exercise_id: string; progression_variant?: string; order_index?: number }
+): Promise<import('../types/api').ProgramDayExerciseNested> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}/exercises`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as import('../types/api').ProgramDayExerciseNested | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add exercise'));
+  return data as import('../types/api').ProgramDayExerciseNested;
+}
+
+export async function patchProgramDayExercise(
+  userId: string,
+  programId: string,
+  dayId: string,
+  pdeId: string,
+  body: { order_index?: number; progression_variant?: string }
+): Promise<WorkoutProgramDetailResponse> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}/exercises/${pdeId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as WorkoutProgramDetailResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update exercise line'));
+  return data as WorkoutProgramDetailResponse;
+}
+
+export async function deleteProgramDayExercise(
+  userId: string,
+  programId: string,
+  dayId: string,
+  pdeId: string
+): Promise<void> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}/exercises/${pdeId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to remove exercise'));
+  }
+}
+
+export async function addProgramSetTemplate(
+  userId: string,
+  programId: string,
+  dayId: string,
+  pdeId: string,
+  body: {
+    set_role: string;
+    set_index?: number;
+    target_reps_min?: number | null;
+    target_reps_max?: number | null;
+    target_rir_min?: number | null;
+    target_rir_max?: number | null;
+    percent_of_top?: number | null;
+  }
+): Promise<import('../types/api').ProgramSetTemplateResponse> {
+  const res = await fetch(`${programsBase(userId)}/${programId}/days/${dayId}/exercises/${pdeId}/templates`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as import('../types/api').ProgramSetTemplateResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add template'));
+  return data as import('../types/api').ProgramSetTemplateResponse;
+}
+
+export async function deleteProgramSetTemplate(
+  userId: string,
+  programId: string,
+  dayId: string,
+  pdeId: string,
+  templateId: string
+): Promise<void> {
+  const res = await fetch(
+    `${programsBase(userId)}/${programId}/days/${dayId}/exercises/${pdeId}/templates/${templateId}`,
+    { method: 'DELETE', headers: getAuthHeaders() }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete template'));
   }
 }
 

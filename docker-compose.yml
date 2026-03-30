@@ -1,5 +1,6 @@
 # Body Fat Tracker
 # - Local dev: run `docker compose up -d db` and set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker in backend/.env
+# - Integration tests use DB body_fat_tracker_test. Create it once: docker compose exec -T db psql -U postgres -c "CREATE DATABASE body_fat_tracker_test;"
 # - Optional: `api` service runs the backend in a container (legacy; app now uses PostgreSQL)
 services:
   db:

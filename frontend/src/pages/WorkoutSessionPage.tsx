@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { UnitsPreference, WorkoutDetailResponse, WorkoutExerciseNested } from '../types/api';
+import type { UnitsPreference, WorkoutDetailResponse, WorkoutExerciseNested, ProgressionVariant } from '../types/api';
 import {
   getUser,
   getWorkout,
@@ -13,12 +13,15 @@ import {
   listExercises,
   createWorkout,
   createExercise,
-  getExerciseInsights,
+  postBatchExerciseInsights,
   addExerciseFavorite,
   removeExerciseFavorite,
+  getWorkoutProgram,
 } from '../api/client';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import RestTimer from '../components/workouts/RestTimer';
+import WorkoutSessionChrome from '../components/workouts/WorkoutSessionChrome';
+import WorkoutSetRow from '../components/workouts/WorkoutSetRow';
 import PageLoading from '../components/PageLoading';
 
 interface WorkoutSessionPageProps {
@@ -29,13 +32,17 @@ interface WorkoutSessionPageProps {
 
 type InsightsState = Record<
   string,
-  { last: string; suggestion: string } | undefined
+  { last: string; suggestion: string; variant?: string } | undefined
 >;
 
 function kindLabel(kind: string): string {
   if (kind === 'weight_reps') return 'Weight × reps';
   if (kind === 'bodyweight_reps') return 'Reps';
   return 'Time';
+}
+
+function stepStorageKey(workoutId: string): string {
+  return `workout:${workoutId}:step`;
 }
 
 export default function WorkoutSessionPage({ userId, onError, onSuccess }: WorkoutSessionPageProps) {
@@ -52,51 +59,81 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [favoritesOnlyPicker, setFavoritesOnlyPicker] = useState(false);
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
 
   const refreshInsights = useCallback(
-    async (lines: WorkoutExerciseNested[], unitsForDisplay: UnitsPreference = units) => {
+    async (w: WorkoutDetailResponse, unitsForDisplay: UnitsPreference) => {
+      const lines = w.exercises;
       if (lines.length === 0) {
         setInsights({});
         return;
       }
-      const next: InsightsState = {};
-      await Promise.all(
-        lines.map(async (line) => {
-          try {
-            const ins = await getExerciseInsights(userId, line.exercise_id);
-            const lp = ins.last_performance;
-            const lastStr = lp
-              ? lp.sets
-                  .map((s) => {
-                    const parts: string[] = [];
-                    if (s.weight_kg != null) parts.push(formatWeight(s.weight_kg, unitsForDisplay));
-                    if (s.reps != null) parts.push(`×${s.reps}`);
-                    if (s.duration_sec != null) parts.push(`${s.duration_sec}s`);
-                    return parts.join(' ');
-                  })
-                  .filter(Boolean)
-                  .join(' · ')
-              : '—';
-            next[line.id] = {
-              last: lastStr || '—',
-              suggestion: ins.suggestion.hint,
-            };
-          } catch {
-            next[line.id] = { last: '—', suggestion: '' };
+      let variantMap: Record<string, ProgressionVariant> | undefined;
+      if (w.program_id && w.program_day_id) {
+        try {
+          const p = await getWorkoutProgram(userId, w.program_id);
+          const day = p.days.find((d) => d.id === w.program_day_id);
+          if (day) {
+            variantMap = {};
+            for (const e of day.exercises) {
+              variantMap[e.exercise_id] = e.progression_variant as ProgressionVariant;
+            }
           }
-        })
-      );
-      setInsights(next);
+        } catch {
+          variantMap = undefined;
+        }
+      }
+      const next: InsightsState = {};
+      try {
+        const res = await postBatchExerciseInsights(userId, {
+          exercise_ids: lines.map((l) => l.exercise_id),
+          ...(variantMap && Object.keys(variantMap).length > 0
+            ? { progression_variant_by_exercise_id: variantMap }
+            : {}),
+        });
+        for (const line of lines) {
+          const ins = res.insights[line.exercise_id];
+          if (!ins) {
+            next[line.id] = { last: '—', suggestion: '' };
+            continue;
+          }
+          const lp = ins.last_performance;
+          const lastStr = lp
+            ? lp.sets
+                .map((s) => {
+                  const parts: string[] = [];
+                  if (s.weight_kg != null) parts.push(formatWeight(s.weight_kg, unitsForDisplay));
+                  if (s.reps != null) parts.push(`×${s.reps}`);
+                  if (s.duration_sec != null) parts.push(`${s.duration_sec}s`);
+                  if (s.rir != null) parts.push(`RIR${s.rir}`);
+                  return parts.join(' ');
+                })
+                .filter(Boolean)
+                .join(' · ')
+            : '—';
+          next[line.id] = {
+            last: lastStr || '—',
+            suggestion: ins.suggestion.hint,
+            variant: ins.progression_variant,
+          };
+        }
+        setInsights(next);
+      } catch {
+        for (const line of lines) {
+          next[line.id] = { last: '—', suggestion: '' };
+        }
+        setInsights(next);
+      }
     },
-    [userId, units]
+    [userId]
   );
 
   const loadWorkout = useCallback(async () => {
     if (!workoutId) return;
     const w = await getWorkout(userId, workoutId);
     setWorkout(w);
-    await refreshInsights(w.exercises);
-  }, [userId, workoutId, refreshInsights]);
+    await refreshInsights(w, units);
+  }, [userId, workoutId, refreshInsights, units]);
 
   useEffect(() => {
     if (!workoutId) return;
@@ -107,7 +144,18 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         if (cancelled) return;
         setUnits(u.units);
         setWorkout(w);
-        void refreshInsights(w.exercises, u.units);
+        void refreshInsights(w, u.units);
+        if (w.program_day_id) {
+          const raw = sessionStorage.getItem(stepStorageKey(workoutId));
+          if (raw != null) {
+            const n = parseInt(raw, 10);
+            if (!Number.isNaN(n) && w.exercises.length > 0) {
+              setActiveExerciseIndex(Math.min(Math.max(0, n), w.exercises.length - 1));
+            }
+          } else {
+            setActiveExerciseIndex(0);
+          }
+        }
       })
       .catch((e) => {
         if (!cancelled) onError?.(e instanceof Error ? e.message : 'Failed to load workout');
@@ -119,6 +167,19 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       cancelled = true;
     };
   }, [userId, workoutId, onError, refreshInsights]);
+
+  useEffect(() => {
+    if (!workoutId || !workout?.program_day_id) return;
+    sessionStorage.setItem(stepStorageKey(workoutId), String(activeExerciseIndex));
+  }, [workoutId, workout?.program_day_id, activeExerciseIndex]);
+
+  useEffect(() => {
+    if (!workout) return;
+    setActiveExerciseIndex((i) => {
+      if (workout.exercises.length === 0) return 0;
+      return Math.min(i, workout.exercises.length - 1);
+    });
+  }, [workout?.exercises.length, workout]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -139,6 +200,12 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   }, [pickerOpen, search, userId, favoritesOnlyPicker]);
 
   const completed = workout?.completed_at != null;
+  const fromProgram = Boolean(workout?.program_day_id);
+  const guided = fromProgram && !completed;
+  const visibleLines: WorkoutExerciseNested[] =
+    guided && workout && workout.exercises.length > 0
+      ? [workout.exercises[activeExerciseIndex]!]
+      : workout?.exercises ?? [];
 
   const handleNotesBlur = async (notes: string) => {
     if (!workoutId || !workout || completed) return;
@@ -262,9 +329,11 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     );
   }
 
+  const exCount = workout.exercises.length;
+
   return (
     <div className="workout-session">
-      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+      <p className="workout-session__back progress-text">
         <Link to="/workouts">← Workouts</Link>
       </p>
 
@@ -276,21 +345,26 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         />
       )}
 
-      <section className="app__card">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 className="app__card-title" style={{ margin: 0, flex: '1 1 auto' }}>
-            {workout.name || 'Workout'}
-          </h2>
-          {completed ? (
-            <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void handleRepeat()}>
-              Repeat workout
-            </button>
-          ) : (
-            <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void handleComplete()}>
-              {saving ? 'Saving…' : 'Finish workout'}
-            </button>
-          )}
-        </div>
+      <WorkoutSessionChrome
+        workoutName={workout.name || 'Workout'}
+        completed={completed}
+        saving={saving}
+        guided={guided}
+        exerciseIndex={activeExerciseIndex}
+        exerciseCount={exCount}
+        onFinish={() => void handleComplete()}
+        onRepeat={() => void handleRepeat()}
+        onPrev={() => setActiveExerciseIndex((i) => Math.max(0, i - 1))}
+        onNext={() => setActiveExerciseIndex((i) => Math.min(exCount - 1, i + 1))}
+      />
+
+      <section className="app__card workout-session__meta-card">
+        {workout.training_week_index != null && (
+          <p className="progress-text workout-session__week-hint">
+            Block week {workout.training_week_index}
+            {workout.is_deload_week ? ' · Deload' : ''}
+          </p>
+        )}
         <label className="form-label" htmlFor="workout-notes">
           Workout notes
         </label>
@@ -303,21 +377,21 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
           onBlur={(e) => void handleNotesBlur(e.target.value)}
           placeholder="Optional session notes"
         />
-        <p className="progress-text" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+        <p className="progress-text workout-session__started">
           Started {new Date(workout.started_at).toLocaleString()}
           {completed && ` · Completed ${new Date(workout.completed_at!).toLocaleString()}`}
         </p>
       </section>
 
-      {!completed && (
+      {!completed && !fromProgram && (
         <section className="app__card">
           <h3 className="app__card-title">Add exercise</h3>
           <button type="button" className="btn btn--secondary" onClick={() => setPickerOpen(!pickerOpen)}>
             {pickerOpen ? 'Close picker' : 'Browse exercises'}
           </button>
           {pickerOpen && (
-            <div style={{ marginTop: '1rem' }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <div className="workout-session__picker">
+              <label className="form-label workout-session__fav-toggle">
                 <input
                   type="checkbox"
                   checked={favoritesOnlyPicker}
@@ -327,14 +401,13 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
               </label>
               <input
                 type="search"
-                className="form-input"
-                style={{ marginTop: '0.5rem' }}
+                className="form-input workout-session__search"
                 placeholder="Search…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Search exercises"
               />
-              <ul className="workout-exercise-list" style={{ marginTop: '0.75rem', listStyle: 'none', padding: 0 }}>
+              <ul className="workout-exercise-list workout-session__ex-list">
                 {exerciseHits.map((ex) => (
                   <li key={ex.id} className="workout-exercise-list__item">
                     <button type="button" className="workout-exercise-list__pick" onClick={() => void addExercise(ex.id)}>
@@ -343,7 +416,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                     </button>
                     <button
                       type="button"
-                      className="btn btn--secondary btn--sm"
+                      className="btn btn--secondary btn--sm btn--touch"
                       aria-label={ex.is_favorite ? 'Remove favorite' : 'Add favorite'}
                       onClick={async () => {
                         try {
@@ -364,7 +437,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                   </li>
                 ))}
               </ul>
-              <form onSubmit={handleCreateCustom} style={{ marginTop: '1rem' }}>
+              <form onSubmit={handleCreateCustom} className="workout-session__new-ex">
                 <label className="form-label" htmlFor="new-ex-name">
                   New custom exercise
                 </label>
@@ -386,18 +459,21 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         </section>
       )}
 
-      {workout.exercises.map((line) => (
+      {fromProgram && !completed && (
+        <p className="progress-text workout-session__program-hint">
+          Program day: step through exercises with Prev / Next. Add exercise is disabled for this session.
+        </p>
+      )}
+
+      {visibleLines.map((line) => (
         <section key={line.id} className="app__card">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'baseline' }}>
-            <h3 className="app__card-title" style={{ margin: 0 }}>
-              {line.exercise.name}
-            </h3>
+          <div className="workout-session__ex-header">
+            <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
             <span className="workout-kind-badge">{kindLabel(line.exercise.kind)}</span>
-            {!completed && (
+            {!completed && !fromProgram && (
               <button
                 type="button"
-                className="btn btn--secondary btn--sm"
-                style={{ marginLeft: 'auto' }}
+                className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
                 onClick={async () => {
                   if (!workoutId) return;
                   if (!window.confirm('Remove this exercise from the workout?')) return;
@@ -414,8 +490,14 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
             )}
           </div>
           {insights[line.id] && (
-            <p className="progress-text" style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+            <p className="progress-text workout-session__insight">
               <strong>Last time:</strong> {insights[line.id]!.last}
+              {insights[line.id]?.variant != null && insights[line.id]!.variant !== '' && (
+                <>
+                  <br />
+                  <strong>Progression:</strong> {insights[line.id]!.variant!.replace(/_/g, ' ')}
+                </>
+              )}
               {insights[line.id]!.suggestion && (
                 <>
                   <br />
@@ -424,186 +506,51 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
               )}
             </p>
           )}
-          <div className="workout-sets" style={{ marginTop: '0.75rem' }}>
-            {line.sets.map((set) => (
-              <div key={set.id} className="workout-set-row">
-                {line.exercise.kind !== 'time' && (
-                  <div className="form-group" style={{ marginBottom: 0, minWidth: '5rem', flex: '1 1 6rem' }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
-                      {line.exercise.kind === 'bodyweight_reps' ? '—' : units === 'imperial' ? 'lb' : 'kg'}
-                    </label>
-                    {line.exercise.kind !== 'bodyweight_reps' && (
-                      <div className="workout-stepper">
-                        <button
-                          type="button"
-                          className="btn btn--secondary btn--sm"
-                          disabled={completed}
-                          aria-label="Decrease weight"
-                          onClick={() => {
-                            const kg = set.weight_kg ?? 0;
-                            const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
-                            const next = Math.max(0.5, kg - step);
-                            void patchSetField(line.id, set.id, { weight_kg: next });
-                          }}
-                        >
-                          −
-                        </button>
-                        <input
-                          key={`w-${set.id}-${set.weight_kg ?? 'x'}`}
-                          className="form-input workout-set-input"
-                          type="number"
-                          disabled={completed}
-                          defaultValue={displayWeight(set.weight_kg)}
-                          placeholder="—"
-                          onBlur={(e) => {
-                            const raw = e.target.value.trim();
-                            if (raw === '') {
-                              void patchSetField(line.id, set.id, { weight_kg: null });
-                              return;
-                            }
-                            const kg = parseWeightInput(raw);
-                            if (kg != null) void patchSetField(line.id, set.id, { weight_kg: kg });
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn--secondary btn--sm"
-                          disabled={completed}
-                          aria-label="Increase weight"
-                          onClick={() => {
-                            const kg = set.weight_kg ?? (units === 'imperial' ? lbToKg(45) : 20);
-                            const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
-                            void patchSetField(line.id, set.id, { weight_kg: Math.min(500, kg + step) });
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {line.exercise.kind !== 'time' && (
-                  <div className="form-group" style={{ marginBottom: 0, minWidth: '4rem', flex: '1 1 4rem' }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
-                      Reps
-                    </label>
-                    <div className="workout-stepper">
-                      <button
-                        type="button"
-                        className="btn btn--secondary btn--sm"
-                        disabled={completed}
-                        onClick={() => {
-                          const r = set.reps ?? 0;
-                          void patchSetField(line.id, set.id, { reps: Math.max(0, r - 1) });
-                        }}
-                      >
-                        −
-                      </button>
-                      <input
-                        key={`r-${set.id}-${set.reps ?? 'x'}`}
-                        className="form-input workout-set-input"
-                        type="number"
-                        min={0}
-                        disabled={completed}
-                        defaultValue={set.reps ?? ''}
-                        onBlur={(e) => {
-                          const raw = e.target.value.trim();
-                          if (raw === '') {
-                            void patchSetField(line.id, set.id, { reps: null });
-                            return;
-                          }
-                          const v = Number(raw);
-                          if (!Number.isNaN(v)) void patchSetField(line.id, set.id, { reps: v });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn--secondary btn--sm"
-                        disabled={completed}
-                        onClick={() => {
-                          const r = set.reps ?? 0;
-                          void patchSetField(line.id, set.id, { reps: r + 1 });
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {line.exercise.kind === 'time' && (
-                  <div className="form-group" style={{ marginBottom: 0, minWidth: '5rem' }}>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>
-                      Sec
-                    </label>
-                    <input
-                      key={`d-${set.id}-${set.duration_sec ?? 'x'}`}
-                      className="form-input workout-set-input"
-                      type="number"
-                      min={0}
-                      disabled={completed}
-                      defaultValue={set.duration_sec ?? ''}
-                      onBlur={(e) => {
-                        const raw = e.target.value.trim();
-                        if (raw === '') {
-                          void patchSetField(line.id, set.id, { duration_sec: null });
-                          return;
+          <div className="workout-sets">
+            {line.sets.map((set) => {
+              const deleteHandler =
+                !completed && line.sets.length > 1
+                  ? () => {
+                      void (async () => {
+                        if (!workoutId) return;
+                        try {
+                          await deleteWorkoutSet(userId, workoutId, line.id, set.id);
+                          await loadWorkout();
+                        } catch (err) {
+                          onError?.(err instanceof Error ? err.message : 'Delete set failed');
                         }
-                        const v = Number(raw);
-                        if (!Number.isNaN(v)) void patchSetField(line.id, set.id, { duration_sec: v });
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="form-group" style={{ marginBottom: 0, flex: '2 1 8rem' }}>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>
-                    Set note
-                  </label>
-                  <input
-                    key={`n-${set.id}-${set.notes ?? ''}`}
-                    className="form-input"
-                    disabled={completed}
-                    defaultValue={set.notes ?? ''}
-                    onBlur={(e) => void patchSetField(line.id, set.id, { notes: e.target.value.trim() || null })}
-                  />
-                </div>
-                {!completed && (
-                  <div className="workout-set-actions">
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      onClick={() => {
-                        const sec = set.rest_seconds_after ?? line.default_rest_seconds ?? 90;
-                        setRestSeconds(Math.min(3600, Math.max(5, sec)));
-                      }}
-                    >
-                      Rest
-                    </button>
-                    {line.sets.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn--secondary btn--sm"
-                        onClick={async () => {
-                          if (!workoutId) return;
-                          try {
-                            await deleteWorkoutSet(userId, workoutId, line.id, set.id);
-                            await loadWorkout();
-                          } catch (err) {
-                            onError?.(err instanceof Error ? err.message : 'Delete set failed');
-                          }
-                        }}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                      })();
+                    }
+                  : undefined;
+              return (
+                <WorkoutSetRow
+                  key={set.id}
+                  line={line}
+                  set={{
+                    ...set,
+                    rir: set.rir ?? null,
+                    set_role: set.set_role ?? null,
+                    target_reps_min: set.target_reps_min ?? null,
+                    target_reps_max: set.target_reps_max ?? null,
+                    target_rir_min: set.target_rir_min ?? null,
+                    target_rir_max: set.target_rir_max ?? null,
+                    calibration_to_failure: set.calibration_to_failure ?? false,
+                  }}
+                  units={units}
+                  completed={completed}
+                  displayWeight={displayWeight}
+                  parseWeightInput={parseWeightInput}
+                  onPatch={(patch) => void patchSetField(line.id, set.id, patch)}
+                  onRest={(sec) => setRestSeconds(sec)}
+                  canDeleteSet={line.sets.length > 1}
+                  {...(deleteHandler ? { onDelete: deleteHandler } : {})}
+                />
+              );
+            })}
             {!completed && (
               <button
                 type="button"
-                className="btn btn--secondary btn--sm"
-                style={{ marginTop: '0.5rem' }}
+                className="btn btn--secondary btn--sm workout-session__add-set"
                 onClick={async () => {
                   if (!workoutId) return;
                   try {

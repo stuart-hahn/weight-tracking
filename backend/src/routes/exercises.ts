@@ -5,11 +5,12 @@ import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 import {
   validateCreateExercise,
   validateUpdateExercise,
+  validateBatchExerciseInsights,
 } from '../middleware/validate.js';
-import type { ExerciseCreateInput, ExerciseUpdateInput } from '../types/index.js';
-import { getLastPerformanceForExercise } from '../services/workoutDb.js';
-import { suggestNextWeightKg } from '../services/workoutProgression.js';
+import type { ExerciseCreateInput, ExerciseUpdateInput, ExerciseBatchInsightsInput } from '../types/index.js';
 import type { ExerciseKind } from '../services/workoutProgression.js';
+import { buildExerciseInsight } from '../services/workoutInsights.js';
+import type { ProgressionVariant } from '../services/workoutProgressionStrategies.js';
 
 const router = Router({ mergeParams: true });
 
@@ -86,6 +87,36 @@ router.post('/', requireAuth, validateCreateExercise, async (req: AuthRequest, r
   }
 });
 
+router.post(
+  '/batch-insights',
+  requireAuth,
+  validateBatchExerciseInsights,
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const userId = assertUser(req, res);
+    if (!userId) return;
+    const body = req.body as ExerciseBatchInsightsInput;
+    try {
+      const exercises = await prisma.exercise.findMany({
+        where: { id: { in: body.exercise_ids }, OR: [{ userId: null }, { userId }] },
+      });
+      const byId = new Map(exercises.map((e) => [e.id, e]));
+      const variants = body.progression_variant_by_exercise_id ?? {};
+      const insights: Record<string, Awaited<ReturnType<typeof buildExerciseInsight>>> = {};
+      await Promise.all(
+        body.exercise_ids.map(async (id) => {
+          const ex = byId.get(id);
+          if (!ex) return;
+          const override = variants[id] as ProgressionVariant | undefined;
+          insights[id] = await buildExerciseInsight(userId, ex.id, ex.kind as ExerciseKind, ex.name, override ?? null);
+        })
+      );
+      res.json({ insights });
+    } catch (err) {
+      next(err as Error);
+    }
+  }
+);
+
 router.get('/:exerciseId/insights', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = assertUser(req, res);
   if (!userId) return;
@@ -97,15 +128,8 @@ router.get('/:exerciseId/insights', requireAuth, async (req: AuthRequest, res: R
     res.status(404).json({ error: 'Exercise not found' });
     return;
   }
-  const last = await getLastPerformanceForExercise(userId, exerciseId);
-  const suggestion = last
-    ? suggestNextWeightKg(exercise.kind as ExerciseKind, last.sets)
-    : { suggested_weight_kg: null, suggested_reps: null, hint: 'No prior logged sets for this exercise.' };
-  res.json({
-    exercise_id: exerciseId,
-    last_performance: last,
-    suggestion,
-  });
+  const payload = await buildExerciseInsight(userId, exerciseId, exercise.kind as ExerciseKind, exercise.name);
+  res.json(payload);
 });
 
 router.post('/:exerciseId/favorite', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {

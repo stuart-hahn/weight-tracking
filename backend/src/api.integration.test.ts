@@ -1,6 +1,15 @@
 /**
- * API integration tests. Use a test DB (PostgreSQL). In CI, DATABASE_URL is set by the workflow.
- * Locally: set DATABASE_URL or run a Postgres (e.g. Docker) and use the default below.
+ * API integration tests. Use a dedicated PostgreSQL database (default: body_fat_tracker_test).
+ *
+ * CI: `.github/workflows/ci.yml` sets POSTGRES_DB=body_fat_tracker_test on the service container.
+ *
+ * Local (Docker Compose db): create the database once, then `cd backend && npm run test:integration`
+ *   docker compose exec -T db psql -U postgres -c "CREATE DATABASE body_fat_tracker_test;"
+ * (If it already exists, Postgres returns an error—you can ignore it.)
+ *
+ * Local (Postgres on host): PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE body_fat_tracker_test;"
+ *
+ * Override URL: DATABASE_URL=... npm run test:integration
  */
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ??
@@ -129,7 +138,7 @@ describe('API integration', () => {
     expect(res.body.body_fat_percent).toBe(22);
   });
 
-  it('GET /api/users/:id/export returns profile, entries, optional_metrics, workouts', async () => {
+  it('GET /api/users/:id/export returns profile, entries, optional_metrics, workouts, workout_programs', async () => {
     const res = await request(app)
       .get(`/api/users/${userId}/export`)
       .set('Authorization', `Bearer ${token}`);
@@ -143,6 +152,8 @@ describe('API integration', () => {
     expect(Array.isArray(res.body.optional_metrics)).toBe(true);
     expect(res.body).toHaveProperty('workouts');
     expect(Array.isArray(res.body.workouts)).toBe(true);
+    expect(res.body).toHaveProperty('workout_programs');
+    expect(Array.isArray(res.body.workout_programs)).toBe(true);
   });
 
   it('workouts: create exercise, workout, line, set, complete, clone', async () => {
@@ -204,6 +215,68 @@ describe('API integration', () => {
     expect(clone.body.completed_at).toBeNull();
     expect(clone.body.exercises.length).toBeGreaterThanOrEqual(1);
     expect(clone.body.exercises[0].sets[0].weight_kg).toBe(50);
+  });
+
+  it('programs: create program, day, exercise line, template, start workout, batch insights', async () => {
+    const ex = await request(app)
+      .post(`/api/users/${userId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: 'Program Test Lift', kind: 'weight_reps' });
+    expect(ex.status).toBe(201);
+    const exerciseId = ex.body.id as string;
+
+    const pr = await request(app)
+      .post(`/api/users/${userId}/programs`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: 'Integration Mesocycle' });
+    expect(pr.status).toBe(201);
+    const programId = pr.body.id as string;
+
+    const day = await request(app)
+      .post(`/api/users/${userId}/programs/${programId}/days`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: 'Day A' });
+    expect(day.status).toBe(201);
+    const dayId = day.body.id as string;
+
+    const pde = await request(app)
+      .post(`/api/users/${userId}/programs/${programId}/days/${dayId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ exercise_id: exerciseId, progression_variant: 'general_double' });
+    expect(pde.status).toBe(201);
+    const pdeId = pde.body.id as string;
+
+    const tpl = await request(app)
+      .post(`/api/users/${userId}/programs/${programId}/days/${dayId}/exercises/${pdeId}/templates`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ set_role: 'working', target_reps_min: 8, target_reps_max: 12 });
+    expect(tpl.status).toBe(201);
+
+    const wo = await request(app)
+      .post(`/api/users/${userId}/workouts`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ program_day_id: dayId });
+    expect(wo.status).toBe(201);
+    expect(wo.body.program_day_id).toBe(dayId);
+    expect(wo.body.exercises.length).toBeGreaterThanOrEqual(1);
+    expect(wo.body.exercises[0].sets[0].target_reps_max).toBe(12);
+
+    const batch = await request(app)
+      .post(`/api/users/${userId}/exercises/batch-insights`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({
+        exercise_ids: [exerciseId],
+        progression_variant_by_exercise_id: { [exerciseId]: 'general_double' },
+      });
+    expect(batch.status).toBe(200);
+    expect(batch.body.insights[exerciseId].progression_variant).toBe('general_double');
   });
 
   it('POST /api/auth/verify-email verifies with valid token', async () => {
