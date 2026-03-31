@@ -21,6 +21,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from './app.js';
 import { prisma } from './config/db.js';
+import { FIXED_PROGRAM_NAME } from './services/defaultFixedProgram.js';
 
 describe('API integration', () => {
   let userId: string;
@@ -277,6 +278,38 @@ describe('API integration', () => {
       });
     expect(batch.status).toBe(200);
     expect(batch.body.insights[exerciseId].progression_variant).toBe('general_double');
+  });
+
+  it('default fixed program is seeded and Monday session instantiates with notes and sets', async () => {
+    const list = await request(app)
+      .get(`/api/users/${userId}/programs`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(list.status).toBe(200);
+    const fixed = list.body.find((p: { name: string }) => p.name === FIXED_PROGRAM_NAME);
+    expect(fixed).toBeDefined();
+    const det = await request(app)
+      .get(`/api/users/${userId}/programs/${fixed!.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(det.status).toBe(200);
+    expect(det.body.days.length).toBe(6);
+    const monday = det.body.days.find((d: { order_index: number }) => d.order_index === 0);
+    expect(monday).toBeDefined();
+    expect(monday!.exercises.length).toBe(6);
+    const incline = monday!.exercises.find((e: { exercise: { name: string } }) =>
+      e.exercise.name.toLowerCase().includes('incline press')
+    );
+    expect(incline?.set_templates?.length).toBe(2);
+
+    const wo = await request(app)
+      .post(`/api/users/${userId}/workouts`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ program_day_id: monday!.id });
+    expect(wo.status).toBe(201);
+    expect(wo.body.exercises.length).toBe(6);
+    expect(wo.body.exercises[0].sets.length).toBe(2);
+    expect(typeof wo.body.exercises[0].notes).toBe('string');
+    expect((wo.body.exercises[0].notes as string).length).toBeGreaterThan(0);
   });
 
   it('GET exercises custom_only and POST duplicate from global', async () => {

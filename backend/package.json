@@ -8,6 +8,7 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "prisma generate && tsx watch src/index.ts",
+    "dev:devdb": "cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker npm run dev",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
     "db:push:test": "cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker_test prisma db push",
     "test:integration": "npm run db:push:test && cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker_test JWT_SECRET=test-secret-for-integration-tests vitest run src/api.integration.test.ts",
@@ -16,7 +17,9 @@
     "db:seed": "prisma db seed",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force && prisma db seed",
+    "db:fresh": "prisma generate && prisma migrate reset --force && prisma db seed",
+    "db:fresh:dev": "cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker prisma generate && cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker prisma migrate reset --force && cross-env DATABASE_URL=postgresql://postgres:postgres@localhost:5432/body_fat_tracker prisma db seed"
   },
   "engines": {
     "node": ">=20"

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listWorkouts, createWorkout, listWorkoutPrograms, getWorkoutProgram } from '../api/client';
 import type { WorkoutListItem, WorkoutProgramListItem, WorkoutProgramDetailResponse } from '../types/api';
 import PageLoading from '../components/PageLoading';
+import { FIXED_PROGRAM_NAME, weekdayToFixedProgramDayOrderIndex } from '../constants/fixedProgram';
 
 interface WorkoutsPageProps {
   userId: string;
@@ -27,16 +28,25 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   const [programs, setPrograms] = useState<WorkoutProgramListItem[]>([]);
   const [programDetail, setProgramDetail] = useState<WorkoutProgramDetailResponse | null>(null);
   const [programLoading, setProgramLoading] = useState(false);
+  const [fixedProgramDetail, setFixedProgramDetail] = useState<WorkoutProgramDetailResponse | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
       listWorkouts(userId, { status: 'in_progress', limit: 10 }),
       listWorkouts(userId, { status: 'completed', limit: 40 }),
+      listWorkoutPrograms(userId),
     ])
-      .then(([ip, co]) => {
+      .then(async ([ip, co, progList]) => {
         setInProgress(ip);
         setCompleted(co);
+        const fp = progList.find((p) => p.name === FIXED_PROGRAM_NAME);
+        if (fp) {
+          const detail = await getWorkoutProgram(userId, fp.id);
+          setFixedProgramDetail(detail);
+        } else {
+          setFixedProgramDetail(null);
+        }
         onError?.(null);
       })
       .catch((e) => onError?.(e instanceof Error ? e.message : 'Failed to load workouts'))
@@ -46,6 +56,13 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const sortedFixedDays = useMemo(() => {
+    if (!fixedProgramDetail) return [];
+    return [...fixedProgramDetail.days].sort((a, b) => a.order_index - b.order_index);
+  }, [fixedProgramDetail]);
+
+  const todayOrderIndex = weekdayToFixedProgramDayOrderIndex(new Date());
 
   const startNew = async () => {
     setStarting(true);
@@ -113,14 +130,53 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
       <section className="app__card">
         <h2 className="app__card-title">Workouts</h2>
         <p className="progress-text" style={{ marginBottom: '1rem' }}>
-          Log strength sessions, see last time&apos;s performance, and repeat past workouts for progressive overload.
+          Default plan: upper / lower split. Choose the session you&apos;re doing today; each screen lists every exercise and set with targets, then you log load, reps, and RIR.
         </p>
+
+        {fixedProgramDetail && sortedFixedDays.length > 0 && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h3 className="app__card-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+              Start session
+            </h3>
+            {todayOrderIndex === null && (
+              <p className="progress-text" style={{ marginBottom: '0.75rem' }}>
+                Sunday is off. You can still start any session below if you&apos;re training on a different schedule.
+              </p>
+            )}
+            <div className="program-day-tabs">
+              {sortedFixedDays.map((d) => {
+                const isToday = todayOrderIndex !== null && d.order_index === todayOrderIndex;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={isToday ? 'btn btn--primary' : 'btn btn--secondary'}
+                    disabled={starting}
+                    onClick={() => void startFromProgramDay(d.id)}
+                  >
+                    {d.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!fixedProgramDetail && (
+          <p className="progress-text" style={{ marginBottom: '1rem' }}>
+            Default program not found. Open{' '}
+            <Link to="/workouts/programs">Programs</Link> or pull to refresh after signing in.
+          </p>
+        )}
+
         <p className="progress-text" style={{ marginBottom: '1rem' }}>
-          <Link to="/exercises">Manage exercise catalog</Link>
+          <Link to="/exercises">Exercise catalog</Link>
+          {' · '}
+          <Link to="/workouts/programs">Programs</Link>
         </p>
         <div className="workout-start-actions">
-          <button type="button" className="btn btn--primary" disabled={starting} onClick={() => void startNew()}>
-            {starting ? 'Starting…' : 'Start new workout'}
+          <button type="button" className="btn btn--secondary" disabled={starting} onClick={() => void startNew()}>
+            {starting ? 'Starting…' : 'Empty workout'}
           </button>
           <button
             type="button"
@@ -128,7 +184,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
             disabled={starting}
             onClick={() => void openProgramPicker()}
           >
-            Start from program
+            Other program
           </button>
         </div>
         {programPickerOpen && (

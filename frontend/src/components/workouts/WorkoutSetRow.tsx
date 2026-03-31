@@ -1,6 +1,14 @@
 import type { UnitsPreference, WorkoutExerciseNested, WorkoutSetResponse } from '../../types/api';
 import { lbToKg } from '../../utils/units';
 
+function formatSetRoleLabel(role: string | null | undefined): string | null {
+  if (!role) return null;
+  if (role === 'top') return 'Top set';
+  if (role === 'backoff') return 'Backoff';
+  if (role === 'working') return null;
+  return role;
+}
+
 interface WorkoutSetRowProps {
   line: WorkoutExerciseNested;
   set: WorkoutSetResponse;
@@ -12,6 +20,8 @@ interface WorkoutSetRowProps {
   onRest: (seconds: number) => void;
   onDelete?: () => void;
   canDeleteSet: boolean;
+  /** Program sessions: hide per-set notes to reduce clutter */
+  hideSetNote?: boolean;
 }
 
 export default function WorkoutSetRow({
@@ -25,6 +35,7 @@ export default function WorkoutSetRow({
   onRest,
   onDelete,
   canDeleteSet,
+  hideSetNote = false,
 }: WorkoutSetRowProps) {
   const targetBits: string[] = [];
   if (set.target_reps_min != null || set.target_reps_max != null) {
@@ -35,7 +46,8 @@ export default function WorkoutSetRow({
   if (set.target_rir_min != null || set.target_rir_max != null) {
     targetBits.push(`RIR ${set.target_rir_min ?? '—'}–${set.target_rir_max ?? '—'}`);
   }
-  if (set.set_role) targetBits.push(set.set_role);
+  const roleLabel = formatSetRoleLabel(set.set_role);
+  if (roleLabel) targetBits.push(roleLabel);
 
   return (
     <div className="workout-set-row workout-set-row--stack-sm">
@@ -212,16 +224,18 @@ export default function WorkoutSetRow({
             />
           </div>
         )}
-        <div className="workout-set-field workout-set-field--grow">
-          <label className="form-label workout-set-field__label">Note</label>
-          <input
-            key={`n-${set.id}-${set.notes ?? ''}`}
-            className="form-input"
-            disabled={completed}
-            defaultValue={set.notes ?? ''}
-            onBlur={(e) => onPatch({ notes: e.target.value.trim() || null })}
-          />
-        </div>
+        {!hideSetNote && (
+          <div className="workout-set-field workout-set-field--grow">
+            <label className="form-label workout-set-field__label">Note</label>
+            <input
+              key={`n-${set.id}-${set.notes ?? ''}`}
+              className="form-input"
+              disabled={completed}
+              defaultValue={set.notes ?? ''}
+              onBlur={(e) => onPatch({ notes: e.target.value.trim() || null })}
+            />
+          </div>
+        )}
         {!completed && (
           <div className="workout-set-actions">
             <button

@@ -52,6 +52,7 @@ export async function instantiateWorkoutFromProgramDay(userId: string, programDa
         workoutId: workout.id,
         exerciseId: pde.exerciseId,
         orderIndex: pde.orderIndex,
+        notes: pde.notes,
       },
     });
 

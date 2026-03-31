@@ -112,6 +112,7 @@ model ProgramDayExercise {
   exerciseId         String   @map("exercise_id")
   orderIndex         Int      @map("order_index")
   progressionVariant String   @default("general_double") @map("progression_variant")
+  notes              String?
   createdAt          DateTime @default(now()) @map("created_at")
 
   programDay   ProgramDay            @relation(fields: [programDayId], references: [id], onDelete: Cascade)

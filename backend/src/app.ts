@@ -13,7 +13,13 @@ import programsRouter from './routes/programs.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const app = express();
-app.set('trust proxy', true);
+// Rate limiting uses the client IP; `trust proxy: true` without a real reverse proxy breaks
+// express-rate-limit validation locally. Enable only behind a proxy (typ. production).
+if (process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1') {
+  app.set('trust proxy', 1);
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173', credentials: true }));
 app.use(express.json());

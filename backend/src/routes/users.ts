@@ -6,6 +6,7 @@ import { prisma } from '../config/db.js';
 import { requireAuth, signToken, type AuthRequest } from '../middleware/auth.js';
 import { validateCreateUser, validateUpdateUser } from '../middleware/validate.js';
 import { sendVerificationEmail } from '../lib/email.js';
+import { ensureDefaultFixedProgram } from '../services/defaultFixedProgram.js';
 import type { UserCreateInput, UserUpdateInput, UserProfile } from '../types/index.js';
 
 const router = Router();
@@ -36,6 +37,11 @@ router.post('/', validateCreateUser, async (req, res: Response, next: NextFuncti
       },
       select: { id: true, email: true, onboardingComplete: true },
     });
+    try {
+      await ensureDefaultFixedProgram(user.id);
+    } catch (err) {
+      console.error('Default workout program seed failed:', err);
+    }
     const token = signToken({ sub: user.id, email: user.email });
     res.status(201).json({
       user: { id: user.id, email: user.email, onboarding_complete: user.onboardingComplete, email_verified_at: null },
@@ -227,6 +233,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
           exercise_id: e.exerciseId,
           order_index: e.orderIndex,
           progression_variant: e.progressionVariant,
+          notes: e.notes,
           exercise: {
             id: e.exercise.id,
             name: e.exercise.name,

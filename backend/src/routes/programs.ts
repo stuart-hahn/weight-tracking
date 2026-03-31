@@ -1,6 +1,7 @@
 import { Router, type Response, type NextFunction } from 'express';
 import { prisma } from '../config/db.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
+import { ensureDefaultFixedProgram } from '../services/defaultFixedProgram.js';
 import type { ProgressionVariant } from '../services/workoutProgressionStrategies.js';
 
 const router = Router({ mergeParams: true });
@@ -46,6 +47,35 @@ function serializeTemplate(t: {
   };
 }
 
+function serializeProgramDayExercise(e: {
+  id: string;
+  exerciseId: string;
+  orderIndex: number;
+  progressionVariant: string;
+  notes: string | null;
+  exercise: { id: string; name: string; kind: string };
+  setTemplates: Array<{
+    id: string;
+    setIndex: number;
+    setRole: string;
+    targetRepsMin: number | null;
+    targetRepsMax: number | null;
+    targetRirMin: number | null;
+    targetRirMax: number | null;
+    percentOfTop: number | null;
+  }>;
+}) {
+  return {
+    id: e.id,
+    exercise_id: e.exerciseId,
+    order_index: e.orderIndex,
+    progression_variant: e.progressionVariant,
+    notes: e.notes,
+    exercise: { id: e.exercise.id, name: e.exercise.name, kind: e.exercise.kind },
+    set_templates: e.setTemplates.map(serializeTemplate),
+  };
+}
+
 async function loadProgramFull(programId: string, userId: string) {
   return prisma.workoutProgram.findFirst({
     where: { id: programId, userId },
@@ -69,11 +99,19 @@ async function loadProgramFull(programId: string, userId: string) {
 router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = assertUser(req, res);
   if (!userId) return;
-  const rows = await prisma.workoutProgram.findMany({
+  let rows = await prisma.workoutProgram.findMany({
     where: { userId },
     orderBy: { updatedAt: 'desc' },
     include: { _count: { select: { days: true } } },
   });
+  if (rows.length === 0) {
+    await ensureDefaultFixedProgram(userId);
+    rows = await prisma.workoutProgram.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      include: { _count: { select: { days: true } } },
+    });
+  }
   res.json(
     rows.map((p) => ({
       id: p.id,
@@ -133,18 +171,7 @@ router.get('/:programId', requireAuth, async (req: AuthRequest, res: Response): 
       id: d.id,
       name: d.name,
       order_index: d.orderIndex,
-      exercises: d.exercises.map((e) => ({
-        id: e.id,
-        exercise_id: e.exerciseId,
-        order_index: e.orderIndex,
-        progression_variant: e.progressionVariant,
-        exercise: {
-          id: e.exercise.id,
-          name: e.exercise.name,
-          kind: e.exercise.kind,
-        },
-        set_templates: e.setTemplates.map(serializeTemplate),
-      })),
+      exercises: d.exercises.map(serializeProgramDayExercise),
     })),
   });
 });
@@ -181,14 +208,7 @@ router.patch('/:programId', requireAuth, async (req: AuthRequest, res: Response,
         id: d.id,
         name: d.name,
         order_index: d.orderIndex,
-        exercises: d.exercises.map((e) => ({
-          id: e.id,
-          exercise_id: e.exerciseId,
-          order_index: e.orderIndex,
-          progression_variant: e.progressionVariant,
-          exercise: { id: e.exercise.id, name: e.exercise.name, kind: e.exercise.kind },
-          set_templates: e.setTemplates.map(serializeTemplate),
-        })),
+        exercises: d.exercises.map(serializeProgramDayExercise),
       })),
     });
   } catch (err) {
@@ -283,14 +303,7 @@ router.patch('/:programId/days/:dayId', requireAuth, async (req: AuthRequest, re
         id: d.id,
         name: d.name,
         order_index: d.orderIndex,
-        exercises: d.exercises.map((e) => ({
-          id: e.id,
-          exercise_id: e.exerciseId,
-          order_index: e.orderIndex,
-          progression_variant: e.progressionVariant,
-          exercise: { id: e.exercise.id, name: e.exercise.name, kind: e.exercise.kind },
-          set_templates: e.setTemplates.map(serializeTemplate),
-        })),
+        exercises: d.exercises.map(serializeProgramDayExercise),
       })),
     });
   } catch (err) {
@@ -319,7 +332,7 @@ router.delete('/:programId/days/:dayId', requireAuth, async (req: AuthRequest, r
 router.post('/:programId/days/:dayId/exercises', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const userId = assertUser(req, res);
   if (!userId) return;
-  const body = req.body as { exercise_id?: string; progression_variant?: string; order_index?: number };
+  const body = req.body as { exercise_id?: string; progression_variant?: string; order_index?: number; notes?: string | null };
   if (!body?.exercise_id || typeof body.exercise_id !== 'string') {
     res.status(400).json({ error: 'exercise_id required' });
     return;
@@ -349,23 +362,23 @@ router.post('/:programId/days/:dayId/exercises', requireAuth, async (req: AuthRe
       _max: { orderIndex: true },
     });
     const orderIndex = body.order_index ?? (maxO._max.orderIndex ?? -1) + 1;
+    const notesVal =
+      body.notes === undefined
+        ? undefined
+        : body.notes === null
+          ? null
+          : String(body.notes).slice(0, 2000);
     const pde = await prisma.programDayExercise.create({
       data: {
         programDayId: day.id,
         exerciseId: ex.id,
         orderIndex,
         progressionVariant: variant as ProgressionVariant,
+        ...(notesVal !== undefined ? { notes: notesVal } : {}),
       },
       include: { exercise: true, setTemplates: true },
     });
-    res.status(201).json({
-      id: pde.id,
-      exercise_id: pde.exerciseId,
-      order_index: pde.orderIndex,
-      progression_variant: pde.progressionVariant,
-      exercise: { id: pde.exercise.id, name: pde.exercise.name, kind: pde.exercise.kind },
-      set_templates: pde.setTemplates.map(serializeTemplate),
-    });
+    res.status(201).json(serializeProgramDayExercise(pde));
   } catch (err) {
     next(err as Error);
   }
@@ -377,7 +390,7 @@ router.patch(
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     const userId = assertUser(req, res);
     if (!userId) return;
-    const body = req.body as { order_index?: number; progression_variant?: string };
+    const body = req.body as { order_index?: number; progression_variant?: string; notes?: string | null };
     const pde = await prisma.programDayExercise.findFirst({
       where: {
         id: req.params.pdeId,
@@ -395,8 +408,8 @@ router.patch(
         return;
       }
     }
-    if (body.order_index === undefined && body.progression_variant === undefined) {
-      res.status(400).json({ error: 'order_index or progression_variant required' });
+    if (body.order_index === undefined && body.progression_variant === undefined && body.notes === undefined) {
+      res.status(400).json({ error: 'order_index, progression_variant, or notes required' });
       return;
     }
     try {
@@ -425,6 +438,12 @@ router.patch(
           data: { progressionVariant: body.progression_variant },
         });
       }
+      if (body.notes !== undefined) {
+        await prisma.programDayExercise.update({
+          where: { id: pde.id },
+          data: { notes: body.notes === null ? null : String(body.notes).slice(0, 2000) },
+        });
+      }
       const p = await loadProgramFull(req.params.programId, userId);
       if (!p) {
         res.status(404).json({ error: 'Program not found' });
@@ -440,14 +459,7 @@ router.patch(
           id: d.id,
           name: d.name,
           order_index: d.orderIndex,
-          exercises: d.exercises.map((e) => ({
-            id: e.id,
-            exercise_id: e.exerciseId,
-            order_index: e.orderIndex,
-            progression_variant: e.progressionVariant,
-            exercise: { id: e.exercise.id, name: e.exercise.name, kind: e.exercise.kind },
-            set_templates: e.setTemplates.map(serializeTemplate),
-          })),
+          exercises: d.exercises.map(serializeProgramDayExercise),
         })),
       });
     } catch (err) {

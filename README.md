@@ -123,7 +123,12 @@ This runs `prisma db push` against the test URL, then Vitest. Override the URL i
 | `npm run db:seed` | Seed a test user with ~35 days of entries (dev/demo only). |
 | `npm run db:migrate` | Create and run a migration (`prisma migrate dev`). |
 | `npm run db:studio` | Open Prisma Studio to inspect/edit data. |
-| `npm run db:reset` | Reset DB (drops and reapplies). **Destructive.** |
+| `npm run db:reset` | `migrate reset` + `db seed`. **Destructive.** |
+| `npm run db:fresh` | `prisma generate` + `migrate reset` + `prisma db seed` (uses `.env` `DATABASE_URL`). **Destructive.** |
+| `npm run db:fresh:dev` | Same as `db:fresh` but forces local URL `…/body_fat_tracker` for all steps. **Destructive.** |
+| `npm run dev:devdb` | Run the API with the same default local URL as `db:fresh:dev` (use if `.env` points at another database). |
+
+**Login fails after `db:fresh:dev`?** `db:fresh:dev` seeds `postgresql://…/body_fat_tracker`. `npm run dev` reads `DATABASE_URL` from `.env`. If those differ, the API hits an empty database. Fix: set `DATABASE_URL` in `.env` to that URL, or run `npm run dev:devdb` instead of `npm run dev`.
 
 ### Test user (dev/demo)
 

@@ -321,6 +321,7 @@ export interface ProgramDayExerciseNested {
   exercise_id: string;
   order_index: number;
   progression_variant: string;
+  notes: string | null;
   exercise: { id: string; name: string; kind: WorkoutExerciseKind };
   set_templates: ProgramSetTemplateResponse[];
 }

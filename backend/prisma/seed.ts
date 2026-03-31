@@ -7,11 +7,35 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { ensureDefaultFixedProgram } from '../src/services/defaultFixedProgram.js';
 
 const TEST_EMAIL = 'test@example.com';
 const TEST_PASSWORD = 'TestPassword123';
 
 const connectionString = process.env.DATABASE_URL ?? '';
+
+function describeDatabaseTarget(url: string): string {
+  if (!url.trim()) return '(DATABASE_URL is empty — seed will fail)';
+  try {
+    const m = url.match(/postgresql:\/\/(?:[^@/]+@)?([^/]+)\/([^?]+)/);
+    if (m) return `${m[1]}/${m[2]}`;
+  } catch {
+    /* ignore */
+  }
+  return '(could not parse DATABASE_URL)';
+}
+
+function printLoginHint(): void {
+  console.log('');
+  console.log('---');
+  console.log('Test login:', TEST_EMAIL);
+  console.log('Password:   ', TEST_PASSWORD);
+  console.log('Database:  ', describeDatabaseTarget(connectionString));
+  console.log('Use the same DATABASE_URL for `npm run dev` as for migrate/seed.');
+  console.log('Tip: after `npm run db:fresh:dev`, run `npm run dev:devdb` OR set DATABASE_URL in .env to that URL.');
+  console.log('---');
+  console.log('');
+}
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
@@ -48,9 +72,12 @@ async function main(): Promise<void> {
   }
 
   const userId = user.id;
+  await ensureDefaultFixedProgram(userId);
+  console.log('Ensured default fixed workout program for test user.');
   const entriesExisting = await prisma.dailyEntry.count({ where: { userId } });
   if (entriesExisting >= 30) {
     console.log('Test user already has', entriesExisting, 'entries; skipping entry seed.');
+    printLoginHint();
     return;
   }
 
@@ -121,6 +148,8 @@ async function main(): Promise<void> {
   if (addedEx > 0) {
     console.log('Seeded', addedEx, 'global exercises.');
   }
+
+  printLoginHint();
 }
 
 main()

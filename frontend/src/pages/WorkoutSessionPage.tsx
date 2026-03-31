@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { UnitsPreference, WorkoutDetailResponse, WorkoutExerciseNested, ProgressionVariant } from '../types/api';
+import type { UnitsPreference, WorkoutDetailResponse, ProgressionVariant } from '../types/api';
 import {
   getUser,
   getWorkout,
@@ -15,7 +15,6 @@ import {
   postBatchExerciseInsights,
   addExerciseFavorite,
   removeExerciseFavorite,
-  getWorkoutProgram,
 } from '../api/client';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import RestTimer from '../components/workouts/RestTimer';
@@ -35,10 +34,6 @@ type InsightsState = Record<
   { last: string; suggestion: string; variant?: string } | undefined
 >;
 
-function stepStorageKey(workoutId: string): string {
-  return `workout:${workoutId}:step`;
-}
-
 export default function WorkoutSessionPage({ userId, onError, onSuccess }: WorkoutSessionPageProps) {
   const { workoutId } = useParams<{ workoutId: string }>();
   const navigate = useNavigate();
@@ -52,37 +47,22 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [favoritesOnlyPicker, setFavoritesOnlyPicker] = useState(false);
-  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
 
   const refreshInsights = useCallback(
     async (w: WorkoutDetailResponse, unitsForDisplay: UnitsPreference) => {
+      if (w.program_day_id) {
+        setInsights({});
+        return;
+      }
       const lines = w.exercises;
       if (lines.length === 0) {
         setInsights({});
         return;
       }
-      let variantMap: Record<string, ProgressionVariant> | undefined;
-      if (w.program_id && w.program_day_id) {
-        try {
-          const p = await getWorkoutProgram(userId, w.program_id);
-          const day = p.days.find((d) => d.id === w.program_day_id);
-          if (day) {
-            variantMap = {};
-            for (const e of day.exercises) {
-              variantMap[e.exercise_id] = e.progression_variant as ProgressionVariant;
-            }
-          }
-        } catch {
-          variantMap = undefined;
-        }
-      }
       const next: InsightsState = {};
       try {
         const res = await postBatchExerciseInsights(userId, {
           exercise_ids: lines.map((l) => l.exercise_id),
-          ...(variantMap && Object.keys(variantMap).length > 0
-            ? { progression_variant_by_exercise_id: variantMap }
-            : {}),
         });
         for (const line of lines) {
           const ins = res.insights[line.exercise_id];
@@ -107,7 +87,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
           next[line.id] = {
             last: lastStr || '—',
             suggestion: ins.suggestion.hint,
-            variant: ins.progression_variant,
+            variant: ins.progression_variant as ProgressionVariant,
           };
         }
         setInsights(next);
@@ -138,17 +118,6 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         setUnits(u.units);
         setWorkout(w);
         void refreshInsights(w, u.units);
-        if (w.program_day_id) {
-          const raw = sessionStorage.getItem(stepStorageKey(workoutId));
-          if (raw != null) {
-            const n = parseInt(raw, 10);
-            if (!Number.isNaN(n) && w.exercises.length > 0) {
-              setActiveExerciseIndex(Math.min(Math.max(0, n), w.exercises.length - 1));
-            }
-          } else {
-            setActiveExerciseIndex(0);
-          }
-        }
       })
       .catch((e) => {
         if (!cancelled) onError?.(e instanceof Error ? e.message : 'Failed to load workout');
@@ -160,19 +129,6 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       cancelled = true;
     };
   }, [userId, workoutId, onError, refreshInsights]);
-
-  useEffect(() => {
-    if (!workoutId || !workout?.program_day_id) return;
-    sessionStorage.setItem(stepStorageKey(workoutId), String(activeExerciseIndex));
-  }, [workoutId, workout?.program_day_id, activeExerciseIndex]);
-
-  useEffect(() => {
-    if (!workout) return;
-    setActiveExerciseIndex((i) => {
-      if (workout.exercises.length === 0) return 0;
-      return Math.min(i, workout.exercises.length - 1);
-    });
-  }, [workout?.exercises.length, workout]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -194,11 +150,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
 
   const completed = workout?.completed_at != null;
   const fromProgram = Boolean(workout?.program_day_id);
-  const guided = fromProgram && !completed;
-  const visibleLines: WorkoutExerciseNested[] =
-    guided && workout && workout.exercises.length > 0
-      ? [workout.exercises[activeExerciseIndex]!]
-      : workout?.exercises ?? [];
+  const lines = workout?.exercises ?? [];
 
   const handleNotesBlur = async (notes: string) => {
     if (!workoutId || !workout || completed) return;
@@ -309,8 +261,6 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     );
   }
 
-  const exCount = workout.exercises.length;
-
   return (
     <div className="workout-session">
       <p className="workout-session__back progress-text">
@@ -329,13 +279,13 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         workoutName={workout.name || 'Workout'}
         completed={completed}
         saving={saving}
-        guided={guided}
-        exerciseIndex={activeExerciseIndex}
-        exerciseCount={exCount}
+        guided={false}
+        exerciseIndex={0}
+        exerciseCount={lines.length}
         onFinish={() => void handleComplete()}
         onRepeat={() => void handleRepeat()}
-        onPrev={() => setActiveExerciseIndex((i) => Math.max(0, i - 1))}
-        onNext={() => setActiveExerciseIndex((i) => Math.min(exCount - 1, i + 1))}
+        onPrev={() => {}}
+        onNext={() => {}}
       />
 
       <section className="app__card workout-session__meta-card">
@@ -431,11 +381,11 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
 
       {fromProgram && !completed && (
         <p className="progress-text workout-session__program-hint">
-          Program day: step through exercises with Prev / Next. Add exercise is disabled for this session.
+          Program session: work through the list in order. Targets show the plan; enter load, reps, and RIR for each set.
         </p>
       )}
 
-      {visibleLines.map((line) => (
+      {lines.map((line) => (
         <section key={line.id} className="app__card">
           <div className="workout-session__ex-header">
             <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
@@ -459,7 +409,10 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
               </button>
             )}
           </div>
-          {insights[line.id] && (
+          {line.notes != null && line.notes.trim() !== '' && (
+            <p className="progress-text workout-session__ex-notes">{line.notes}</p>
+          )}
+          {!fromProgram && insights[line.id] && (
             <p className="progress-text workout-session__insight">
               <strong>Last time:</strong> {insights[line.id]!.last}
               {insights[line.id]?.variant != null && insights[line.id]!.variant !== '' && (
@@ -478,20 +431,20 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
           )}
           <div className="workout-sets">
             {line.sets.map((set) => {
-              const deleteHandler =
-                !completed && line.sets.length > 1
-                  ? () => {
-                      void (async () => {
-                        if (!workoutId) return;
-                        try {
-                          await deleteWorkoutSet(userId, workoutId, line.id, set.id);
-                          await loadWorkout();
-                        } catch (err) {
-                          onError?.(err instanceof Error ? err.message : 'Delete set failed');
-                        }
-                      })();
-                    }
-                  : undefined;
+              const allowDelete = !completed && !fromProgram && line.sets.length > 1;
+              const deleteHandler = allowDelete
+                ? () => {
+                    void (async () => {
+                      if (!workoutId) return;
+                      try {
+                        await deleteWorkoutSet(userId, workoutId, line.id, set.id);
+                        await loadWorkout();
+                      } catch (err) {
+                        onError?.(err instanceof Error ? err.message : 'Delete set failed');
+                      }
+                    })();
+                  }
+                : undefined;
               return (
                 <WorkoutSetRow
                   key={set.id}
@@ -512,12 +465,13 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                   parseWeightInput={parseWeightInput}
                   onPatch={(patch) => void patchSetField(line.id, set.id, patch)}
                   onRest={(sec) => setRestSeconds(sec)}
-                  canDeleteSet={line.sets.length > 1}
+                  canDeleteSet={allowDelete}
+                  hideSetNote={fromProgram}
                   {...(deleteHandler ? { onDelete: deleteHandler } : {})}
                 />
               );
             })}
-            {!completed && (
+            {!completed && !fromProgram && (
               <button
                 type="button"
                 className="btn btn--secondary btn--sm workout-session__add-set"
