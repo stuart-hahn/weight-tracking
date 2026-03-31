@@ -148,6 +148,11 @@ export interface ExerciseUpdateInput {
   kind?: ExerciseKind;
 }
 
+/** POST .../exercises/:exerciseId/duplicate — copy visible exercise to user's catalog */
+export interface ExerciseDuplicateInput {
+  name?: string | null;
+}
+
 export interface WorkoutCreateInput {
   name?: string | null;
   notes?: string | null;

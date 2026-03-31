@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { UnitsPreference, WorkoutDetailResponse, WorkoutExerciseNested, ProgressionVariant } from '../types/api';
 import {
@@ -12,7 +12,6 @@ import {
   deleteWorkoutExercise,
   listExercises,
   createWorkout,
-  createExercise,
   postBatchExerciseInsights,
   addExerciseFavorite,
   removeExerciseFavorite,
@@ -23,6 +22,7 @@ import RestTimer from '../components/workouts/RestTimer';
 import WorkoutSessionChrome from '../components/workouts/WorkoutSessionChrome';
 import WorkoutSetRow from '../components/workouts/WorkoutSetRow';
 import PageLoading from '../components/PageLoading';
+import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
 
 interface WorkoutSessionPageProps {
   userId: string;
@@ -34,12 +34,6 @@ type InsightsState = Record<
   string,
   { last: string; suggestion: string; variant?: string } | undefined
 >;
-
-function kindLabel(kind: string): string {
-  if (kind === 'weight_reps') return 'Weight × reps';
-  if (kind === 'bodyweight_reps') return 'Reps';
-  return 'Time';
-}
 
 function stepStorageKey(workoutId: string): string {
   return `workout:${workoutId}:step`;
@@ -54,7 +48,6 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [exerciseHits, setExerciseHits] = useState<Awaited<ReturnType<typeof listExercises>>>([]);
-  const [newExerciseName, setNewExerciseName] = useState('');
   const [insights, setInsights] = useState<InsightsState>({});
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -259,19 +252,6 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     }
   };
 
-  const handleCreateCustom = async (e: FormEvent) => {
-    e.preventDefault();
-    const name = newExerciseName.trim();
-    if (!name || !workoutId || completed) return;
-    try {
-      const ex = await createExercise(userId, { name, kind: 'weight_reps' });
-      setNewExerciseName('');
-      await addExercise(ex.id);
-    } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Failed to create exercise');
-    }
-  };
-
   const patchSetField = async (
     lineId: string,
     setId: string,
@@ -412,7 +392,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                   <li key={ex.id} className="workout-exercise-list__item">
                     <button type="button" className="workout-exercise-list__pick" onClick={() => void addExercise(ex.id)}>
                       <span>{ex.name}</span>
-                      <span className="workout-exercise-list__meta">{kindLabel(ex.kind)}</span>
+                      <span className="workout-exercise-list__meta">{exerciseKindLabel(ex.kind)}</span>
                     </button>
                     <button
                       type="button"
@@ -437,23 +417,13 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                   </li>
                 ))}
               </ul>
-              <form onSubmit={handleCreateCustom} className="workout-session__new-ex">
-                <label className="form-label" htmlFor="new-ex-name">
-                  New custom exercise
-                </label>
-                <div className="workout-inline">
-                  <input
-                    id="new-ex-name"
-                    className="form-input"
-                    value={newExerciseName}
-                    onChange={(e) => setNewExerciseName(e.target.value)}
-                    placeholder="e.g. Landmine press"
-                  />
-                  <button type="submit" className="btn btn--secondary">
-                    Create & add
-                  </button>
-                </div>
-              </form>
+              <ExerciseCreateInline
+                userId={userId}
+                onCreated={(ex) => void addExercise(ex.id)}
+                {...(onError != null ? { onError } : {})}
+                submitLabel="Create & add"
+                className="workout-session__new-ex"
+              />
             </div>
           )}
         </section>
@@ -469,7 +439,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         <section key={line.id} className="app__card">
           <div className="workout-session__ex-header">
             <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
-            <span className="workout-kind-badge">{kindLabel(line.exercise.kind)}</span>
+            <span className="workout-kind-badge">{exerciseKindLabel(line.exercise.kind)}</span>
             {!completed && !fromProgram && (
               <button
                 type="button"

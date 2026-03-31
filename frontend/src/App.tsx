@@ -11,6 +11,7 @@ import WorkoutsPage from './pages/WorkoutsPage';
 import WorkoutSessionPage from './pages/WorkoutSessionPage';
 import ProgramsPage from './pages/ProgramsPage';
 import ProgramEditPage from './pages/ProgramEditPage';
+import ExercisesCatalogPage from './pages/ExercisesCatalogPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -353,6 +354,21 @@ function AppContent({
                   <>
                     <Nav onLogout={handleLogout} email={userEmail} />
                     <WorkoutsPage userId={userId} onError={setError} />
+                  </>
+                ) : userId ? (
+                  <Navigate to="/onboarding" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/exercises"
+              element={
+                userId && onboardingComplete !== false ? (
+                  <>
+                    <Nav onLogout={handleLogout} email={userEmail} />
+                    <ExercisesCatalogPage userId={userId} onError={setError} onSuccess={setSuccess} />
                   </>
                 ) : userId ? (
                   <Navigate to="/onboarding" replace />

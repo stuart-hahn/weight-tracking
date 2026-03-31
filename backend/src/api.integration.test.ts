@@ -279,6 +279,39 @@ describe('API integration', () => {
     expect(batch.body.insights[exerciseId].progression_variant).toBe('general_double');
   });
 
+  it('GET exercises custom_only and POST duplicate from global', async () => {
+    if (!userId || !token) {
+      expect.fail('userId/token not set');
+      return;
+    }
+    const unique = `GlobalDupSrc-${Date.now()}`;
+    const globalEx = await prisma.exercise.create({
+      data: { userId: null, name: unique, kind: 'weight_reps' },
+    });
+
+    const dup = await request(app)
+      .post(`/api/users/${userId}/exercises/${globalEx.id}/duplicate`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({});
+    expect(dup.status).toBe(201);
+    expect(dup.body.is_custom).toBe(true);
+    expect(dup.body.user_id).toBe(userId);
+    expect(dup.body.kind).toBe('weight_reps');
+
+    const customList = await request(app)
+      .get(`/api/users/${userId}/exercises?custom_only=true`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(customList.status).toBe(200);
+    expect(Array.isArray(customList.body)).toBe(true);
+    expect(customList.body.every((e: { is_custom: boolean }) => e.is_custom)).toBe(true);
+    const dupIds = customList.body.map((e: { id: string }) => e.id);
+    expect(dupIds).toContain(dup.body.id);
+
+    await prisma.exercise.delete({ where: { id: dup.body.id } });
+    await prisma.exercise.delete({ where: { id: globalEx.id } });
+  });
+
   it('POST /api/auth/verify-email verifies with valid token', async () => {
     if (!userId) {
       expect.fail('userId not set (previous test may have failed)');

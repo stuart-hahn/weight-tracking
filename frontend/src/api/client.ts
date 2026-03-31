@@ -17,6 +17,8 @@ import type {
   CreateWorkoutRequest,
   PatchWorkoutRequest,
   CreateExerciseRequest,
+  PatchExerciseRequest,
+  DuplicateExerciseRequest,
   AddWorkoutExerciseRequest,
   PatchWorkoutExerciseRequest,
   PatchWorkoutSetRequest,
@@ -203,16 +205,24 @@ export async function upsertOptionalMetric(
 
 export async function listExercises(
   userId: string,
-  params?: { q?: string; favorites_only?: boolean }
+  params?: { q?: string; favorites_only?: boolean; custom_only?: boolean }
 ): Promise<ExerciseListItem[]> {
   const sp = new URLSearchParams();
   if (params?.q) sp.set('q', params.q);
   if (params?.favorites_only) sp.set('favorites_only', 'true');
+  if (params?.custom_only) sp.set('custom_only', 'true');
   const q = sp.toString();
   const res = await fetch(`${API_BASE}/users/${userId}/exercises${q ? `?${q}` : ''}`, { headers: getAuthHeaders() });
   const data = (await res.json()) as ExerciseListItem[] | ApiError;
   if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercises'));
   return data as ExerciseListItem[];
+}
+
+export async function getExercise(userId: string, exerciseId: string): Promise<ExerciseListItem> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}`, { headers: getAuthHeaders() });
+  const data = (await res.json()) as ExerciseListItem | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercise'));
+  return data as ExerciseListItem;
 }
 
 export async function createExercise(userId: string, body: CreateExerciseRequest): Promise<ExerciseListItem> {
@@ -223,6 +233,47 @@ export async function createExercise(userId: string, body: CreateExerciseRequest
   });
   const data = (await res.json()) as ExerciseListItem | ApiError;
   if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to create exercise'));
+  return data as ExerciseListItem;
+}
+
+export async function updateExercise(
+  userId: string,
+  exerciseId: string,
+  body: PatchExerciseRequest
+): Promise<ExerciseListItem> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as ExerciseListItem | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to update exercise'));
+  return data as ExerciseListItem;
+}
+
+export async function deleteExercise(userId: string, exerciseId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete exercise'));
+  }
+}
+
+export async function duplicateExercise(
+  userId: string,
+  exerciseId: string,
+  body: DuplicateExerciseRequest = {}
+): Promise<ExerciseListItem> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/duplicate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as ExerciseListItem | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to duplicate exercise'));
   return data as ExerciseListItem;
 }
 

@@ -15,6 +15,9 @@ export default function Nav({ onLogout, email }: NavProps) {
       <NavLink to="/workouts" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
         Workouts
       </NavLink>
+      <NavLink to="/exercises" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
+        Exercises
+      </NavLink>
       <NavLink
         to="/workouts/programs"
         className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}

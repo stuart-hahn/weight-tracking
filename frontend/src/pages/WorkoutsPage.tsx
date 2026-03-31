@@ -115,6 +115,9 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
         <p className="progress-text" style={{ marginBottom: '1rem' }}>
           Log strength sessions, see last time&apos;s performance, and repeat past workouts for progressive overload.
         </p>
+        <p className="progress-text" style={{ marginBottom: '1rem' }}>
+          <Link to="/exercises">Manage exercise catalog</Link>
+        </p>
         <div className="workout-start-actions">
           <button type="button" className="btn btn--primary" disabled={starting} onClick={() => void startNew()}>
             {starting ? 'Starting…' : 'Start new workout'}

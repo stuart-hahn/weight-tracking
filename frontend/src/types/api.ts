@@ -253,6 +253,15 @@ export interface CreateExerciseRequest {
   kind: WorkoutExerciseKind;
 }
 
+export interface PatchExerciseRequest {
+  name?: string;
+  kind?: WorkoutExerciseKind;
+}
+
+export interface DuplicateExerciseRequest {
+  name?: string | null;
+}
+
 export interface AddWorkoutExerciseRequest {
   exercise_id: string;
   notes?: string | null;

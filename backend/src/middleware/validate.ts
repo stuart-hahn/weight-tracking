@@ -7,6 +7,7 @@ import type {
   OptionalMetricCreateInput,
   ExerciseCreateInput,
   ExerciseUpdateInput,
+  ExerciseDuplicateInput,
   WorkoutCreateInput,
   WorkoutUpdateInput,
   WorkoutExerciseCreateInput,
@@ -255,6 +256,26 @@ export function validateUpdateExercise(
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
+  }
+  next();
+}
+
+export function validateDuplicateExercise(
+  req: Request<{ id: string; exerciseId: string }, unknown, ExerciseDuplicateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body as ExerciseDuplicateInput | undefined;
+  if (body !== undefined && body !== null && typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  const name = body?.name;
+  if (name != null && name !== undefined) {
+    if (typeof name !== 'string' || name.trim().length < 1 || name.length > 120) {
+      res.status(400).json({ error: 'name must be 1–120 characters when provided' });
+      return;
+    }
   }
   next();
 }

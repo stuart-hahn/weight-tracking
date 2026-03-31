@@ -1,13 +1,19 @@
 import { Router, type Response, type NextFunction } from 'express';
-import type { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../config/db.js';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 import {
   validateCreateExercise,
   validateUpdateExercise,
   validateBatchExerciseInsights,
+  validateDuplicateExercise,
 } from '../middleware/validate.js';
-import type { ExerciseCreateInput, ExerciseUpdateInput, ExerciseBatchInsightsInput } from '../types/index.js';
+import type {
+  ExerciseCreateInput,
+  ExerciseUpdateInput,
+  ExerciseBatchInsightsInput,
+  ExerciseDuplicateInput,
+} from '../types/index.js';
 import type { ExerciseKind } from '../services/workoutProgression.js';
 import { buildExerciseInsight } from '../services/workoutInsights.js';
 import type { ProgressionVariant } from '../services/workoutProgressionStrategies.js';
@@ -29,6 +35,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
 
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const favoritesOnly = req.query.favorites_only === '1' || req.query.favorites_only === 'true';
+  const customOnly = req.query.custom_only === '1' || req.query.custom_only === 'true';
 
   const favoriteRows = await prisma.userExerciseFavorite.findMany({
     where: { userId },
@@ -36,11 +43,17 @@ router.get('/', requireAuth, async (req: AuthRequest, res: Response): Promise<vo
   });
   const favoriteIds = new Set(favoriteRows.map((f) => f.exerciseId));
 
-  const where: Prisma.ExerciseWhereInput = {
-    OR: [{ userId: null }, { userId }],
-    ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
-    ...(favoritesOnly ? { id: { in: [...favoriteIds] } } : {}),
-  };
+  const where: Prisma.ExerciseWhereInput = customOnly
+    ? {
+        userId,
+        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+        ...(favoritesOnly ? { id: { in: [...favoriteIds] } } : {}),
+      }
+    : {
+        OR: [{ userId: null }, { userId }],
+        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+        ...(favoritesOnly ? { id: { in: [...favoriteIds] } } : {}),
+      };
 
   const exercises = await prisma.exercise.findMany({
     where,
@@ -83,6 +96,10 @@ router.post('/', requireAuth, validateCreateExercise, async (req: AuthRequest, r
       created_at: exercise.createdAt.toISOString(),
     });
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      res.status(409).json({ error: 'You already have an exercise with this name.' });
+      return;
+    }
     next(err as Error);
   }
 });
@@ -163,6 +180,67 @@ router.delete('/:exerciseId/favorite', requireAuth, async (req: AuthRequest, res
   res.status(204).send();
 });
 
+router.post(
+  '/:exerciseId/duplicate',
+  requireAuth,
+  validateDuplicateExercise,
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const userId = assertUser(req, res);
+    if (!userId) return;
+    const { exerciseId } = req.params;
+    const body = (req.body ?? {}) as ExerciseDuplicateInput;
+    const source = await prisma.exercise.findFirst({
+      where: { id: exerciseId, OR: [{ userId: null }, { userId }] },
+    });
+    if (!source) {
+      res.status(404).json({ error: 'Exercise not found' });
+      return;
+    }
+    const base =
+      body.name != null && typeof body.name === 'string' && body.name.trim().length > 0
+        ? body.name.trim().slice(0, 120)
+        : `${source.name.slice(0, 100)} (copy)`.slice(0, 120);
+    const tryNames = [base];
+    for (let n = 2; n <= 15; n++) {
+      tryNames.push(`${base.slice(0, 110)} (${n})`.slice(0, 120));
+    }
+    try {
+      for (const name of tryNames) {
+        try {
+          const exercise = await prisma.exercise.create({
+            data: {
+              userId,
+              name,
+              kind: source.kind,
+            },
+          });
+          const fav = await prisma.userExerciseFavorite.findUnique({
+            where: { userId_exerciseId: { userId, exerciseId: exercise.id } },
+          });
+          res.status(201).json({
+            id: exercise.id,
+            user_id: exercise.userId,
+            name: exercise.name,
+            kind: exercise.kind,
+            is_custom: true,
+            is_favorite: fav != null,
+            created_at: exercise.createdAt.toISOString(),
+          });
+          return;
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            continue;
+          }
+          throw err;
+        }
+      }
+      res.status(409).json({ error: 'Could not find a unique name for the copy; try a different name.' });
+    } catch (err) {
+      next(err as Error);
+    }
+  }
+);
+
 router.get('/:exerciseId', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = assertUser(req, res);
   if (!userId) return;
@@ -221,6 +299,10 @@ router.patch('/:exerciseId', requireAuth, validateUpdateExercise, async (req: Au
       created_at: updated.createdAt.toISOString(),
     });
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      res.status(409).json({ error: 'You already have an exercise with this name.' });
+      return;
+    }
     next(err as Error);
   }
 });

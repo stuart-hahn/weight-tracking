@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   getWorkoutProgram,
   patchWorkoutProgram,
@@ -15,6 +15,7 @@ import {
 } from '../api/client';
 import type { WorkoutProgramDetailResponse, ProgramDayNested, ProgramDayExerciseNested } from '../types/api';
 import PageLoading from '../components/PageLoading';
+import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
 
 interface ProgramEditPageProps {
   userId: string;
@@ -34,6 +35,7 @@ const VARIANTS: { value: string; label: string }[] = [
 
 export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramEditPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { programId } = useParams<{ programId: string }>();
   const [program, setProgram] = useState<WorkoutProgramDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,6 +156,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
       setSearch('');
       setHits([]);
       await load();
+      onSuccess?.('Exercise added.');
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Failed to add exercise');
     } finally {
@@ -340,10 +343,24 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
       {activeDay && (
         <section className="app__card" style={{ marginTop: '1rem' }}>
           <h3 className="app__card-title">{activeDay.name} — exercises</h3>
+          <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+            <Link
+              to={`/exercises?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`}
+            >
+              Open full catalog…
+            </Link>
+          </p>
+          <ExerciseCreateInline
+            userId={userId}
+            onCreated={(ex) => void addExercise(ex.id)}
+            {...(onError != null ? { onError } : {})}
+            submitLabel="Create & add to day"
+            className="program-edit__new-ex"
+          />
           <input
             type="search"
             className="form-input"
-            style={{ marginBottom: '0.75rem' }}
+            style={{ marginBottom: '0.75rem', marginTop: '0.75rem' }}
             placeholder="Search exercise to add…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -354,7 +371,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
                 <li key={ex.id} className="workout-exercise-list__item">
                   <button type="button" className="workout-exercise-list__pick" onClick={() => void addExercise(ex.id)}>
                     <span>{ex.name}</span>
-                    <span className="workout-exercise-list__meta">{ex.kind}</span>
+                    <span className="workout-exercise-list__meta">{exerciseKindLabel(ex.kind)}</span>
                   </button>
                 </li>
               ))}

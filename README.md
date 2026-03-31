@@ -154,14 +154,15 @@ Do not use in production.
 
 **Workouts (all Bearer, `:id` must match token user):**
 
-- `GET /api/users/:id/exercises` – list exercises (`q`, `favorites_only`); global catalog + user custom
-- `POST /api/users/:id/exercises` – create custom exercise (`name`, `kind`: `weight_reps` \| `bodyweight_reps` \| `time`)
+- `GET /api/users/:id/exercises` – list exercises (`q`, `favorites_only`, `custom_only`); global catalog + user custom; `custom_only=true` returns only the user’s custom exercises
+- `POST /api/users/:id/exercises` – create custom exercise (`name`, `kind`: `weight_reps` \| `bodyweight_reps` \| `time`); **409** if a custom exercise with the same name already exists
 - `GET /api/users/:id/exercises/:exerciseId` – exercise detail
+- `POST /api/users/:id/exercises/:exerciseId/duplicate` – copy a visible exercise (global or own) into a new custom row (`name` optional); kind is copied; **409** if no free name
 - `POST /api/users/:id/exercises/batch-insights` – body `{ exercise_ids: string[], progression_variant_by_exercise_id?: Record<exerciseId, variant> }` → `{ insights: Record<exerciseId, payload> }` (single round-trip for session load)
 - `GET /api/users/:id/exercises/:exerciseId/insights` – last performance + suggestion + `progression_variant` (strategy-based hint)
 - `POST /api/users/:id/exercises/:exerciseId/favorite` – add favorite
 - `DELETE /api/users/:id/exercises/:exerciseId/favorite` – remove favorite
-- `PATCH /api/users/:id/exercises/:exerciseId` – update custom exercise
+- `PATCH /api/users/:id/exercises/:exerciseId` – update custom exercise (**409** on duplicate name)
 - `DELETE /api/users/:id/exercises/:exerciseId` – delete custom exercise
 - `GET /api/users/:id/workouts` – list workouts (`status=in_progress` \| `completed`, `limit`)
 - `POST /api/users/:id/workouts` – start workout (optional `clone_from_workout_id` **or** `program_day_id`, `name`, `notes`)
