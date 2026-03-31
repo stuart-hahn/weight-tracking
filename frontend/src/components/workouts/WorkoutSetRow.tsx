@@ -1,5 +1,9 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { UnitsPreference, WorkoutExerciseNested, WorkoutSetResponse } from '../../types/api';
 import { lbToKg } from '../../utils/units';
+
+const DEBOUNCE_MS = 350;
+const LAST_REST_STORAGE_KEY = 'workout-last-rest-seconds';
 
 function formatSetRoleLabel(role: string | null | undefined): string | null {
   if (!role) return null;
@@ -7,6 +11,26 @@ function formatSetRoleLabel(role: string | null | undefined): string | null {
   if (role === 'backoff') return 'Backoff';
   if (role === 'working') return null;
   return role;
+}
+
+function readLastRestSeconds(): number | null {
+  try {
+    const raw = localStorage.getItem(LAST_REST_STORAGE_KEY);
+    if (raw == null) return null;
+    const n = Number(raw);
+    if (Number.isNaN(n) || n < 5) return null;
+    return Math.min(3600, n);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastRestSeconds(sec: number): void {
+  try {
+    localStorage.setItem(LAST_REST_STORAGE_KEY, String(sec));
+  } catch {
+    /* ignore */
+  }
 }
 
 interface WorkoutSetRowProps {
@@ -49,6 +73,209 @@ export default function WorkoutSetRow({
   const roleLabel = formatSetRoleLabel(set.set_role);
   if (roleLabel) targetBits.push(roleLabel);
 
+  const defaultRestSec = set.rest_seconds_after ?? line.default_rest_seconds ?? 90;
+  const [lastRestSec, setLastRestSec] = useState<number | null>(() => readLastRestSeconds());
+
+  const weightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rirTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [weightDraft, setWeightDraft] = useState(() => displayWeight(set.weight_kg));
+  const [repsDraft, setRepsDraft] = useState(() => (set.reps != null ? String(set.reps) : ''));
+  const [rirDraft, setRirDraft] = useState(() => (set.rir != null ? String(set.rir) : ''));
+  const [durationDraft, setDurationDraft] = useState(() =>
+    set.duration_sec != null ? String(set.duration_sec) : ''
+  );
+
+  useEffect(() => {
+    setWeightDraft(displayWeight(set.weight_kg));
+  }, [set.id, set.weight_kg, units]);
+
+  useEffect(() => {
+    setRepsDraft(set.reps != null ? String(set.reps) : '');
+  }, [set.id, set.reps]);
+
+  useEffect(() => {
+    setRirDraft(set.rir != null ? String(set.rir) : '');
+  }, [set.id, set.rir]);
+
+  useEffect(() => {
+    setDurationDraft(set.duration_sec != null ? String(set.duration_sec) : '');
+  }, [set.id, set.duration_sec]);
+
+  useEffect(
+    () => () => {
+      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
+      if (repsTimerRef.current) clearTimeout(repsTimerRef.current);
+      if (rirTimerRef.current) clearTimeout(rirTimerRef.current);
+      if (durationTimerRef.current) clearTimeout(durationTimerRef.current);
+    },
+    []
+  );
+
+  const clearWeightTimer = useCallback(() => {
+    if (weightTimerRef.current) {
+      clearTimeout(weightTimerRef.current);
+      weightTimerRef.current = null;
+    }
+  }, []);
+
+  const flushWeight = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearWeightTimer();
+      const t = raw.trim();
+      if (t === '') onPatch({ weight_kg: null });
+      else {
+        const kg = parseWeightInput(t);
+        if (kg != null) onPatch({ weight_kg: kg });
+      }
+    },
+    [clearWeightTimer, completed, onPatch, parseWeightInput]
+  );
+
+  const scheduleWeight = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearWeightTimer();
+      weightTimerRef.current = setTimeout(() => {
+        weightTimerRef.current = null;
+        const t = raw.trim();
+        if (t === '') onPatch({ weight_kg: null });
+        else {
+          const kg = parseWeightInput(t);
+          if (kg != null) onPatch({ weight_kg: kg });
+        }
+      }, DEBOUNCE_MS);
+    },
+    [clearWeightTimer, completed, onPatch, parseWeightInput]
+  );
+
+  const clearRepsTimer = useCallback(() => {
+    if (repsTimerRef.current) {
+      clearTimeout(repsTimerRef.current);
+      repsTimerRef.current = null;
+    }
+  }, []);
+
+  const flushReps = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearRepsTimer();
+      const t = raw.trim();
+      if (t === '') onPatch({ reps: null });
+      else {
+        const v = Number(t);
+        if (!Number.isNaN(v)) onPatch({ reps: v });
+      }
+    },
+    [clearRepsTimer, completed, onPatch]
+  );
+
+  const scheduleReps = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearRepsTimer();
+      repsTimerRef.current = setTimeout(() => {
+        repsTimerRef.current = null;
+        const t = raw.trim();
+        if (t === '') onPatch({ reps: null });
+        else {
+          const v = Number(t);
+          if (!Number.isNaN(v)) onPatch({ reps: v });
+        }
+      }, DEBOUNCE_MS);
+    },
+    [clearRepsTimer, completed, onPatch]
+  );
+
+  const clearRirTimer = useCallback(() => {
+    if (rirTimerRef.current) {
+      clearTimeout(rirTimerRef.current);
+      rirTimerRef.current = null;
+    }
+  }, []);
+
+  const flushRir = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearRirTimer();
+      const t = raw.trim();
+      if (t === '') onPatch({ rir: null });
+      else {
+        const v = Number(t);
+        if (!Number.isNaN(v)) onPatch({ rir: v });
+      }
+    },
+    [clearRirTimer, completed, onPatch]
+  );
+
+  const scheduleRir = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearRirTimer();
+      rirTimerRef.current = setTimeout(() => {
+        rirTimerRef.current = null;
+        const t = raw.trim();
+        if (t === '') onPatch({ rir: null });
+        else {
+          const v = Number(t);
+          if (!Number.isNaN(v)) onPatch({ rir: v });
+        }
+      }, DEBOUNCE_MS);
+    },
+    [clearRirTimer, completed, onPatch]
+  );
+
+  const clearDurationTimer = useCallback(() => {
+    if (durationTimerRef.current) {
+      clearTimeout(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+  }, []);
+
+  const flushDuration = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearDurationTimer();
+      const t = raw.trim();
+      if (t === '') onPatch({ duration_sec: null });
+      else {
+        const v = Number(t);
+        if (!Number.isNaN(v)) onPatch({ duration_sec: v });
+      }
+    },
+    [clearDurationTimer, completed, onPatch]
+  );
+
+  const scheduleDuration = useCallback(
+    (raw: string) => {
+      if (completed) return;
+      clearDurationTimer();
+      durationTimerRef.current = setTimeout(() => {
+        durationTimerRef.current = null;
+        const t = raw.trim();
+        if (t === '') onPatch({ duration_sec: null });
+        else {
+          const v = Number(t);
+          if (!Number.isNaN(v)) onPatch({ duration_sec: v });
+        }
+      }, DEBOUNCE_MS);
+    },
+    [clearDurationTimer, completed, onPatch]
+  );
+
+  const fireRest = useCallback(
+    (sec: number) => {
+      const clamped = Math.min(3600, Math.max(5, sec));
+      writeLastRestSeconds(clamped);
+      setLastRestSec(clamped);
+      onRest(clamped);
+    },
+    [onRest]
+  );
+
   return (
     <div className="workout-set-row workout-set-row--stack-sm">
       {targetBits.length > 0 && (
@@ -68,6 +295,7 @@ export default function WorkoutSetRow({
                   disabled={completed}
                   aria-label="Decrease weight"
                   onClick={() => {
+                    clearWeightTimer();
                     const kg = set.weight_kg ?? 0;
                     const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
                     const next = Math.max(0.5, kg - step);
@@ -77,21 +305,16 @@ export default function WorkoutSetRow({
                   −
                 </button>
                 <input
-                  key={`w-${set.id}-${set.weight_kg ?? 'x'}`}
                   className="form-input workout-set-input"
                   type="number"
                   disabled={completed}
-                  defaultValue={displayWeight(set.weight_kg)}
+                  value={weightDraft}
                   placeholder="—"
-                  onBlur={(e) => {
-                    const raw = e.target.value.trim();
-                    if (raw === '') {
-                      onPatch({ weight_kg: null });
-                      return;
-                    }
-                    const kg = parseWeightInput(raw);
-                    if (kg != null) onPatch({ weight_kg: kg });
+                  onChange={(e) => {
+                    setWeightDraft(e.target.value);
+                    scheduleWeight(e.target.value);
                   }}
+                  onBlur={() => flushWeight(weightDraft)}
                 />
                 <button
                   type="button"
@@ -99,6 +322,7 @@ export default function WorkoutSetRow({
                   disabled={completed}
                   aria-label="Increase weight"
                   onClick={() => {
+                    clearWeightTimer();
                     const kg = set.weight_kg ?? (units === 'imperial' ? lbToKg(45) : 20);
                     const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
                     onPatch({ weight_kg: Math.min(500, kg + step) });
@@ -119,6 +343,7 @@ export default function WorkoutSetRow({
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
+                  clearRepsTimer();
                   const r = set.reps ?? 0;
                   onPatch({ reps: Math.max(0, r - 1) });
                 }}
@@ -126,27 +351,23 @@ export default function WorkoutSetRow({
                 −
               </button>
               <input
-                key={`r-${set.id}-${set.reps ?? 'x'}`}
                 className="form-input workout-set-input"
                 type="number"
                 min={0}
                 disabled={completed}
-                defaultValue={set.reps ?? ''}
-                onBlur={(e) => {
-                  const raw = e.target.value.trim();
-                  if (raw === '') {
-                    onPatch({ reps: null });
-                    return;
-                  }
-                  const v = Number(raw);
-                  if (!Number.isNaN(v)) onPatch({ reps: v });
+                value={repsDraft}
+                onChange={(e) => {
+                  setRepsDraft(e.target.value);
+                  scheduleReps(e.target.value);
                 }}
+                onBlur={() => flushReps(repsDraft)}
               />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
+                  clearRepsTimer();
                   const r = set.reps ?? 0;
                   onPatch({ reps: r + 1 });
                 }}
@@ -165,6 +386,7 @@ export default function WorkoutSetRow({
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
+                  clearRirTimer();
                   const r = set.rir ?? 0;
                   onPatch({ rir: Math.max(0, r - 1) });
                 }}
@@ -172,27 +394,23 @@ export default function WorkoutSetRow({
                 −
               </button>
               <input
-                key={`rir-${set.id}-${set.rir ?? 'x'}`}
                 className="form-input workout-set-input"
                 type="number"
                 min={0}
                 disabled={completed}
-                defaultValue={set.rir ?? ''}
-                onBlur={(e) => {
-                  const raw = e.target.value.trim();
-                  if (raw === '') {
-                    onPatch({ rir: null });
-                    return;
-                  }
-                  const v = Number(raw);
-                  if (!Number.isNaN(v)) onPatch({ rir: v });
+                value={rirDraft}
+                onChange={(e) => {
+                  setRirDraft(e.target.value);
+                  scheduleRir(e.target.value);
                 }}
+                onBlur={() => flushRir(rirDraft)}
               />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
+                  clearRirTimer();
                   const r = set.rir ?? 0;
                   onPatch({ rir: Math.min(30, r + 1) });
                 }}
@@ -206,21 +424,16 @@ export default function WorkoutSetRow({
           <div className="workout-set-field">
             <label className="form-label workout-set-field__label">Sec</label>
             <input
-              key={`d-${set.id}-${set.duration_sec ?? 'x'}`}
               className="form-input workout-set-input"
               type="number"
               min={0}
               disabled={completed}
-              defaultValue={set.duration_sec ?? ''}
-              onBlur={(e) => {
-                const raw = e.target.value.trim();
-                if (raw === '') {
-                  onPatch({ duration_sec: null });
-                  return;
-                }
-                const v = Number(raw);
-                if (!Number.isNaN(v)) onPatch({ duration_sec: v });
+              value={durationDraft}
+              onChange={(e) => {
+                setDurationDraft(e.target.value);
+                scheduleDuration(e.target.value);
               }}
+              onBlur={() => flushDuration(durationDraft)}
             />
           </div>
         )}
@@ -237,17 +450,20 @@ export default function WorkoutSetRow({
           </div>
         )}
         {!completed && (
-          <div className="workout-set-actions">
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm btn--touch"
-              onClick={() => {
-                const sec = set.rest_seconds_after ?? line.default_rest_seconds ?? 90;
-                onRest(Math.min(3600, Math.max(5, sec)));
-              }}
-            >
+          <div className="workout-set-actions workout-set-actions--with-hint">
+            <span className="workout-set-actions__rest-hint">Rest ~{defaultRestSec}s</span>
+            <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => fireRest(defaultRestSec)}>
               Rest
             </button>
+            {lastRestSec != null && lastRestSec !== defaultRestSec && (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm btn--touch"
+                onClick={() => fireRest(lastRestSec)}
+              >
+                Last ({lastRestSec}s)
+              </button>
+            )}
             {canDeleteSet && onDelete && (
               <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onDelete}>
                 ✕

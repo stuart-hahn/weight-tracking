@@ -64,6 +64,11 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
 
   const todayOrderIndex = weekdayToFixedProgramDayOrderIndex(new Date());
 
+  const repeatProgramDayId = useMemo(
+    () => completed[0]?.program_day_id ?? null,
+    [completed]
+  );
+
   const startNew = async () => {
     setStarting(true);
     try {
@@ -159,6 +164,21 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
                 );
               })}
             </div>
+            {repeatProgramDayId && (
+              <div className="workouts-page__repeat-day">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  disabled={starting}
+                  onClick={() => void startFromProgramDay(repeatProgramDayId)}
+                >
+                  Same program day again
+                </button>
+                <p className="progress-text workouts-page__repeat-hint">
+                  Starts the same template as your last completed program session (progression uses recent history).
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -174,19 +194,22 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
           {' · '}
           <Link to="/workouts/programs">Programs</Link>
         </p>
-        <div className="workout-start-actions">
-          <button type="button" className="btn btn--secondary" disabled={starting} onClick={() => void startNew()}>
-            {starting ? 'Starting…' : 'Empty workout'}
-          </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            disabled={starting}
-            onClick={() => void openProgramPicker()}
-          >
-            Other program
-          </button>
-        </div>
+        <details className="workouts-page__more-start">
+          <summary className="workouts-page__more-start-summary">More ways to start</summary>
+          <div className="workout-start-actions workouts-page__more-start-actions">
+            <button type="button" className="btn btn--secondary" disabled={starting} onClick={() => void startNew()}>
+              {starting ? 'Starting…' : 'Empty workout'}
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={starting}
+              onClick={() => void openProgramPicker()}
+            >
+              Other program
+            </button>
+          </div>
+        </details>
         {programPickerOpen && (
           <div className="app__card program-start-modal">
             <h3 className="app__card-title">Choose program day</h3>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { UnitsPreference, WorkoutDetailResponse, ProgressionVariant } from '../types/api';
 import {
@@ -34,6 +34,40 @@ type InsightsState = Record<
   { last: string; suggestion: string; variant?: string } | undefined
 >;
 
+const FAVORITES_ONLY_PICKER_KEY = 'workout-exercise-picker-favorites-only';
+
+function humanizeVariant(v: string): string {
+  return v
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function ProgramExerciseNotes({ text, fromProgram }: { text: string; fromProgram: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!fromProgram) {
+    return <p className="progress-text workout-session__ex-notes">{text}</p>;
+  }
+  const needsToggle = text.length > 140 || text.includes('\n');
+  return (
+    <div className="workout-session__ex-notes-block">
+      <p
+        className={
+          expanded || !needsToggle
+            ? 'progress-text workout-session__ex-notes'
+            : 'progress-text workout-session__ex-notes workout-session__ex-notes--clamp'
+        }
+      >
+        {text}
+      </p>
+      {needsToggle && (
+        <button type="button" className="workout-session__notes-toggle btn btn--secondary btn--sm" onClick={() => setExpanded((e) => !e)}>
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function WorkoutSessionPage({ userId, onError, onSuccess }: WorkoutSessionPageProps) {
   const { workoutId } = useParams<{ workoutId: string }>();
   const navigate = useNavigate();
@@ -47,13 +81,12 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [favoritesOnlyPicker, setFavoritesOnlyPicker] = useState(false);
+  const [removeConfirmLineId, setRemoveConfirmLineId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const prevPickerOpenRef = useRef(false);
 
   const refreshInsights = useCallback(
     async (w: WorkoutDetailResponse, unitsForDisplay: UnitsPreference) => {
-      if (w.program_day_id) {
-        setInsights({});
-        return;
-      }
       const lines = w.exercises;
       if (lines.length === 0) {
         setInsights({});
@@ -147,6 +180,30 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       cancelled = true;
     };
   }, [pickerOpen, search, userId, favoritesOnlyPicker]);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(FAVORITES_ONLY_PICKER_KEY);
+      if (v === '1') setFavoritesOnlyPicker(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAVORITES_ONLY_PICKER_KEY, favoritesOnlyPicker ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [favoritesOnlyPicker]);
+
+  useEffect(() => {
+    if (pickerOpen && !prevPickerOpenRef.current) {
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+    prevPickerOpenRef.current = pickerOpen;
+  }, [pickerOpen]);
 
   const completed = workout?.completed_at != null;
   const fromProgram = Boolean(workout?.program_day_id);
@@ -279,13 +336,8 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         workoutName={workout.name || 'Workout'}
         completed={completed}
         saving={saving}
-        guided={false}
-        exerciseIndex={0}
-        exerciseCount={lines.length}
         onFinish={() => void handleComplete()}
         onRepeat={() => void handleRepeat()}
-        onPrev={() => {}}
-        onNext={() => {}}
       />
 
       <section className="app__card workout-session__meta-card">
@@ -330,6 +382,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                 Favorites only
               </label>
               <input
+                ref={searchInputRef}
                 type="search"
                 className="form-input workout-session__search"
                 placeholder="Search…"
@@ -391,43 +444,69 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
             <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
             <span className="workout-kind-badge">{exerciseKindLabel(line.exercise.kind)}</span>
             {!completed && !fromProgram && (
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
-                onClick={async () => {
-                  if (!workoutId) return;
-                  if (!window.confirm('Remove this exercise from the workout?')) return;
-                  try {
-                    await deleteWorkoutExercise(userId, workoutId, line.id);
-                    await loadWorkout();
-                  } catch (err) {
-                    onError?.(err instanceof Error ? err.message : 'Remove failed');
-                  }
-                }}
-              >
-                Remove
-              </button>
+              <div className="workout-session__remove-wrap">
+                {removeConfirmLineId === line.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
+                      onClick={async () => {
+                        if (!workoutId) return;
+                        try {
+                          await deleteWorkoutExercise(userId, workoutId, line.id);
+                          setRemoveConfirmLineId(null);
+                          await loadWorkout();
+                        } catch (err) {
+                          onError?.(err instanceof Error ? err.message : 'Remove failed');
+                        }
+                      }}
+                    >
+                      Confirm remove
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm btn--touch"
+                      onClick={() => setRemoveConfirmLineId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
+                    onClick={() => setRemoveConfirmLineId(line.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             )}
           </div>
           {line.notes != null && line.notes.trim() !== '' && (
-            <p className="progress-text workout-session__ex-notes">{line.notes}</p>
+            <ProgramExerciseNotes text={line.notes} fromProgram={fromProgram} />
           )}
-          {!fromProgram && insights[line.id] && (
-            <p className="progress-text workout-session__insight">
-              <strong>Last time:</strong> {insights[line.id]!.last}
-              {insights[line.id]?.variant != null && insights[line.id]!.variant !== '' && (
-                <>
-                  <br />
-                  <strong>Progression:</strong> {insights[line.id]!.variant!.replace(/_/g, ' ')}
-                </>
+          {insights[line.id] && (
+            <div className="progress-text workout-session__insight">
+              <p className="workout-session__insight-last">
+                <strong>Last time:</strong> {insights[line.id]!.last}
+              </p>
+              {(insights[line.id]!.suggestion || (insights[line.id]?.variant != null && insights[line.id]!.variant !== '')) && (
+                <details className="workout-session__insight-details">
+                  <summary className="workout-session__insight-more">More</summary>
+                  {insights[line.id]?.variant != null && insights[line.id]!.variant !== '' && (
+                    <p className="workout-session__insight-extra">
+                      <strong>Progression:</strong> {humanizeVariant(insights[line.id]!.variant!)}
+                    </p>
+                  )}
+                  {insights[line.id]!.suggestion ? (
+                    <p className="workout-session__insight-extra">
+                      <strong>Suggestion:</strong> {insights[line.id]!.suggestion}
+                    </p>
+                  ) : null}
+                </details>
               )}
-              {insights[line.id]!.suggestion && (
-                <>
-                  <br />
-                  <strong>Suggestion:</strong> {insights[line.id]!.suggestion}
-                </>
-              )}
-            </p>
+            </div>
           )}
           <div className="workout-sets">
             {line.sets.map((set) => {
