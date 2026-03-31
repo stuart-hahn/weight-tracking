@@ -9,10 +9,36 @@
   padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 
+@media (min-width: 640px) {
+  .app {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .app {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
 .app__main {
   width: 100%;
-  max-width: var(--max-width);
+  max-width: var(--layout-max-sm);
   flex: 1;
+}
+
+@media (min-width: 640px) {
+  .app__main {
+    max-width: var(--layout-max-md);
+  }
+}
+
+@media (min-width: 900px) {
+  .app__main {
+    max-width: var(--layout-max-lg);
+  }
 }
 
 .app__header {
@@ -254,6 +280,8 @@
   margin: 0;
   font-size: 1.15rem;
   line-height: 1.25;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .workout-session-chrome__progress {
@@ -335,14 +363,15 @@
 }
 
 .program-day-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.5rem;
   margin-top: 0.5rem;
 }
 
 .program-day-tabs .btn {
-  width: auto;
+  width: 100%;
+  min-height: var(--touch-target-min);
 }
 
 .program-exercise-block {
@@ -422,8 +451,11 @@
 
 .workout-set-row__targets {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
   color: var(--muted);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .workout-set-row__grid {
@@ -448,36 +480,65 @@
   font-size: 0.75rem;
 }
 
-@media (max-width: 480px) {
+.workout-set-row--stack-sm .workout-set-row__grid {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.workout-set-row--stack-sm .workout-set-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.workout-set-row--stack-sm .workout-stepper {
+  flex: 1;
+  min-width: 0;
+}
+
+.workout-set-row--stack-sm .workout-set-input {
+  flex: 1;
+  min-width: 5.5rem;
+  width: auto;
+  max-width: none;
+}
+
+.workout-set-row--stack-sm .workout-set-actions {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+@media (min-width: 640px) {
   .workout-set-row--stack-sm .workout-set-row__grid {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
   }
 
   .workout-set-row--stack-sm .workout-set-field {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 1 1 5.5rem;
+    min-width: 5rem;
   }
 
-  .workout-set-row--stack-sm .workout-set-input {
-    width: 100%;
-    max-width: 12rem;
+  .workout-set-row--stack-sm .workout-stepper .workout-set-input {
+    flex: 0 1 auto;
+    width: 4.5rem;
+    min-width: 4rem;
+    max-width: 8rem;
   }
-
-  .workout-set-row--stack-sm .workout-set-actions {
-    flex-direction: row;
-    justify-content: flex-start;
-  }
-}
-
-.workout-set-row:last-of-type {
-  border-bottom: none;
 }
 
 .workout-stepper {
   display: flex;
   gap: 0.25rem;
   align-items: center;
+}
+
+.workout-stepper .btn.btn--sm,
+.workout-stepper .btn.btn--touch {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 0.35rem 0.5rem;
+  flex-shrink: 0;
 }
 
 .workout-set-input {
@@ -574,6 +635,16 @@
 .workout-history-list__link:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+button.workout-history-list__link {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
 }
 
 .workout-history-list__meta {
@@ -710,15 +781,38 @@
 /* Nav */
 .app__nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0 0.65rem;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.app__nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.app__nav::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+@media (min-width: 900px) {
+  .app__nav {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
 }
 
 .app__nav-link {
-  padding: 0.5rem 0.75rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0.5rem 0.85rem;
   color: var(--muted);
   text-decoration: none;
   font-weight: 500;
@@ -735,12 +829,37 @@
   background: rgba(56, 189, 248, 0.1);
 }
 
+.app__nav-email {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  min-height: var(--touch-target-min);
+  margin-left: auto;
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .app__nav-link--btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0.5rem 0.85rem;
   background: none;
   border: none;
   font: inherit;
   cursor: pointer;
-  margin-left: auto;
+  color: var(--muted);
+  font-weight: 500;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.app__nav-link--btn:hover {
+  color: var(--text);
 }
 
 /* Log out */
@@ -751,7 +870,7 @@
 
 .app__logout .btn {
   width: 100%;
-  max-width: var(--max-width);
+  max-width: 100%;
 }
 
 .entry-row:hover {
@@ -853,4 +972,70 @@
 .exercise-create-inline__kind {
   flex: 0 1 11rem;
   min-width: 0;
+}
+
+/* Workouts page – spacing (replaces inline layout styles) */
+.workouts-page__lead {
+  margin-bottom: 1rem;
+}
+
+.workouts-page__start-block {
+  margin-bottom: 1.25rem;
+}
+
+.workouts-page__subsection-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.program-start-modal {
+  margin-top: 1rem;
+}
+
+.workouts-page__modal-back {
+  margin-bottom: 0.75rem;
+}
+
+.workouts-page__modal-pick-hint {
+  margin-bottom: 0.5rem;
+}
+
+.workouts-page__modal-cancel {
+  margin-top: 0.75rem;
+}
+
+/* Settings / shared section spacing */
+.settings-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.app__card-title--sub {
+  font-size: 1rem;
+}
+
+.progress-text--mb-lg {
+  margin-bottom: 1rem;
+}
+
+.progress-text--mb-md {
+  margin-bottom: 0.75rem;
+}
+
+.progress-text--mb-sm {
+  margin-bottom: 0.5rem;
+}
+
+.progress-text--fine {
+  font-size: 0.9rem;
+}
+
+.form-submit-mt {
+  margin-top: 1rem;
+}
+
+.form-hint--tight {
+  margin-top: 0.5rem;
 }

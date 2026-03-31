@@ -129,17 +129,17 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
     <div>
       <section className="app__card">
         <h2 className="app__card-title">Workouts</h2>
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        <p className="progress-text workouts-page__lead">
           Default plan: upper / lower split. Choose the session you&apos;re doing today; each screen lists every exercise and set with targets, then you log load, reps, and RIR.
         </p>
 
         {fixedProgramDetail && sortedFixedDays.length > 0 && (
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h3 className="app__card-title" style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+          <div className="workouts-page__start-block">
+            <h3 className="app__card-title workouts-page__subsection-title">
               Start session
             </h3>
             {todayOrderIndex === null && (
-              <p className="progress-text" style={{ marginBottom: '0.75rem' }}>
+              <p className="progress-text progress-text--mb-md">
                 Sunday is off. You can still start any session below if you&apos;re training on a different schedule.
               </p>
             )}
@@ -163,13 +163,13 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
         )}
 
         {!fixedProgramDetail && (
-          <p className="progress-text" style={{ marginBottom: '1rem' }}>
+          <p className="progress-text progress-text--mb-lg">
             Default program not found. Open{' '}
             <Link to="/workouts/programs">Programs</Link> or pull to refresh after signing in.
           </p>
         )}
 
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        <p className="progress-text progress-text--mb-lg">
           <Link to="/exercises">Exercise catalog</Link>
           {' · '}
           <Link to="/workouts/programs">Programs</Link>
@@ -188,7 +188,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
           </button>
         </div>
         {programPickerOpen && (
-          <div className="app__card program-start-modal" style={{ marginTop: '1rem' }}>
+          <div className="app__card program-start-modal">
             <h3 className="app__card-title">Choose program day</h3>
             {programLoading && !programDetail && <p className="progress-text">Loading…</p>}
             {!programDetail && programs.length > 0 && (
@@ -198,7 +198,6 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
                     <button
                       type="button"
                       className="workout-history-list__link"
-                      style={{ border: 'none', cursor: 'pointer', font: 'inherit', width: '100%', textAlign: 'left' }}
                       onClick={() => void selectProgramForStart(p.id)}
                     >
                       <span>{p.name}</span>
@@ -215,10 +214,10 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
             )}
             {programDetail && (
               <>
-                <button type="button" className="btn btn--secondary btn--sm" style={{ marginBottom: '0.75rem' }} onClick={() => setProgramDetail(null)}>
+                <button type="button" className="btn btn--secondary btn--sm workouts-page__modal-back" onClick={() => setProgramDetail(null)}>
                   ← Back to programs
                 </button>
-                <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+                <p className="progress-text workouts-page__modal-pick-hint">
                   Pick a day for <strong>{programDetail.name}</strong>:
                 </p>
                 <div className="program-day-tabs">
@@ -241,8 +240,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
             )}
             <button
               type="button"
-              className="btn btn--secondary btn--sm"
-              style={{ marginTop: '0.75rem' }}
+              className="btn btn--secondary btn--sm workouts-page__modal-cancel"
               onClick={() => {
                 setProgramPickerOpen(false);
                 setProgramDetail(null);

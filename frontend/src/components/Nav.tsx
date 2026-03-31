@@ -30,11 +30,7 @@ export default function Nav({ onLogout, email }: NavProps) {
       <NavLink to="/settings" className={({ isActive }) => `app__nav-link ${isActive ? 'app__nav-link--active' : ''}`}>
         Settings
       </NavLink>
-      {displayEmail && (
-        <span className="app__nav-email" style={{ fontSize: '0.8rem', color: 'var(--muted)', alignSelf: 'center', marginLeft: 'auto', marginRight: '0.5rem' }}>
-          {displayEmail}
-        </span>
-      )}
+      {displayEmail && <span className="app__nav-email">{displayEmail}</span>}
       <button type="button" className="app__nav-link app__nav-link--btn" onClick={onLogout}>
         Sign out
       </button>

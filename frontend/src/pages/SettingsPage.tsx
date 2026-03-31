@@ -137,7 +137,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   return (
     <section className="app__card" aria-label="Settings">
       <h2 className="app__card-title">Settings</h2>
-      <p className="progress-text" style={{ marginBottom: '1rem' }}>
+      <p className="progress-text progress-text--mb-lg">
         {profile.email}
       </p>
       <form onSubmit={handleSubmit} noValidate>
@@ -269,15 +269,15 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             onChange={(e) => setLeanMassKg(e.target.value)}
           />
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={saving}>
+        <button type="submit" className="btn btn--primary form-submit-mt" disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </form>
-      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-        <h3 className="app__card-title" style={{ fontSize: '1rem' }}>
+      <div className="settings-section">
+        <h3 className="app__card-title app__card-title--sub">
           Strength training block
         </h3>
-        <p className="progress-text" style={{ marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+        <p className="progress-text progress-text--mb-md progress-text--fine">
           Set the start date of your current mesocycle. Week index (for deload on week 6 and calibration cues) is computed as
           full weeks since this date. Leave empty to default to week 1 behavior.
         </p>
@@ -297,7 +297,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           {savingBlock ? 'Saving…' : 'Save block start'}
         </button>
       </div>
-      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+      <div className="settings-section">
         <button
           type="button"
           className="btn btn--secondary"
@@ -306,7 +306,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         >
           {exporting ? 'Preparing…' : 'Download my data (export)'}
         </button>
-        <p className="form-hint" style={{ marginTop: '0.5rem' }}>
+        <p className="form-hint form-hint--tight">
           Export your profile, entries, workouts, programs, and optional metrics as JSON.
         </p>
       </div>

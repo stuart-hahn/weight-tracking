@@ -12,7 +12,11 @@
   --danger: #f87171;
   --radius: 12px;
   --touch-min: 48px;
-  --max-width: 480px;
+  --touch-target-min: 44px;
+  --layout-max-sm: 480px;
+  --layout-max-md: 640px;
+  --layout-max-lg: 920px;
+  --max-width: var(--layout-max-sm);
 }
 
 *,
