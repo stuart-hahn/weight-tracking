@@ -1123,3 +1123,149 @@ button.workout-history-list__link {
 .workouts-page__more-start-actions {
   margin-top: 0.5rem;
 }
+
+/* Workout session — outline, focus mode, picker empty, set row patch status */
+.workout-session__nav-card {
+  margin-bottom: 1rem;
+}
+
+.workout-session__focus-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.workout-session__focus-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.workout-session__focus-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.workout-session__focus-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workout-session__focus-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workout-session__outline {
+  margin-top: 0.25rem;
+}
+
+.workout-session__outline-summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  padding: 0.25rem 0;
+}
+
+.workout-session__outline-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.workout-session__outline-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  max-width: 100%;
+}
+
+.workout-session__outline-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.workout-session__outline-idx {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.workout-session__next-incomplete {
+  margin-top: 0.65rem;
+}
+
+.workout-session__ex-card--hidden {
+  display: none !important;
+}
+
+.workout-session__picker-loading,
+.workout-session__picker-empty {
+  margin-top: 0.65rem;
+}
+
+.workout-session__picker-empty .btn {
+  margin-top: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.workout-set-row__status {
+  margin-bottom: 0.25rem;
+}
+
+.workout-set-row__saving {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.workout-set-row__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--danger);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.workout-set-row__error-dismiss {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.workout-set-row__error-dismiss:hover {
+  border-color: var(--accent);
+}
+
+.workout-set-row__field-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+.workout-session__finish-confirm {
+  margin-bottom: 1rem;
+}

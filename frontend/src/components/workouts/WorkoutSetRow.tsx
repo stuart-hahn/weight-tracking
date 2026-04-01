@@ -46,6 +46,10 @@ interface WorkoutSetRowProps {
   canDeleteSet: boolean;
   /** Program sessions: hide per-set notes to reduce clutter */
   hideSetNote?: boolean;
+  /** Row-level save feedback (avoids global banner for patch failures) */
+  isPatching?: boolean;
+  patchError?: string | null;
+  onDismissPatchError?: () => void;
 }
 
 export default function WorkoutSetRow({
@@ -60,6 +64,9 @@ export default function WorkoutSetRow({
   onDelete,
   canDeleteSet,
   hideSetNote = false,
+  isPatching = false,
+  patchError = null,
+  onDismissPatchError,
 }: WorkoutSetRowProps) {
   const targetBits: string[] = [];
   if (set.target_reps_min != null || set.target_reps_max != null) {
@@ -76,10 +83,8 @@ export default function WorkoutSetRow({
   const defaultRestSec = set.rest_seconds_after ?? line.default_rest_seconds ?? 90;
   const [lastRestSec, setLastRestSec] = useState<number | null>(() => readLastRestSeconds());
 
-  const weightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const repsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rirTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPatchRef = useRef<Partial<import('../../types/api').PatchWorkoutSetRequest>>({});
 
   const [weightDraft, setWeightDraft] = useState(() => displayWeight(set.weight_kg));
   const [repsDraft, setRepsDraft] = useState(() => (set.reps != null ? String(set.reps) : ''));
@@ -87,6 +92,7 @@ export default function WorkoutSetRow({
   const [durationDraft, setDurationDraft] = useState(() =>
     set.duration_sec != null ? String(set.duration_sec) : ''
   );
+  const [fieldErrors, setFieldErrors] = useState<{ weight?: string; reps?: string; rir?: string; duration?: string }>({});
 
   useEffect(() => {
     setWeightDraft(displayWeight(set.weight_kg));
@@ -106,164 +112,95 @@ export default function WorkoutSetRow({
 
   useEffect(
     () => () => {
-      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
-      if (repsTimerRef.current) clearTimeout(repsTimerRef.current);
-      if (rirTimerRef.current) clearTimeout(rirTimerRef.current);
-      if (durationTimerRef.current) clearTimeout(durationTimerRef.current);
+      if (patchTimerRef.current) clearTimeout(patchTimerRef.current);
     },
     []
   );
 
-  const clearWeightTimer = useCallback(() => {
-    if (weightTimerRef.current) {
-      clearTimeout(weightTimerRef.current);
-      weightTimerRef.current = null;
+  const clearPatchTimer = useCallback(() => {
+    if (patchTimerRef.current) {
+      clearTimeout(patchTimerRef.current);
+      patchTimerRef.current = null;
     }
   }, []);
 
-  const flushWeight = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearWeightTimer();
-      const t = raw.trim();
-      if (t === '') onPatch({ weight_kg: null });
-      else {
-        const kg = parseWeightInput(t);
-        if (kg != null) onPatch({ weight_kg: kg });
-      }
-    },
-    [clearWeightTimer, completed, onPatch, parseWeightInput]
-  );
+  const flushPendingPatch = useCallback(() => {
+    if (completed) return;
+    clearPatchTimer();
+    const patch = pendingPatchRef.current;
+    pendingPatchRef.current = {};
+    const keys = Object.keys(patch);
+    if (keys.length === 0) return;
+    onPatch(patch);
+  }, [clearPatchTimer, completed, onPatch]);
 
-  const scheduleWeight = useCallback(
-    (raw: string) => {
+  const queuePatch = useCallback(
+    (patch: Partial<import('../../types/api').PatchWorkoutSetRequest>, opts?: { flush?: boolean }) => {
       if (completed) return;
-      clearWeightTimer();
-      weightTimerRef.current = setTimeout(() => {
-        weightTimerRef.current = null;
-        const t = raw.trim();
-        if (t === '') onPatch({ weight_kg: null });
-        else {
-          const kg = parseWeightInput(t);
-          if (kg != null) onPatch({ weight_kg: kg });
-        }
+      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+      if (opts?.flush) {
+        flushPendingPatch();
+        return;
+      }
+      clearPatchTimer();
+      patchTimerRef.current = setTimeout(() => {
+        patchTimerRef.current = null;
+        flushPendingPatch();
       }, DEBOUNCE_MS);
     },
-    [clearWeightTimer, completed, onPatch, parseWeightInput]
+    [clearPatchTimer, completed, flushPendingPatch]
   );
 
-  const clearRepsTimer = useCallback(() => {
-    if (repsTimerRef.current) {
-      clearTimeout(repsTimerRef.current);
-      repsTimerRef.current = null;
-    }
+  const setFieldError = useCallback((key: keyof typeof fieldErrors, msg: string | undefined) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (msg == null) delete next[key];
+      else next[key] = msg;
+      return next;
+    });
   }, []);
 
-  const flushReps = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearRepsTimer();
+  const queueWeightFromDraft = useCallback(
+    (raw: string, opts?: { flush?: boolean }) => {
       const t = raw.trim();
-      if (t === '') onPatch({ reps: null });
-      else {
-        const v = Number(t);
-        if (!Number.isNaN(v)) onPatch({ reps: v });
+      if (t === '') {
+        setFieldError('weight', undefined);
+        queuePatch({ weight_kg: null }, opts);
+        return;
       }
+      const kg = parseWeightInput(t);
+      if (kg == null) {
+        setFieldError('weight', 'Enter a valid weight');
+        return;
+      }
+      setFieldError('weight', undefined);
+      queuePatch({ weight_kg: kg }, opts);
     },
-    [clearRepsTimer, completed, onPatch]
+    [parseWeightInput, queuePatch, setFieldError]
   );
 
-  const scheduleReps = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearRepsTimer();
-      repsTimerRef.current = setTimeout(() => {
-        repsTimerRef.current = null;
-        const t = raw.trim();
-        if (t === '') onPatch({ reps: null });
-        else {
-          const v = Number(t);
-          if (!Number.isNaN(v)) onPatch({ reps: v });
-        }
-      }, DEBOUNCE_MS);
-    },
-    [clearRepsTimer, completed, onPatch]
-  );
-
-  const clearRirTimer = useCallback(() => {
-    if (rirTimerRef.current) {
-      clearTimeout(rirTimerRef.current);
-      rirTimerRef.current = null;
-    }
-  }, []);
-
-  const flushRir = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearRirTimer();
+  const queueIntFromDraft = useCallback(
+    (
+      key: 'reps' | 'rir' | 'duration',
+      raw: string,
+      field: 'reps' | 'rir' | 'duration_sec',
+      opts?: { flush?: boolean }
+    ) => {
       const t = raw.trim();
-      if (t === '') onPatch({ rir: null });
-      else {
-        const v = Number(t);
-        if (!Number.isNaN(v)) onPatch({ rir: v });
+      if (t === '') {
+        setFieldError(key, undefined);
+        queuePatch({ [field]: null } as Partial<import('../../types/api').PatchWorkoutSetRequest>, opts);
+        return;
       }
-    },
-    [clearRirTimer, completed, onPatch]
-  );
-
-  const scheduleRir = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearRirTimer();
-      rirTimerRef.current = setTimeout(() => {
-        rirTimerRef.current = null;
-        const t = raw.trim();
-        if (t === '') onPatch({ rir: null });
-        else {
-          const v = Number(t);
-          if (!Number.isNaN(v)) onPatch({ rir: v });
-        }
-      }, DEBOUNCE_MS);
-    },
-    [clearRirTimer, completed, onPatch]
-  );
-
-  const clearDurationTimer = useCallback(() => {
-    if (durationTimerRef.current) {
-      clearTimeout(durationTimerRef.current);
-      durationTimerRef.current = null;
-    }
-  }, []);
-
-  const flushDuration = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearDurationTimer();
-      const t = raw.trim();
-      if (t === '') onPatch({ duration_sec: null });
-      else {
-        const v = Number(t);
-        if (!Number.isNaN(v)) onPatch({ duration_sec: v });
+      const v = Number(t);
+      if (Number.isNaN(v) || v < 0) {
+        setFieldError(key, 'Enter a valid number');
+        return;
       }
+      setFieldError(key, undefined);
+      queuePatch({ [field]: v } as Partial<import('../../types/api').PatchWorkoutSetRequest>, opts);
     },
-    [clearDurationTimer, completed, onPatch]
-  );
-
-  const scheduleDuration = useCallback(
-    (raw: string) => {
-      if (completed) return;
-      clearDurationTimer();
-      durationTimerRef.current = setTimeout(() => {
-        durationTimerRef.current = null;
-        const t = raw.trim();
-        if (t === '') onPatch({ duration_sec: null });
-        else {
-          const v = Number(t);
-          if (!Number.isNaN(v)) onPatch({ duration_sec: v });
-        }
-      }, DEBOUNCE_MS);
-    },
-    [clearDurationTimer, completed, onPatch]
+    [queuePatch, setFieldError]
   );
 
   const fireRest = useCallback(
@@ -277,7 +214,22 @@ export default function WorkoutSetRow({
   );
 
   return (
-    <div className="workout-set-row workout-set-row--stack-sm">
+    <div className="workout-set-row workout-set-row--stack-sm" aria-busy={isPatching || undefined}>
+      {(isPatching || patchError) && (
+        <div className="workout-set-row__status">
+          {isPatching && <span className="workout-set-row__saving">Saving…</span>}
+          {patchError && (
+            <p className="workout-set-row__error" role="alert">
+              {patchError}
+              {onDismissPatchError && (
+                <button type="button" className="workout-set-row__error-dismiss" onClick={onDismissPatchError}>
+                  Dismiss
+                </button>
+              )}
+            </p>
+          )}
+        </div>
+      )}
       {targetBits.length > 0 && (
         <p className="workout-set-row__targets">{targetBits.join(' · ')}</p>
       )}
@@ -295,11 +247,12 @@ export default function WorkoutSetRow({
                   disabled={completed}
                   aria-label="Decrease weight"
                   onClick={() => {
-                    clearWeightTimer();
                     const kg = set.weight_kg ?? 0;
                     const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
                     const next = Math.max(0.5, kg - step);
-                    onPatch({ weight_kg: next });
+                    setWeightDraft(displayWeight(next));
+                    setFieldError('weight', undefined);
+                    queuePatch({ weight_kg: next }, { flush: true });
                   }}
                 >
                   −
@@ -312,9 +265,9 @@ export default function WorkoutSetRow({
                   placeholder="—"
                   onChange={(e) => {
                     setWeightDraft(e.target.value);
-                    scheduleWeight(e.target.value);
+                    queueWeightFromDraft(e.target.value);
                   }}
-                  onBlur={() => flushWeight(weightDraft)}
+                  onBlur={() => queueWeightFromDraft(weightDraft, { flush: true })}
                 />
                 <button
                   type="button"
@@ -322,16 +275,19 @@ export default function WorkoutSetRow({
                   disabled={completed}
                   aria-label="Increase weight"
                   onClick={() => {
-                    clearWeightTimer();
                     const kg = set.weight_kg ?? (units === 'imperial' ? lbToKg(45) : 20);
                     const step = units === 'imperial' ? lbToKg(2.5) : 2.5;
-                    onPatch({ weight_kg: Math.min(500, kg + step) });
+                    const next = Math.min(500, kg + step);
+                    setWeightDraft(displayWeight(next));
+                    setFieldError('weight', undefined);
+                    queuePatch({ weight_kg: next }, { flush: true });
                   }}
                 >
                   +
                 </button>
               </div>
             )}
+            {fieldErrors.weight && <p className="progress-text workout-set-row__field-error">{fieldErrors.weight}</p>}
           </div>
         )}
         {line.exercise.kind !== 'time' && (
@@ -343,9 +299,11 @@ export default function WorkoutSetRow({
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
-                  clearRepsTimer();
                   const r = set.reps ?? 0;
-                  onPatch({ reps: Math.max(0, r - 1) });
+                  const next = Math.max(0, r - 1);
+                  setRepsDraft(String(next));
+                  setFieldError('reps', undefined);
+                  queuePatch({ reps: next }, { flush: true });
                 }}
               >
                 −
@@ -358,23 +316,26 @@ export default function WorkoutSetRow({
                 value={repsDraft}
                 onChange={(e) => {
                   setRepsDraft(e.target.value);
-                  scheduleReps(e.target.value);
+                  queueIntFromDraft('reps', e.target.value, 'reps');
                 }}
-                onBlur={() => flushReps(repsDraft)}
+                onBlur={() => queueIntFromDraft('reps', repsDraft, 'reps', { flush: true })}
               />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
-                  clearRepsTimer();
                   const r = set.reps ?? 0;
-                  onPatch({ reps: r + 1 });
+                  const next = r + 1;
+                  setRepsDraft(String(next));
+                  setFieldError('reps', undefined);
+                  queuePatch({ reps: next }, { flush: true });
                 }}
               >
                 +
               </button>
             </div>
+            {fieldErrors.reps && <p className="progress-text workout-set-row__field-error">{fieldErrors.reps}</p>}
           </div>
         )}
         {line.exercise.kind === 'weight_reps' && (
@@ -386,9 +347,11 @@ export default function WorkoutSetRow({
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
-                  clearRirTimer();
                   const r = set.rir ?? 0;
-                  onPatch({ rir: Math.max(0, r - 1) });
+                  const next = Math.max(0, r - 1);
+                  setRirDraft(String(next));
+                  setFieldError('rir', undefined);
+                  queuePatch({ rir: next }, { flush: true });
                 }}
               >
                 −
@@ -401,23 +364,26 @@ export default function WorkoutSetRow({
                 value={rirDraft}
                 onChange={(e) => {
                   setRirDraft(e.target.value);
-                  scheduleRir(e.target.value);
+                  queueIntFromDraft('rir', e.target.value, 'rir');
                 }}
-                onBlur={() => flushRir(rirDraft)}
+                onBlur={() => queueIntFromDraft('rir', rirDraft, 'rir', { flush: true })}
               />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
                 disabled={completed}
                 onClick={() => {
-                  clearRirTimer();
                   const r = set.rir ?? 0;
-                  onPatch({ rir: Math.min(30, r + 1) });
+                  const next = Math.min(30, r + 1);
+                  setRirDraft(String(next));
+                  setFieldError('rir', undefined);
+                  queuePatch({ rir: next }, { flush: true });
                 }}
               >
                 +
               </button>
             </div>
+            {fieldErrors.rir && <p className="progress-text workout-set-row__field-error">{fieldErrors.rir}</p>}
           </div>
         )}
         {line.exercise.kind === 'time' && (
@@ -431,10 +397,11 @@ export default function WorkoutSetRow({
               value={durationDraft}
               onChange={(e) => {
                 setDurationDraft(e.target.value);
-                scheduleDuration(e.target.value);
+                queueIntFromDraft('duration', e.target.value, 'duration_sec');
               }}
-              onBlur={() => flushDuration(durationDraft)}
+              onBlur={() => queueIntFromDraft('duration', durationDraft, 'duration_sec', { flush: true })}
             />
+            {fieldErrors.duration && <p className="progress-text workout-set-row__field-error">{fieldErrors.duration}</p>}
           </div>
         )}
         {!hideSetNote && (

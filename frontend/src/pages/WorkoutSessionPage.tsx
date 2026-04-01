@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { UnitsPreference, WorkoutDetailResponse, ProgressionVariant } from '../types/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { UnitsPreference, WorkoutDetailResponse, ProgressionVariant, WorkoutExerciseNested, WorkoutSetResponse } from '../types/api';
 import {
   getUser,
   getWorkout,
@@ -16,12 +17,15 @@ import {
   addExerciseFavorite,
   removeExerciseFavorite,
 } from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import RestTimer from '../components/workouts/RestTimer';
 import WorkoutSessionChrome from '../components/workouts/WorkoutSessionChrome';
-import WorkoutSetRow from '../components/workouts/WorkoutSetRow';
 import PageLoading from '../components/PageLoading';
-import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
+import WorkoutSessionNavCard from '../components/workouts/session/WorkoutSessionNavCard';
+import WorkoutExercisePickerCard from '../components/workouts/session/WorkoutExercisePickerCard';
+import WorkoutSessionMetaCard from '../components/workouts/session/WorkoutSessionMetaCard';
+import WorkoutExerciseCard from '../components/workouts/session/WorkoutExerciseCard';
 
 interface WorkoutSessionPageProps {
   userId: string;
@@ -35,11 +39,32 @@ type InsightsState = Record<
 >;
 
 const FAVORITES_ONLY_PICKER_KEY = 'workout-exercise-picker-favorites-only';
+const PICKER_SEARCH_DEBOUNCE_MS = 250;
 
 function humanizeVariant(v: string): string {
   return v
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isSetIncomplete(line: WorkoutExerciseNested, set: WorkoutSetResponse): boolean {
+  const k = line.exercise.kind;
+  if (k === 'time') return set.duration_sec == null || set.duration_sec <= 0;
+  if (k === 'bodyweight_reps') return set.reps == null;
+  if (k === 'weight_reps') {
+    return set.weight_kg == null || set.weight_kg <= 0 || set.reps == null;
+  }
+  return false;
+}
+
+function countIncompleteSets(w: WorkoutDetailResponse): number {
+  let n = 0;
+  for (const line of w.exercises) {
+    for (const set of line.sets) {
+      if (isSetIncomplete(line, set)) n += 1;
+    }
+  }
+  return n;
 }
 
 function ProgramExerciseNotes({ text, fromProgram }: { text: string; fromProgram: boolean }) {
@@ -71,33 +96,76 @@ function ProgramExerciseNotes({ text, fromProgram }: { text: string; fromProgram
 export default function WorkoutSessionPage({ userId, onError, onSuccess }: WorkoutSessionPageProps) {
   const { workoutId } = useParams<{ workoutId: string }>();
   const navigate = useNavigate();
-  const [units, setUnits] = useState<UnitsPreference>('metric');
-  const [workout, setWorkout] = useState<WorkoutDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [exerciseHits, setExerciseHits] = useState<Awaited<ReturnType<typeof listExercises>>>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [insights, setInsights] = useState<InsightsState>({});
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
+  const [finishIncompleteCount, setFinishIncompleteCount] = useState(0);
   const [favoritesOnlyPicker, setFavoritesOnlyPicker] = useState(false);
   const [removeConfirmLineId, setRemoveConfirmLineId] = useState<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const prevPickerOpenRef = useRef(false);
+  const [savingSetId, setSavingSetId] = useState<string | null>(null);
+  const [setPatchErrors, setSetPatchErrors] = useState<Record<string, string>>({});
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusExerciseIdx, setFocusExerciseIdx] = useState(0);
+
+  const prevInsightsKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(search.trim()), PICKER_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
+  const { data: userProfile } = useQuery({
+    queryKey: queryKeys.user(userId),
+    queryFn: () => getUser(userId),
+  });
+  const units: UnitsPreference = userProfile?.units ?? 'metric';
+
+  const {
+    data: workout,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: queryKeys.workout(userId, workoutId ?? ''),
+    queryFn: () => getWorkout(userId, workoutId!),
+    enabled: Boolean(workoutId),
+  });
+
+  const { data: exerciseHits = [], isFetching: pickerListFetching } = useQuery({
+    queryKey: queryKeys.exercisesPicker(userId, debouncedSearch, favoritesOnlyPicker),
+    queryFn: () =>
+      listExercises(userId, {
+        ...(debouncedSearch ? { q: debouncedSearch } : {}),
+        ...(favoritesOnlyPicker ? { favorites_only: true } : {}),
+      }),
+    enabled: pickerOpen,
+  });
+
+  const lines = workout?.exercises ?? [];
+  const exerciseIdsFingerprint = useMemo(
+    () => lines.map((e) => e.exercise_id).join('\0'),
+    [lines]
+  );
+  const insightsKey = `${exerciseIdsFingerprint}|${units}`;
 
   const refreshInsights = useCallback(
     async (w: WorkoutDetailResponse, unitsForDisplay: UnitsPreference) => {
-      const lines = w.exercises;
-      if (lines.length === 0) {
+      const exLines = w.exercises;
+      if (exLines.length === 0) {
         setInsights({});
         return;
       }
       const next: InsightsState = {};
       try {
         const res = await postBatchExerciseInsights(userId, {
-          exercise_ids: lines.map((l) => l.exercise_id),
+          exercise_ids: exLines.map((l) => l.exercise_id),
         });
-        for (const line of lines) {
+        for (const line of exLines) {
           const ins = res.insights[line.exercise_id];
           if (!ins) {
             next[line.id] = { last: '—', suggestion: '' };
@@ -125,7 +193,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         }
         setInsights(next);
       } catch {
-        for (const line of lines) {
+        for (const line of exLines) {
           next[line.id] = { last: '—', suggestion: '' };
         }
         setInsights(next);
@@ -134,52 +202,16 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     [userId]
   );
 
-  const loadWorkout = useCallback(async () => {
-    if (!workoutId) return;
-    const w = await getWorkout(userId, workoutId);
-    setWorkout(w);
-    await refreshInsights(w, units);
-  }, [userId, workoutId, refreshInsights, units]);
-
   useEffect(() => {
-    if (!workoutId) return;
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([getUser(userId), getWorkout(userId, workoutId)])
-      .then(([u, w]) => {
-        if (cancelled) return;
-        setUnits(u.units);
-        setWorkout(w);
-        void refreshInsights(w, u.units);
-      })
-      .catch((e) => {
-        if (!cancelled) onError?.(e instanceof Error ? e.message : 'Failed to load workout');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, workoutId, onError, refreshInsights]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    let cancelled = false;
-    listExercises(userId, {
-      ...(search.trim() ? { q: search.trim() } : {}),
-      ...(favoritesOnlyPicker ? { favorites_only: true } : {}),
-    })
-      .then((list) => {
-        if (!cancelled) setExerciseHits(list);
-      })
-      .catch(() => {
-        if (!cancelled) setExerciseHits([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pickerOpen, search, userId, favoritesOnlyPicker]);
+    if (!workout || lines.length === 0) {
+      setInsights({});
+      prevInsightsKeyRef.current = '';
+      return;
+    }
+    if (prevInsightsKeyRef.current === insightsKey) return;
+    prevInsightsKeyRef.current = insightsKey;
+    void refreshInsights(workout, units);
+  }, [workout, lines.length, insightsKey, units, refreshInsights]);
 
   useEffect(() => {
     try {
@@ -199,20 +231,60 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   }, [favoritesOnlyPicker]);
 
   useEffect(() => {
-    if (pickerOpen && !prevPickerOpenRef.current) {
-      requestAnimationFrame(() => searchInputRef.current?.focus());
-    }
-    prevPickerOpenRef.current = pickerOpen;
-  }, [pickerOpen]);
+    setFocusExerciseIdx((i) => {
+      if (lines.length === 0) return 0;
+      return Math.min(Math.max(0, i), lines.length - 1);
+    });
+  }, [lines.length]);
 
   const completed = workout?.completed_at != null;
   const fromProgram = Boolean(workout?.program_day_id);
-  const lines = workout?.exercises ?? [];
+
+  const scrollToExercise = useCallback(
+    (lineId: string) => {
+      document.getElementById(`workout-ex-${lineId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    []
+  );
+
+  const jumpToExercise = useCallback(
+    (lineId: string) => {
+      const idx = lines.findIndex((l) => l.id === lineId);
+      if (idx >= 0) setFocusExerciseIdx(idx);
+      requestAnimationFrame(() => scrollToExercise(lineId));
+    },
+    [lines, scrollToExercise]
+  );
+
+  const scrollToNextIncomplete = useCallback(() => {
+    if (!workout) return;
+    for (const line of workout.exercises) {
+      for (const set of line.sets) {
+        if (isSetIncomplete(line, set)) {
+          if (focusMode) {
+            const idx = lines.findIndex((l) => l.id === line.id);
+            if (idx >= 0) setFocusExerciseIdx(idx);
+          }
+          scrollToExercise(line.id);
+          return;
+        }
+      }
+    }
+  }, [workout, focusMode, lines, scrollToExercise]);
+
+  const invalidateWorkout = useCallback(() => {
+    if (workoutId) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workout(userId, workoutId) });
+    }
+  }, [queryClient, userId, workoutId]);
 
   const handleNotesBlur = async (notes: string) => {
     if (!workoutId || !workout || completed) return;
     try {
       await patchWorkout(userId, workoutId, { notes: notes.trim() || null });
+      queryClient.setQueryData<WorkoutDetailResponse>(queryKeys.workout(userId, workoutId), (prev) =>
+        prev ? { ...prev, notes: notes.trim() || null } : prev
+      );
       onError?.(null);
     } catch (e) {
       onError?.(e instanceof Error ? e.message : 'Failed to save notes');
@@ -220,17 +292,30 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   };
 
   const handleComplete = async () => {
-    if (!workoutId || completed) return;
+    if (!workoutId || !workout || completed) return;
+    const inc = countIncompleteSets(workout);
+    if (inc > 0) {
+      setFinishIncompleteCount(inc);
+      setFinishConfirmOpen(true);
+      return;
+    }
+    await completeWorkout();
+  };
+
+  const completeWorkout = async () => {
+    if (!workoutId || !workout || completed) return;
     setSaving(true);
     try {
       const w = await patchWorkout(userId, workoutId, { completed_at: new Date().toISOString() });
-      setWorkout(w);
+      queryClient.setQueryData(queryKeys.workout(userId, workoutId), w);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutsHub(userId) });
       onSuccess?.('Workout saved.');
       onError?.(null);
     } catch (e) {
       onError?.(e instanceof Error ? e.message : 'Failed to complete');
     } finally {
       setSaving(false);
+      setFinishConfirmOpen(false);
     }
   };
 
@@ -239,6 +324,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     setSaving(true);
     try {
       const w = await createWorkout(userId, { clone_from_workout_id: workoutId });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutsHub(userId) });
       navigate(`/workouts/${w.id}`, { replace: true });
       onSuccess?.('Started from last workout.');
     } catch (e) {
@@ -251,10 +337,19 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const addExercise = async (exerciseId: string) => {
     if (!workoutId || completed) return;
     try {
-      await addWorkoutExercise(userId, workoutId, { exercise_id: exerciseId });
-      await loadWorkout();
+      const line = await addWorkoutExercise(userId, workoutId, { exercise_id: exerciseId });
+      queryClient.setQueryData<WorkoutDetailResponse>(queryKeys.workout(userId, workoutId), (prev) => {
+        if (!prev) return prev;
+        const next = [...prev.exercises, line].sort((a, b) => a.order_index - b.order_index);
+        return { ...prev, exercises: next };
+      });
+      prevInsightsKeyRef.current = '';
+    void queryClient.invalidateQueries({
+      predicate: (q) => q.queryKey[0] === 'exercisesPicker' && q.queryKey[1] === userId,
+    });
       setPickerOpen(false);
       setSearch('');
+      setDebouncedSearch('');
       onError?.(null);
     } catch (e) {
       onError?.(e instanceof Error ? e.message : 'Failed to add exercise');
@@ -267,9 +362,15 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     patch: Parameters<typeof patchWorkoutSet>[4]
   ) => {
     if (!workoutId || completed) return;
+    setSavingSetId(setId);
+    setSetPatchErrors((prev) => {
+      const next = { ...prev };
+      delete next[setId];
+      return next;
+    });
     try {
       const updated = await patchWorkoutSet(userId, workoutId, lineId, setId, patch);
-      setWorkout((prev) => {
+      queryClient.setQueryData<WorkoutDetailResponse>(queryKeys.workout(userId, workoutId), (prev) => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -283,9 +384,11 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
           ),
         };
       });
-      onError?.(null);
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Failed to update set');
+      const msg = err instanceof Error ? err.message : 'Failed to update set';
+      setSetPatchErrors((prev) => ({ ...prev, [setId]: msg }));
+    } finally {
+      setSavingSetId(null);
     }
   };
 
@@ -305,11 +408,11 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     return <p className="progress-text">Missing workout.</p>;
   }
 
-  if (loading) {
+  if (isLoading) {
     return <PageLoading />;
   }
 
-  if (!workout) {
+  if (isError || !workout) {
     return (
       <p className="progress-text">
         <Link to="/workouts">← Workouts</Link>
@@ -317,6 +420,9 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       </p>
     );
   }
+
+  const showPickerEmpty =
+    pickerOpen && !pickerListFetching && exerciseHits.length === 0;
 
   return (
     <div className="workout-session">
@@ -340,96 +446,67 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         onRepeat={() => void handleRepeat()}
       />
 
-      <section className="app__card workout-session__meta-card">
-        {workout.training_week_index != null && (
-          <p className="progress-text workout-session__week-hint">
-            Block week {workout.training_week_index}
-            {workout.is_deload_week ? ' · Deload' : ''}
+      {!completed && finishConfirmOpen && (
+        <section className="app__card workout-session__finish-confirm" role="dialog" aria-label="Finish workout confirmation">
+          <h3 className="app__card-title">Finish workout?</h3>
+          <p className="progress-text">
+            {finishIncompleteCount} set(s) still missing weight, reps, or duration.
           </p>
-        )}
-        <label className="form-label" htmlFor="workout-notes">
-          Workout notes
-        </label>
-        <textarea
-          id="workout-notes"
-          className="form-input"
-          rows={2}
-          disabled={completed}
-          defaultValue={workout.notes ?? ''}
-          onBlur={(e) => void handleNotesBlur(e.target.value)}
-          placeholder="Optional session notes"
+          <div className="workout-start-actions">
+            <button type="button" className="btn btn--secondary" disabled={saving} onClick={() => setFinishConfirmOpen(false)}>
+              Keep editing
+            </button>
+            <button type="button" className="btn btn--primary" disabled={saving} onClick={() => void completeWorkout()}>
+              {saving ? 'Saving…' : 'Finish anyway'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!completed && lines.length > 0 && (
+        <WorkoutSessionNavCard
+          lines={lines}
+          focusMode={focusMode}
+          focusExerciseIdx={focusExerciseIdx}
+          onToggleFocusMode={setFocusMode}
+          onPrevExercise={() => setFocusExerciseIdx((i) => Math.max(0, i - 1))}
+          onNextExercise={() => setFocusExerciseIdx((i) => Math.min(lines.length - 1, i + 1))}
+          onJumpToExercise={jumpToExercise}
+          onNextIncomplete={scrollToNextIncomplete}
         />
-        <p className="progress-text workout-session__started">
-          Started {new Date(workout.started_at).toLocaleString()}
-          {completed && ` · Completed ${new Date(workout.completed_at!).toLocaleString()}`}
-        </p>
-      </section>
+      )}
+
+      <WorkoutSessionMetaCard workout={workout} completed={completed} onNotesBlur={(notes) => void handleNotesBlur(notes)} />
 
       {!completed && !fromProgram && (
-        <section className="app__card">
-          <h3 className="app__card-title">Add exercise</h3>
-          <button type="button" className="btn btn--secondary" onClick={() => setPickerOpen(!pickerOpen)}>
-            {pickerOpen ? 'Close picker' : 'Browse exercises'}
-          </button>
-          {pickerOpen && (
-            <div className="workout-session__picker">
-              <label className="form-label workout-session__fav-toggle">
-                <input
-                  type="checkbox"
-                  checked={favoritesOnlyPicker}
-                  onChange={(e) => setFavoritesOnlyPicker(e.target.checked)}
-                />
-                Favorites only
-              </label>
-              <input
-                ref={searchInputRef}
-                type="search"
-                className="form-input workout-session__search"
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search exercises"
-              />
-              <ul className="workout-exercise-list workout-session__ex-list">
-                {exerciseHits.map((ex) => (
-                  <li key={ex.id} className="workout-exercise-list__item">
-                    <button type="button" className="workout-exercise-list__pick" onClick={() => void addExercise(ex.id)}>
-                      <span>{ex.name}</span>
-                      <span className="workout-exercise-list__meta">{exerciseKindLabel(ex.kind)}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm btn--touch"
-                      aria-label={ex.is_favorite ? 'Remove favorite' : 'Add favorite'}
-                      onClick={async () => {
-                        try {
-                          if (ex.is_favorite) await removeExerciseFavorite(userId, ex.id);
-                          else await addExerciseFavorite(userId, ex.id);
-                          const list = await listExercises(userId, {
-                            ...(search.trim() ? { q: search.trim() } : {}),
-                            ...(favoritesOnlyPicker ? { favorites_only: true } : {}),
-                          });
-                          setExerciseHits(list);
-                        } catch (err) {
-                          onError?.(err instanceof Error ? err.message : 'Favorite failed');
-                        }
-                      }}
-                    >
-                      {ex.is_favorite ? '★' : '☆'}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <ExerciseCreateInline
-                userId={userId}
-                onCreated={(ex) => void addExercise(ex.id)}
-                {...(onError != null ? { onError } : {})}
-                submitLabel="Create & add"
-                className="workout-session__new-ex"
-              />
-            </div>
-          )}
-        </section>
+        <WorkoutExercisePickerCard
+          userId={userId}
+          open={pickerOpen}
+          onToggleOpen={() => setPickerOpen((v) => !v)}
+          search={search}
+          onSearchChange={setSearch}
+          favoritesOnly={favoritesOnlyPicker}
+          onFavoritesOnlyChange={setFavoritesOnlyPicker}
+          debouncedSearch={debouncedSearch}
+          loading={pickerListFetching}
+          showEmpty={showPickerEmpty}
+          hits={exerciseHits}
+          onPickExercise={(exerciseId) => void addExercise(exerciseId)}
+          onToggleFavorite={(exerciseId, nextIsFavorite) => {
+            void (async () => {
+              try {
+                if (nextIsFavorite) await addExerciseFavorite(userId, exerciseId);
+                else await removeExerciseFavorite(userId, exerciseId);
+                await queryClient.invalidateQueries({
+                  predicate: (q) => q.queryKey[0] === 'exercisesPicker' && q.queryKey[1] === userId,
+                });
+              } catch (err) {
+                onError?.(err instanceof Error ? err.message : 'Favorite failed');
+              }
+            })();
+          }}
+          {...(onError != null ? { onError } : {})}
+        />
       )}
 
       {fromProgram && !completed && (
@@ -438,138 +515,77 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         </p>
       )}
 
-      {lines.map((line) => (
-        <section key={line.id} className="app__card">
-          <div className="workout-session__ex-header">
-            <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
-            <span className="workout-kind-badge">{exerciseKindLabel(line.exercise.kind)}</span>
-            {!completed && !fromProgram && (
-              <div className="workout-session__remove-wrap">
-                {removeConfirmLineId === line.id ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
-                      onClick={async () => {
-                        if (!workoutId) return;
-                        try {
-                          await deleteWorkoutExercise(userId, workoutId, line.id);
-                          setRemoveConfirmLineId(null);
-                          await loadWorkout();
-                        } catch (err) {
-                          onError?.(err instanceof Error ? err.message : 'Remove failed');
-                        }
-                      }}
-                    >
-                      Confirm remove
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm btn--touch"
-                      onClick={() => setRemoveConfirmLineId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
-                    onClick={() => setRemoveConfirmLineId(line.id)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          {line.notes != null && line.notes.trim() !== '' && (
-            <ProgramExerciseNotes text={line.notes} fromProgram={fromProgram} />
-          )}
-          {insights[line.id] && (
-            <div className="progress-text workout-session__insight">
-              <p className="workout-session__insight-last">
-                <strong>Last time:</strong> {insights[line.id]!.last}
-              </p>
-              {(insights[line.id]!.suggestion || (insights[line.id]?.variant != null && insights[line.id]!.variant !== '')) && (
-                <details className="workout-session__insight-details">
-                  <summary className="workout-session__insight-more">More</summary>
-                  {insights[line.id]?.variant != null && insights[line.id]!.variant !== '' && (
-                    <p className="workout-session__insight-extra">
-                      <strong>Progression:</strong> {humanizeVariant(insights[line.id]!.variant!)}
-                    </p>
-                  )}
-                  {insights[line.id]!.suggestion ? (
-                    <p className="workout-session__insight-extra">
-                      <strong>Suggestion:</strong> {insights[line.id]!.suggestion}
-                    </p>
-                  ) : null}
-                </details>
-              )}
-            </div>
-          )}
-          <div className="workout-sets">
-            {line.sets.map((set) => {
-              const allowDelete = !completed && !fromProgram && line.sets.length > 1;
-              const deleteHandler = allowDelete
-                ? () => {
-                    void (async () => {
-                      if (!workoutId) return;
-                      try {
-                        await deleteWorkoutSet(userId, workoutId, line.id, set.id);
-                        await loadWorkout();
-                      } catch (err) {
-                        onError?.(err instanceof Error ? err.message : 'Delete set failed');
-                      }
-                    })();
-                  }
-                : undefined;
-              return (
-                <WorkoutSetRow
-                  key={set.id}
-                  line={line}
-                  set={{
-                    ...set,
-                    rir: set.rir ?? null,
-                    set_role: set.set_role ?? null,
-                    target_reps_min: set.target_reps_min ?? null,
-                    target_reps_max: set.target_reps_max ?? null,
-                    target_rir_min: set.target_rir_min ?? null,
-                    target_rir_max: set.target_rir_max ?? null,
-                    calibration_to_failure: set.calibration_to_failure ?? false,
-                  }}
-                  units={units}
-                  completed={completed}
-                  displayWeight={displayWeight}
-                  parseWeightInput={parseWeightInput}
-                  onPatch={(patch) => void patchSetField(line.id, set.id, patch)}
-                  onRest={(sec) => setRestSeconds(sec)}
-                  canDeleteSet={allowDelete}
-                  hideSetNote={fromProgram}
-                  {...(deleteHandler ? { onDelete: deleteHandler } : {})}
-                />
-              );
-            })}
-            {!completed && !fromProgram && (
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm workout-session__add-set"
-                onClick={async () => {
-                  if (!workoutId) return;
-                  try {
-                    await addWorkoutSet(userId, workoutId, line.id, {});
-                    await loadWorkout();
-                  } catch (err) {
-                    onError?.(err instanceof Error ? err.message : 'Add set failed');
-                  }
-                }}
-              >
-                + Add set
-              </button>
-            )}
-          </div>
-        </section>
-      ))}
+      {lines.map((line) => {
+        const focusHidden = focusMode && line.id !== lines[focusExerciseIdx]?.id;
+        const lineInsights = insights[line.id];
+        return (
+          <WorkoutExerciseCard
+            key={line.id}
+            line={line}
+            completed={completed}
+            fromProgram={fromProgram}
+            focusHidden={focusHidden}
+            removeConfirmActive={removeConfirmLineId === line.id}
+            onRequestRemove={() => setRemoveConfirmLineId(line.id)}
+            onCancelRemove={() => setRemoveConfirmLineId(null)}
+            onConfirmRemove={() => {
+              void (async () => {
+                if (!workoutId) return;
+                try {
+                  await deleteWorkoutExercise(userId, workoutId, line.id);
+                  setRemoveConfirmLineId(null);
+                  prevInsightsKeyRef.current = '';
+                  invalidateWorkout();
+                } catch (err) {
+                  onError?.(err instanceof Error ? err.message : 'Remove failed');
+                }
+              })();
+            }}
+            {...(lineInsights != null ? { insights: lineInsights } : {})}
+            humanizeVariant={humanizeVariant}
+            units={units}
+            displayWeight={displayWeight}
+            parseWeightInput={parseWeightInput}
+            onPatchSet={(setId, patch) => void patchSetField(line.id, setId, patch as Parameters<typeof patchWorkoutSet>[4])}
+            onAddSet={() => {
+              void (async () => {
+                if (!workoutId) return;
+                try {
+                  await addWorkoutSet(userId, workoutId, line.id, {});
+                  prevInsightsKeyRef.current = '';
+                  invalidateWorkout();
+                } catch (err) {
+                  onError?.(err instanceof Error ? err.message : 'Add set failed');
+                }
+              })();
+            }}
+            onDeleteSet={(setId) => {
+              void (async () => {
+                if (!workoutId) return;
+                try {
+                  await deleteWorkoutSet(userId, workoutId, line.id, setId);
+                  prevInsightsKeyRef.current = '';
+                  invalidateWorkout();
+                } catch (err) {
+                  onError?.(err instanceof Error ? err.message : 'Delete set failed');
+                }
+              })();
+            }}
+            canDeleteSet={(setCount) => setCount > 1}
+            onRest={(sec) => setRestSeconds(sec)}
+            isPatchingSetId={savingSetId}
+            patchErrorBySetId={setPatchErrors}
+            onDismissPatchError={(setId) =>
+              setSetPatchErrors((prev) => {
+                const next = { ...prev };
+                delete next[setId];
+                return next;
+              })
+            }
+            ProgramExerciseNotes={ProgramExerciseNotes}
+          />
+        );
+      })}
 
       {workout.exercises.length === 0 && (
         <p className="progress-text">No exercises yet. Add one to start logging sets.</p>

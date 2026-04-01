@@ -37,7 +37,7 @@ export default function RestTimer({ seconds, onDone, onDismiss }: RestTimerProps
         <span className="workout-rest-timer__time">
           {m}:{s.toString().padStart(2, '0')}
         </span>
-        <button type="button" className="btn btn--secondary btn--sm" onClick={onDismiss}>
+        <button type="button" className="btn btn--secondary btn--touch" onClick={onDismiss}>
           Skip
         </button>
       </div>

@@ -112,8 +112,56 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  const HISTORY_WEEKS = 18; // ~4 months feels realistic for demos
+  const totalDays = HISTORY_WEEKS * 7;
+  const blockStart = new Date(today);
+  blockStart.setDate(blockStart.getDate() - totalDays);
+
+  // Ensure training-block start is set so week index + deload flags look realistic in the UI.
+  await prisma.user.update({
+    where: { id: userId },
+    data: { trainingBlockStartedAt: blockStart },
+  });
+
+  function trainingWeekIndexAt(start: Date, at: Date): number {
+    const ms = at.getTime() - start.getTime();
+    if (ms < 0) return 1;
+    return Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1;
+  }
+
+  function isDeloadWeekAt(start: Date, at: Date): boolean {
+    const w = trainingWeekIndexAt(start, at);
+    return w > 0 && w % 6 === 0;
+  }
+
+  type LiftState = { weightKg: number; repOffset: number };
+  const stateByExerciseName = new Map<string, LiftState>();
+
+  function roundTo(x: number, step: number): number {
+    return Math.round(x / step) * step;
+  }
+
+  function weightStepKgForName(name: string): number {
+    const n = name.toLowerCase();
+    if (n.includes('lateral') || n.includes('rear delt') || n.includes('raise')) return 1;
+    if (n.includes('curl') || n.includes('triceps')) return 1;
+    if (n.includes('db')) return 1;
+    return 2.5;
+  }
+
+  function restDefaultsFor(name: string): { lineDefault: number; topSet: [number, number]; workSet: [number, number] } {
+    const n = name.toLowerCase();
+    const primary = n.includes('(primary)') || n.includes('squat') || n.includes('rdl') || n.includes('deadlift');
+    if (primary) return { lineDefault: 180, topSet: [180, 240], workSet: [150, 210] };
+    if (n.includes('carry')) return { lineDefault: 120, topSet: [120, 180], workSet: [120, 180] };
+    return { lineDefault: 90, topSet: [120, 180], workSet: [75, 120] };
+  }
+
+  const vacationStartDaysAgo = Math.floor(totalDays * 0.55);
+  const vacationLength = 8;
+
   let seededSessions = 0;
-  for (let daysAgo = 35; daysAgo >= 1; daysAgo--) {
+  for (let daysAgo = totalDays; daysAgo >= 1; daysAgo--) {
     const d = new Date(today);
     d.setDate(d.getDate() - daysAgo);
     const orderIndex = weekdayToProgramDayOrderIndex(d);
@@ -121,10 +169,15 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
     const programDayId = dayIdByOrder.get(orderIndex);
     if (!programDayId) continue;
 
+    // Realism: skip some days (life happens) + one short break window.
+    const inVacation = daysAgo <= vacationStartDaysAgo && daysAgo > vacationStartDaysAgo - vacationLength;
+    if (inVacation) continue;
+    if (rng() < 0.18) continue;
+
     const workoutId = await instantiateWorkoutFromProgramDay(userId, programDayId);
     if (!workoutId) continue;
 
-    const progress = 1 + (35 - daysAgo) * 0.0028;
+    const progress = 1 + (totalDays - daysAgo) * 0.0016;
 
     const wFull = await prisma.workout.findUnique({
       where: { id: workoutId },
@@ -141,6 +194,13 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
 
     for (const line of wFull.exercises) {
       const { kind, name } = line.exercise;
+      const rest = restDefaultsFor(name);
+
+      await prisma.workoutExercise.update({
+        where: { id: line.id },
+        data: { defaultRestSeconds: rest.lineDefault },
+      });
+
       for (const s of line.sets) {
         const tMin = s.targetRepsMin;
         const tMax = s.targetRepsMax;
@@ -151,23 +211,47 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
         let reps: number | null = s.reps;
         let rir: number | null = s.rir;
         let durationSec: number | null = s.durationSec;
+        let restSecondsAfter: number | null = s.restSecondsAfter ?? null;
+
+        const deload = isDeloadWeekAt(blockStart, d);
 
         if (kind === 'weight_reps') {
           const base = BASE_WEIGHT_KG[name] ?? 28;
+          const stepKg = weightStepKgForName(name);
+          const st = stateByExerciseName.get(name) ?? { weightKg: roundTo(base * progress, 0.5), repOffset: 0 };
+
           if (weightKg == null || weightKg <= 0) {
             if (s.setRole === 'backoff') {
-              weightKg = Math.round(base * progress * 0.91 * 10) / 10;
+              weightKg = roundTo(st.weightKg * 0.91, 0.5);
             } else {
-              weightKg = Math.round(base * progress * 10) / 10;
+              weightKg = roundTo(st.weightKg, 0.5);
             }
           }
           if (tMin != null && tMax != null) {
-            reps = pickInt(rng, tMin, tMax);
+            const wiggle = pickInt(rng, 0, Math.min(1, Math.max(0, tMax - tMin)));
+            reps = Math.min(tMax, Math.max(tMin, tMin + st.repOffset + wiggle));
           } else if (name.includes('carry')) {
             reps = pickInt(rng, 24, 36);
           }
           if (rMin != null && rMax != null) {
-            rir = pickInt(rng, rMin, rMax);
+            const bump = deload ? 1 : 0;
+            rir = Math.min(10, pickInt(rng, rMin, rMax) + bump);
+          }
+
+          // Double-progression-ish: rep up, then load bump.
+          if (!deload && tMin != null && tMax != null && reps != null) {
+            if (reps >= tMax && rng() < 0.55) {
+              st.weightKg = roundTo(Math.min(500, st.weightKg + stepKg), 0.5);
+              st.repOffset = 0;
+            } else if (st.repOffset < tMax - tMin && rng() < 0.5) {
+              st.repOffset += 1;
+            }
+          }
+          stateByExerciseName.set(name, st);
+
+          if (restSecondsAfter == null) {
+            const range = s.setRole === 'top' ? rest.topSet : rest.workSet;
+            restSecondsAfter = pickInt(rng, range[0], range[1]);
           }
         } else if (kind === 'bodyweight_reps') {
           if (tMin != null && tMax != null) {
@@ -175,17 +259,23 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
           } else {
             reps = pickInt(rng, 4, 6);
           }
+          if (restSecondsAfter == null) {
+            restSecondsAfter = pickInt(rng, 60, 120);
+          }
         } else if (kind === 'time') {
           if (name.includes('Sprint')) {
             durationSec = pickInt(rng, 12, 20);
           } else {
             durationSec = pickInt(rng, 1260, 1620);
           }
+          if (restSecondsAfter == null) {
+            restSecondsAfter = pickInt(rng, 45, 120);
+          }
         }
 
         await prisma.workoutSet.update({
           where: { id: s.id },
-          data: { weightKg, reps, rir, durationSec },
+          data: { weightKg, reps, rir, durationSec, restSecondsAfter },
         });
       }
     }
@@ -197,12 +287,17 @@ async function seedCompletedWorkoutHistory(userId: string): Promise<void> {
 
     await prisma.workout.update({
       where: { id: workoutId },
-      data: { startedAt, completedAt },
+      data: {
+        startedAt,
+        completedAt,
+        trainingWeekIndex: trainingWeekIndexAt(blockStart, startedAt),
+        isDeloadWeek: isDeloadWeekAt(blockStart, startedAt),
+      },
     });
     seededSessions += 1;
   }
 
-  console.log('Seeded', seededSessions, 'completed program workouts for test user (last ~5 weeks, weekdays).');
+  console.log('Seeded', seededSessions, 'completed program workouts for test user (last ~', HISTORY_WEEKS, 'weeks).');
 }
 
 async function main(): Promise<void> {

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listWorkouts, createWorkout, listWorkoutPrograms, getWorkoutProgram } from '../api/client';
-import type { WorkoutListItem, WorkoutProgramListItem, WorkoutProgramDetailResponse } from '../types/api';
+import type { WorkoutProgramDetailResponse } from '../types/api';
+import { queryKeys } from '../api/queryKeys';
 import PageLoading from '../components/PageLoading';
 import { FIXED_PROGRAM_NAME, weekdayToFixedProgramDayOrderIndex } from '../constants/fixedProgram';
 
@@ -20,42 +22,34 @@ function formatWhen(iso: string): string {
 
 export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [inProgress, setInProgress] = useState<WorkoutListItem[]>([]);
-  const [completed, setCompleted] = useState<WorkoutListItem[]>([]);
+  const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
   const [programPickerOpen, setProgramPickerOpen] = useState(false);
-  const [programs, setPrograms] = useState<WorkoutProgramListItem[]>([]);
+  const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listWorkoutPrograms>>>([]);
   const [programDetail, setProgramDetail] = useState<WorkoutProgramDetailResponse | null>(null);
   const [programLoading, setProgramLoading] = useState(false);
-  const [fixedProgramDetail, setFixedProgramDetail] = useState<WorkoutProgramDetailResponse | null>(null);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    Promise.all([
-      listWorkouts(userId, { status: 'in_progress', limit: 10 }),
-      listWorkouts(userId, { status: 'completed', limit: 40 }),
-      listWorkoutPrograms(userId),
-    ])
-      .then(async ([ip, co, progList]) => {
-        setInProgress(ip);
-        setCompleted(co);
-        const fp = progList.find((p) => p.name === FIXED_PROGRAM_NAME);
-        if (fp) {
-          const detail = await getWorkoutProgram(userId, fp.id);
-          setFixedProgramDetail(detail);
-        } else {
-          setFixedProgramDetail(null);
-        }
-        onError?.(null);
-      })
-      .catch((e) => onError?.(e instanceof Error ? e.message : 'Failed to load workouts'))
-      .finally(() => setLoading(false));
-  }, [userId, onError]);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: queryKeys.workoutsHub(userId),
+    queryFn: async () => {
+      const [inProgress, completed, progList] = await Promise.all([
+        listWorkouts(userId, { status: 'in_progress', limit: 10 }),
+        listWorkouts(userId, { status: 'completed', limit: 40 }),
+        listWorkoutPrograms(userId),
+      ]);
+      const fp = progList.find((p) => p.name === FIXED_PROGRAM_NAME);
+      const fixedProgramDetail = fp ? await getWorkoutProgram(userId, fp.id) : null;
+      return { inProgress, completed, fixedProgramDetail };
+    },
+  });
+
+  const inProgress = data?.inProgress ?? [];
+  const completed = data?.completed ?? [];
+  const fixedProgramDetail = data?.fixedProgramDetail ?? null;
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (isError) onError?.('Failed to load workouts');
+  }, [isError, onError]);
 
   const sortedFixedDays = useMemo(() => {
     if (!fixedProgramDetail) return [];
@@ -69,10 +63,15 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
     [completed]
   );
 
+  const refreshHub = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workoutsHub(userId) });
+  };
+
   const startNew = async () => {
     setStarting(true);
     try {
       const w = await createWorkout(userId, {});
+      refreshHub();
       navigate(`/workouts/${w.id}`);
       onError?.(null);
     } catch (e) {
@@ -117,6 +116,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
       const w = await createWorkout(userId, { program_day_id: programDayId });
       setProgramPickerOpen(false);
       setProgramDetail(null);
+      refreshHub();
       navigate(`/workouts/${w.id}`);
       onError?.(null);
     } catch (e) {
@@ -126,7 +126,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return <PageLoading />;
   }
 

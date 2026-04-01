@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Link, Outlet } from 'react-router-dom';
 import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
@@ -16,7 +16,8 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
-import Nav from './components/Nav';
+import AuthenticatedLayout from './layouts/AuthenticatedLayout';
+import PublicLayout from './layouts/PublicLayout';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -173,6 +174,21 @@ export default function App() {
   );
 }
 
+function RequireAuth({
+  userId,
+  onboardingComplete,
+  requireOnboarded,
+}: {
+  userId: string | null;
+  onboardingComplete: boolean | null;
+  requireOnboarded: boolean;
+}) {
+  if (!userId) return <Navigate to="/" replace />;
+  if (requireOnboarded && onboardingComplete === false) return <Navigate to="/onboarding" replace />;
+  if (!requireOnboarded && onboardingComplete !== false) return <Navigate to="/log" replace />;
+  return <Outlet />;
+}
+
 type AppContentProps = {
   userId: string | null;
   userEmail: string | null;
@@ -250,199 +266,77 @@ function AppContent({
         )}
 
         <Routes>
-            <Route
-              path="/"
-              element={
-                userId ? (
-                  onboardingComplete === false ? (
-                    <Navigate to="/onboarding" replace />
-                  ) : (
-                    <Navigate to="/log" replace />
-                  )
+          <Route
+            path="/"
+            element={
+              userId ? (
+                onboardingComplete === false ? (
+                  <Navigate to="/onboarding" replace />
                 ) : (
-                  <LandingPage
-                    authMode={authMode}
-                    onAuthModeChange={(mode) => { setAuthMode(mode); setError(null); setSuccess(null); }}
-                    onLogin={handleLogin}
-                    onSignup={handleSignup}
-                  />
+                  <Navigate to="/log" replace />
                 )
-              }
-            />
+              ) : (
+                <LandingPage
+                  authMode={authMode}
+                  onAuthModeChange={(mode) => {
+                    setAuthMode(mode);
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  onLogin={handleLogin}
+                  onSignup={handleSignup}
+                />
+              )
+            }
+          />
+
+          <Route element={<PublicLayout />}>
             <Route
               path="/forgot-password"
               element={
-                userId ? (
-                  <Navigate to={onboardingComplete === false ? '/onboarding' : '/log'} replace />
-                ) : (
-                  <ForgotPasswordPage />
-                )
+                userId ? <Navigate to={onboardingComplete === false ? '/onboarding' : '/log'} replace /> : <ForgotPasswordPage />
               }
             />
-            <Route
-              path="/reset-password"
-              element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />}
-            />
-            <Route
-              path="/verify-email"
-              element={
-                <VerifyEmailPage onVerified={onEmailVerified} />
-              }
-            />
-            <Route
-              path="/onboarding"
-              element={
-                userId && onboardingComplete === false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <OnboardingPage
-                      userId={userId}
-                      onComplete={onOnboardingComplete}
-                      onError={setError}
-                    />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/log" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/log"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <LogPage
-                      userId={userId}
-                      refreshTrigger={progressRefreshTrigger}
-                      onSubmit={handleEntrySubmit}
-                      onError={setError}
-                    />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/progress"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <ProgressPage
-                      userId={userId}
-                      refreshTrigger={progressRefreshTrigger}
-                      onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
-                    />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/workouts"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <WorkoutsPage userId={userId} onError={setError} />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/exercises"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <ExercisesCatalogPage userId={userId} onError={setError} onSuccess={setSuccess} />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/workouts/programs/:programId/edit"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <ProgramEditPage userId={userId} onError={setError} onSuccess={setSuccess} />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/workouts/programs"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <ProgramsPage userId={userId} onError={setError} />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/workouts/:workoutId"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <WorkoutSessionPage userId={userId} onError={setError} onSuccess={setSuccess} />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                userId && onboardingComplete !== false ? (
-                  <>
-                    <Nav onLogout={handleLogout} email={userEmail} />
-                    <SettingsPage
-                      userId={userId}
-                      onError={setError}
-                      onSuccess={setSuccess}
-                    />
-                  </>
-                ) : userId ? (
-                  <Navigate to="/onboarding" replace />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            <Route path="/reset-password" element={userId ? <Navigate to="/log" replace /> : <ResetPasswordPage />} />
+          </Route>
+
+          <Route path="/verify-email" element={<VerifyEmailPage onVerified={onEmailVerified} />} />
+
+          <Route element={<RequireAuth userId={userId} onboardingComplete={onboardingComplete} requireOnboarded={false} />}>
+            <Route element={<AuthenticatedLayout onLogout={handleLogout} email={userEmail} />}>
+              <Route path="/onboarding" element={<OnboardingPage userId={userId!} onComplete={onOnboardingComplete} onError={setError} />} />
+            </Route>
+          </Route>
+
+          <Route element={<RequireAuth userId={userId} onboardingComplete={onboardingComplete} requireOnboarded />}>
+            <Route element={<AuthenticatedLayout onLogout={handleLogout} email={userEmail} />}>
+              <Route
+                path="/log"
+                element={
+                  <LogPage userId={userId!} refreshTrigger={progressRefreshTrigger} onSubmit={handleEntrySubmit} onError={setError} />
+                }
+              />
+              <Route
+                path="/progress"
+                element={
+                  <ProgressPage
+                    userId={userId!}
+                    refreshTrigger={progressRefreshTrigger}
+                    onRefresh={() => setProgressRefreshTrigger((n) => n + 1)}
+                  />
+                }
+              />
+              <Route path="/workouts" element={<WorkoutsPage userId={userId!} onError={setError} />} />
+              <Route path="/exercises" element={<ExercisesCatalogPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
+              <Route path="/workouts/programs" element={<ProgramsPage userId={userId!} onError={setError} />} />
+              <Route path="/workouts/programs/:programId/edit" element={<ProgramEditPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
+              <Route path="/workouts/:workoutId" element={<WorkoutSessionPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
+              <Route path="/settings" element={<SettingsPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
+            </Route>
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
         </main>
       </div>
   );
