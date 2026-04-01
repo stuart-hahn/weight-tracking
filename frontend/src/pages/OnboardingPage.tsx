@@ -4,6 +4,7 @@ import { getProgress, createEntry, updateUser } from '../api/client';
 import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import PageLoading from '../components/PageLoading';
+import InlineFieldError from '../components/ui/InlineFieldError';
 
 interface OnboardingPageProps {
   userId: string;
@@ -21,6 +22,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [weight, setWeight] = useState('');
   const [calories, setCalories] = useState('');
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,11 +44,12 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!progress) return;
+      setFieldError(null);
       const units = progress.units;
       let weightKgNum = Number(weight);
       if (units === 'imperial') weightKgNum = lbToKg(weightKgNum);
       if (Number.isNaN(weightKgNum) || weightKgNum <= 0 || weightKgNum > 500) {
-        onError('Please enter a valid weight');
+        setFieldError('Please enter a valid weight.');
         return;
       }
       const date = todayISO();
@@ -138,7 +141,10 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             required
+            aria-invalid={fieldError ? true : undefined}
+            aria-describedby={fieldError ? 'onboarding-weight-error' : undefined}
           />
+          <InlineFieldError id="onboarding-weight-error" message={fieldError} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="onboarding-calories">

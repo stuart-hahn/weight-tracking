@@ -88,6 +88,59 @@
   margin: 0 0 1rem;
 }
 
+/* Shared UI primitives */
+.ui-field-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.ui-inline-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ui-inline-status__title {
+  margin-bottom: 0;
+}
+
+.ui-inline-status__message {
+  margin: 0;
+}
+
+.ui-inline-status--info {
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.ui-inline-status--error {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.ui-inline-status__action {
+  align-self: flex-start;
+}
+
+.ui-empty {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ui-empty__title {
+  margin-bottom: 0;
+}
+
+.ui-empty__message {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ui-empty__action {
+  align-self: flex-start;
+}
+
 /* Auth mode toggle */
 .auth-tabs {
   display: flex;

@@ -1,19 +1,26 @@
 import { useState, useCallback, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api/client';
+import InlineFieldError from '../components/ui/InlineFieldError';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailRequired, setEmailRequired] = useState(false);
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      if (!email.trim()) return;
+      const t = email.trim();
+      setEmailRequired(false);
+      if (!t) {
+        setEmailRequired(true);
+        return;
+      }
       setError(null);
       try {
-        await requestPasswordReset(email.trim());
+        await requestPasswordReset(t);
         setSubmitted(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Request failed');
@@ -64,9 +71,12 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
+                aria-invalid={emailRequired ? true : undefined}
+                aria-describedby={emailRequired ? 'forgot-email-error' : undefined}
               />
+              <InlineFieldError id="forgot-email-error" message={emailRequired ? 'Email is required.' : null} />
             </div>
-            <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+            <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={!email.trim()}>
               Send reset link
             </button>
           </form>

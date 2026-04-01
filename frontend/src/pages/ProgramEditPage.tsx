@@ -16,6 +16,8 @@ import {
 import type { WorkoutProgramDetailResponse, ProgramDayNested, ProgramDayExerciseNested } from '../types/api';
 import PageLoading from '../components/PageLoading';
 import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
+import InlineStatusCard from '../components/ui/InlineStatusCard';
+import EmptyState from '../components/ui/EmptyState';
 
 interface ProgramEditPageProps {
   userId: string;
@@ -43,7 +45,10 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   const [programName, setProgramName] = useState('');
   const [newDayName, setNewDayName] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [hits, setHits] = useState<Awaited<ReturnType<typeof listExercises>>>([]);
+  const [hitsLoading, setHitsLoading] = useState(false);
+  const [hitsError, setHitsError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -71,22 +76,48 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   }, [load]);
 
   useEffect(() => {
-    if (!search.trim()) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    listExercises(userId, { q: search.trim() })
-      .then((r) => {
-        if (!cancelled) setHits(r);
-      })
-      .catch(() => {
-        if (!cancelled) setHits([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [search, userId]);
+    const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 275);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
+  const loadHits = useCallback(
+    (q: string) => {
+      if (!q) {
+        setHits([]);
+        setHitsError(null);
+        setHitsLoading(false);
+        return () => {};
+      }
+      let cancelled = false;
+      setHitsLoading(true);
+      setHitsError(null);
+      listExercises(userId, { q })
+        .then((r) => {
+          if (!cancelled) {
+            setHits(r);
+            setHitsError(null);
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setHits([]);
+            setHitsError(e instanceof Error ? e.message : 'Failed to load exercises');
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setHitsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    },
+    [userId]
+  );
+
+  useEffect(() => {
+    const cleanup = loadHits(debouncedSearch);
+    return cleanup;
+  }, [debouncedSearch, loadHits]);
 
   const activeDay: ProgramDayNested | null =
     program && activeDayId ? program.days.find((d) => d.id === activeDayId) ?? null : null;
@@ -365,11 +396,29 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {hits.length > 0 && (
+          {hitsLoading && <p className="progress-text">Loading…</p>}
+          {!hitsLoading && hitsError && (
+            <InlineStatusCard
+              variant="error"
+              title="Search"
+              message={hitsError}
+              actionLabel="Retry"
+              onAction={() => void loadHits(debouncedSearch)}
+            />
+          )}
+          {!hitsLoading && !hitsError && debouncedSearch !== '' && hits.length === 0 && (
+            <EmptyState message="No exercises match your search." actionLabel="Clear search" onAction={() => setSearch('')} />
+          )}
+          {!hitsLoading && !hitsError && hits.length > 0 && (
             <ul className="workout-exercise-list" style={{ listStyle: 'none', padding: 0, marginBottom: '1rem' }}>
               {hits.map((ex) => (
                 <li key={ex.id} className="workout-exercise-list__item">
-                  <button type="button" className="workout-exercise-list__pick" onClick={() => void addExercise(ex.id)}>
+                  <button
+                    type="button"
+                    className="workout-exercise-list__pick"
+                    disabled={busy}
+                    onClick={() => void addExercise(ex.id)}
+                  >
                     <span>{ex.name}</span>
                     <span className="workout-exercise-list__meta">{exerciseKindLabel(ex.kind)}</span>
                   </button>

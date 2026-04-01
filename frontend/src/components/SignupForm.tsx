@@ -1,6 +1,7 @@
 import { useState, useCallback, FormEvent } from 'react';
 import type { CreateUserRequest, UnitsPreference } from '../types/api';
 import { inToCm, lbToKg } from '../utils/units';
+import InlineFieldError from './ui/InlineFieldError';
 
 interface SignupFormProps {
   onSubmit: (body: CreateUserRequest) => void;
@@ -15,12 +16,12 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [targetBf, setTargetBf] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      setSubmitError(null);
+      setFieldErrors({});
       const ageNum = Number(age);
       let heightNum = Number(heightCm);
       let weightNum = Number(weightKg);
@@ -29,15 +30,15 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         weightNum = lbToKg(weightNum);
       }
       const targetNum = Number(targetBf);
-      const errors: string[] = [];
-      if (!email.trim()) errors.push('Email is required');
-      if (password.length < 8) errors.push('Password must be at least 8 characters');
-      if (Number.isNaN(ageNum) || ageNum < 10 || ageNum > 120) errors.push('Age must be between 10 and 120');
-      if (Number.isNaN(heightNum) || heightNum <= 0 || heightNum > 300) errors.push('Height is required and must be valid');
-      if (Number.isNaN(weightNum) || weightNum <= 0 || weightNum > 500) errors.push('Weight is required and must be valid');
-      if (Number.isNaN(targetNum) || targetNum <= 0 || targetNum >= 100) errors.push('Target body fat % must be between 1 and 99');
-      if (errors.length > 0) {
-        setSubmitError(errors.join('. '));
+      const errors: Record<string, string> = {};
+      if (!email.trim()) errors.email = 'Email is required.';
+      if (password.length < 8) errors.password = 'Password must be at least 8 characters.';
+      if (Number.isNaN(ageNum) || ageNum < 10 || ageNum > 120) errors.age = 'Enter an age between 10 and 120.';
+      if (Number.isNaN(heightNum) || heightNum <= 0 || heightNum > 300) errors.height = 'Enter a valid height.';
+      if (Number.isNaN(weightNum) || weightNum <= 0 || weightNum > 500) errors.weight = 'Enter a valid weight.';
+      if (Number.isNaN(targetNum) || targetNum <= 0 || targetNum >= 100) errors.targetBf = 'Enter a target between 1 and 99.';
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
         return;
       }
       onSubmit({
@@ -60,11 +61,6 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         Create account
       </h2>
       <form onSubmit={handleSubmit} noValidate>
-        {submitError && (
-          <div className="app__error" role="alert" style={{ marginBottom: '1rem' }}>
-            {submitError}
-          </div>
-        )}
         <div className="form-group">
           <label className="form-label" htmlFor="signup-email">
             Email
@@ -78,7 +74,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? 'signup-email-error' : undefined}
           />
+          <InlineFieldError id="signup-email-error" message={fieldErrors.email} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-password">
@@ -93,7 +92,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             required
             minLength={8}
             autoComplete="new-password"
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password ? 'signup-password-error' : undefined}
           />
+          <InlineFieldError id="signup-password-error" message={fieldErrors.password} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-age">
@@ -109,7 +111,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             value={age}
             onChange={(e) => setAge(e.target.value)}
             required
+            aria-invalid={fieldErrors.age ? true : undefined}
+            aria-describedby={fieldErrors.age ? 'signup-age-error' : undefined}
           />
+          <InlineFieldError id="signup-age-error" message={fieldErrors.age} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-sex">
@@ -154,7 +159,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             value={heightCm}
             onChange={(e) => setHeightCm(e.target.value)}
             required
+            aria-invalid={fieldErrors.height ? true : undefined}
+            aria-describedby={fieldErrors.height ? 'signup-height-error' : undefined}
           />
+          <InlineFieldError id="signup-height-error" message={fieldErrors.height} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-weight">
@@ -171,7 +179,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}
             required
+            aria-invalid={fieldErrors.weight ? true : undefined}
+            aria-describedby={fieldErrors.weight ? 'signup-weight-error' : undefined}
           />
+          <InlineFieldError id="signup-weight-error" message={fieldErrors.weight} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="signup-target-bf">
@@ -188,7 +199,10 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
             value={targetBf}
             onChange={(e) => setTargetBf(e.target.value)}
             required
+            aria-invalid={fieldErrors.targetBf ? true : undefined}
+            aria-describedby={fieldErrors.targetBf ? 'signup-target-bf-error' : undefined}
           />
+          <InlineFieldError id="signup-target-bf-error" message={fieldErrors.targetBf} />
           <p className="form-hint">e.g. 15 for 15%</p>
         </div>
         <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>

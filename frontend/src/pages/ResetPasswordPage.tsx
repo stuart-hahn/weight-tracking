@@ -1,6 +1,7 @@
 import { useState, useCallback, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../api/client';
+import InlineFieldError from '../components/ui/InlineFieldError';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -9,16 +10,20 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ password?: string; confirm?: string }>({});
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setFieldErrors({});
       if (password.length < 8) {
-        setError('Password must be at least 8 characters');
+        setFieldErrors({ password: 'Password must be at least 8 characters.' });
+        setError('Fix the highlighted fields.');
         return;
       }
       if (password !== confirmPassword) {
-        setError('Passwords do not match');
+        setFieldErrors({ confirm: 'Passwords do not match.' });
+        setError('Fix the highlighted fields.');
         return;
       }
       if (!tokenFromUrl) {
@@ -88,7 +93,10 @@ export default function ResetPasswordPage() {
             required
             minLength={8}
             autoComplete="new-password"
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password ? 'reset-password-error' : undefined}
           />
+          <InlineFieldError id="reset-password-error" message={fieldErrors.password ?? null} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="reset-confirm">
@@ -103,7 +111,10 @@ export default function ResetPasswordPage() {
             required
             minLength={8}
             autoComplete="new-password"
+            aria-invalid={fieldErrors.confirm ? true : undefined}
+            aria-describedby={fieldErrors.confirm ? 'reset-confirm-error' : undefined}
           />
+          <InlineFieldError id="reset-confirm-error" message={fieldErrors.confirm ?? null} />
         </div>
         <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
           Reset password

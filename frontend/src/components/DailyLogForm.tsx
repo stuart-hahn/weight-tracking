@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
+import InlineStatusCard from './ui/InlineStatusCard';
 
 export interface OptionalBodyFatSubmit {
   date: string;
@@ -31,19 +32,33 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
   const [waistCm, setWaistCm] = useState('');
   const [hipCm, setHipCm] = useState('');
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [progressLoadError, setProgressLoadError] = useState<string | null>(null);
   const [weightError, setWeightError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [duplicateDate, setDuplicateDate] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadProgress = useCallback(() => {
     let cancelled = false;
+    setProgressLoadError(null);
     getProgress(userId)
       .then((p) => {
-        if (!cancelled) setProgress(p);
+        if (!cancelled) {
+          setProgress(p);
+          setProgressLoadError(null);
+        }
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [userId, refreshTrigger]);
+      .catch((e) => {
+        if (!cancelled) setProgressLoadError(e instanceof Error ? e.message : 'Failed to load progress');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const cleanup = loadProgress();
+    return cleanup;
+  }, [loadProgress, refreshTrigger]);
 
   const units = progress?.units ?? 'metric';
   const handleSubmit = useCallback(
@@ -141,6 +156,15 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </p>
           )}
         </section>
+      )}
+      {progress === null && progressLoadError && (
+        <InlineStatusCard
+          variant="error"
+          title="Progress"
+          message={progressLoadError}
+          actionLabel="Retry"
+          onAction={() => void loadProgress()}
+        />
       )}
 
       <section className="app__card" aria-labelledby="log-heading">

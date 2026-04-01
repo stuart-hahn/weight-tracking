@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
+import InlineStatusCard from './ui/InlineStatusCard';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -23,6 +24,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [bodyFatByDate, setBodyFatByDate] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<DailyEntryResponse | null>(null);
   const [editWeight, setEditWeight] = useState('');
   const [editCalories, setEditCalories] = useState('');
@@ -32,10 +34,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editError, setEditError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const lastFocusRef = useRef<HTMLButtonElement | null>(null);
+  const editWeightRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     Promise.all([getEntries(userId), getProgress(userId), getOptionalMetrics(userId)])
       .then(([e, p, om]) => {
         if (!cancelled) {
@@ -46,14 +51,22 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             if (m.body_fat_percent != null) map[m.date] = m.body_fat_percent;
           }
           setBodyFatByDate(map);
+          setLoadError(null);
         }
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Failed to load progress');
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [userId, refreshTrigger]);
+  }, [userId]);
+
+  useEffect(() => {
+    const cleanup = loadAll();
+    return cleanup;
+  }, [loadAll, refreshTrigger]);
 
   useEffect(() => {
     const editDate = (location.state as { editDate?: string } | null)?.editDate;
@@ -138,6 +151,18 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     return <PageLoading title="Progress" />;
   }
 
+  if (loadError) {
+    return (
+      <InlineStatusCard
+        variant="error"
+        title="Progress"
+        message={loadError}
+        actionLabel="Retry"
+        onAction={() => void loadAll()}
+      />
+    );
+  }
+
   if (sortedEntries.length === 0) {
     return (
       <section className="app__card" aria-label="Progress">
@@ -149,17 +174,22 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     );
   }
 
-  const weights = sortedEntries.map((e) => e.weight_kg);
-  const minW = Math.min(...weights);
-  const maxW = Math.max(...weights);
-  const goalKg = progress?.goal_weight_kg;
-  const minY = goalKg != null && goalKg < minW ? goalKg : minW;
-  const maxY = goalKg != null && goalKg > maxW ? goalKg : maxW;
-  const range = maxY - minY || 1;
-  const dates = sortedEntries.map((e) => new Date(e.date).getTime());
-  const minD = Math.min(...dates);
-  const maxD = Math.max(...dates);
-  const dateRange = maxD - minD || 1;
+  const chartModel = useMemo(() => {
+    const weights = sortedEntries.map((e) => e.weight_kg);
+    const minW = Math.min(...weights);
+    const maxW = Math.max(...weights);
+    const goalKg = progress?.goal_weight_kg;
+    const minY = goalKg != null && goalKg < minW ? goalKg : minW;
+    const maxY = goalKg != null && goalKg > maxW ? goalKg : maxW;
+    const range = maxY - minY || 1;
+    const dates = sortedEntries.map((e) => new Date(e.date).getTime());
+    const minD = Math.min(...dates);
+    const maxD = Math.max(...dates);
+    const dateRange = maxD - minD || 1;
+    return { weights, minW, maxW, goalKg, minY, maxY, range, minD, maxD, dateRange };
+  }, [sortedEntries, progress?.goal_weight_kg]);
+
+  const { minW, maxW, goalKg, minY, maxY, range, minD, dateRange } = chartModel;
 
   const width = 320;
   const innerW = width - CHART_PADDING.left - CHART_PADDING.right;
@@ -170,9 +200,10 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const toY = (kg: number) =>
     CHART_PADDING.top + innerH - (innerH * (kg - minY)) / range;
 
-  const points = sortedEntries
-    .map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`)
-    .join(' ');
+  const points = useMemo(
+    () => sortedEntries.map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`).join(' '),
+    [sortedEntries, toX, toY]
+  );
   const goalY = goalKg != null ? toY(goalKg) : null;
   const hasEntryToday =
     progress?.latest_entry_date != null &&
@@ -183,6 +214,29 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const chartSummary = progress
     ? `Weight from ${formatWeight(minW, progress.units)} to ${formatWeight(maxW, progress.units)} over ${sortedEntries.length} entries.${goalKg != null ? ` Goal: ${formatWeight(goalKg, progress.units)}.` : ''}`
     : '';
+
+  const svgTitleId = 'progress-chart-title';
+  const svgDescId = 'progress-chart-desc';
+
+  useEffect(() => {
+    if (!editingEntry) return;
+    const id = requestAnimationFrame(() => editWeightRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [editingEntry]);
+
+  useEffect(() => {
+    if (editingEntry) return;
+    lastFocusRef.current?.focus();
+  }, [editingEntry]);
+
+  useEffect(() => {
+    if (!editingEntry) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setEditingEntry(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editingEntry]);
 
   return (
     <>
@@ -200,8 +254,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
           viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
           className="weight-chart"
-          aria-hidden
+          role="img"
+          aria-labelledby={`${svgTitleId} ${svgDescId}`}
         >
+          <title id={svgTitleId}>Weight over time</title>
+          <desc id={svgDescId}>{chartSummary}</desc>
           {yTicks.map((kg) => (
             <text
               key={kg}
@@ -258,14 +315,32 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         </figcaption>
       </figure>
       <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
+      {progress && (
+        <p className="progress-text" style={{ marginTop: '-0.5rem' }}>
+          Latest: {formatWeight(sortedEntries[sortedEntries.length - 1].weight_kg, progress.units)} · Range: {formatWeight(minW, progress.units)}–{formatWeight(maxW, progress.units)}
+          {goalKg != null ? ` · Goal: ${formatWeight(goalKg, progress.units)}` : ''}
+        </p>
+      )}
       {editingEntry && progress && (
-        <section className="app__card" style={{ marginTop: '1rem' }} aria-label="Edit entry">
-          <h4 className="app__card-title" style={{ fontSize: '0.9rem' }}>Edit entry ({editingEntry.date})</h4>
+        <section
+          className="app__card"
+          style={{ marginTop: '1rem' }}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="edit-entry-title"
+        >
+          <h4 id="edit-entry-title" className="app__card-title" style={{ fontSize: '0.9rem' }}>
+            Edit entry ({editingEntry.date})
+          </h4>
           {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
           <form onSubmit={handleEditSubmit} noValidate>
             <div className="form-group">
-              <label className="form-label">Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})</label>
+              <label className="form-label" htmlFor="edit-entry-weight">
+                Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})
+              </label>
               <input
+                ref={editWeightRef}
+                id="edit-entry-weight"
                 type="number"
                 className="form-input"
                 min={progress.units === 'imperial' ? 20 : 1}
@@ -276,8 +351,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Calories (optional)</label>
+              <label className="form-label" htmlFor="edit-entry-calories">Calories (optional)</label>
               <input
+                id="edit-entry-calories"
                 type="number"
                 className="form-input"
                 min={0}
@@ -287,8 +363,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Waist ({progress.units === 'imperial' ? 'in' : 'cm'})</label>
+              <label className="form-label" htmlFor="edit-entry-waist">
+                Waist ({progress.units === 'imperial' ? 'in' : 'cm'})
+              </label>
               <input
+                id="edit-entry-waist"
                 type="number"
                 className="form-input"
                 min={1}
@@ -299,8 +378,11 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Hip ({progress.units === 'imperial' ? 'in' : 'cm'})</label>
+              <label className="form-label" htmlFor="edit-entry-hip">
+                Hip ({progress.units === 'imperial' ? 'in' : 'cm'})
+              </label>
               <input
+                id="edit-entry-hip"
                 type="number"
                 className="form-input"
                 min={1}
@@ -330,7 +412,10 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             <button
               type="button"
               className="entry-row"
-              onClick={() => setEditingEntry(e)}
+              onClick={(ev) => {
+                lastFocusRef.current = ev.currentTarget;
+                setEditingEntry(e);
+              }}
               style={{
                 width: '100%',
                 display: 'flex',

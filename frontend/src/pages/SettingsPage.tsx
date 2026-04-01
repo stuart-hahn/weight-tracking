@@ -3,6 +3,7 @@ import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
 import PageLoading from '../components/PageLoading';
+import InlineFieldError from '../components/ui/InlineFieldError';
 
 interface SettingsPageProps {
   userId: string;
@@ -22,6 +23,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [activityLevel, setActivityLevel] = useState<string>('');
   const [leanMassKg, setLeanMassKg] = useState('');
   const [units, setUnits] = useState<UnitsPreference>('metric');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   const [blockStart, setBlockStart] = useState('');
   const [savingBlock, setSavingBlock] = useState(false);
@@ -58,28 +60,54 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
       if (!profile) return;
       onError(null);
       onSuccess(null);
+      setFieldErrors({});
+
+      const errors: Record<string, string> = {};
       const body: UpdateUserRequest = {};
       const ageNum = Number(age);
-      if (!Number.isNaN(ageNum) && ageNum >= 10 && ageNum <= 120) body.age = ageNum;
-      body.sex = sex;
+      if (age.trim() !== '') {
+        if (Number.isNaN(ageNum) || ageNum < 10 || ageNum > 120) errors.age = 'Enter an age between 10 and 120.';
+        else if (ageNum !== profile.age) body.age = ageNum;
+      }
+
+      if (sex !== profile.sex) body.sex = sex;
       const heightNum = Number(heightCm);
-      if (!Number.isNaN(heightNum) && heightNum > 0 && heightNum <= 300) body.height_cm = heightNum;
+      if (heightCm.trim() !== '') {
+        if (Number.isNaN(heightNum) || heightNum <= 0 || heightNum > 300) errors.height = 'Enter a valid height.';
+        else if (heightNum !== profile.height_cm) body.height_cm = heightNum;
+      }
       const weightNum = Number(currentWeightKg);
-      if (!Number.isNaN(weightNum) && weightNum > 0 && weightNum <= 500) body.current_weight_kg = weightNum;
+      if (currentWeightKg.trim() !== '') {
+        if (Number.isNaN(weightNum) || weightNum <= 0 || weightNum > 500) errors.currentWeight = 'Enter a valid weight.';
+        else if (weightNum !== profile.current_weight_kg) body.current_weight_kg = weightNum;
+      }
       const targetNum = Number(targetBodyFatPercent);
-      if (!Number.isNaN(targetNum) && targetNum > 0 && targetNum < 100) body.target_body_fat_percent = targetNum;
+      if (targetBodyFatPercent.trim() !== '') {
+        if (Number.isNaN(targetNum) || targetNum <= 0 || targetNum >= 100) errors.targetBodyFat = 'Enter a body fat target between 1 and 99.';
+        else if (targetNum !== profile.target_body_fat_percent) body.target_body_fat_percent = targetNum;
+      }
       if (['sedentary', 'light', 'moderate', 'very_active'].includes(activityLevel)) {
-        body.activity_level = activityLevel as ActivityLevel;
+        const next = activityLevel as ActivityLevel;
+        if (next !== profile.activity_level) body.activity_level = next;
       } else {
-        body.activity_level = null;
+        if (profile.activity_level != null) body.activity_level = null;
       }
       const leanNum = leanMassKg.trim() === '' ? null : Number(leanMassKg);
-      if (leanNum !== null && !Number.isNaN(leanNum) && leanNum > 0 && leanNum <= 500) {
+      if (leanNum === null) {
+        if (profile.lean_mass_kg != null) body.lean_mass_kg = null;
+      } else if (Number.isNaN(leanNum) || leanNum <= 0 || leanNum > 500) {
+        errors.leanMass = 'Enter a valid lean mass or leave blank.';
+      } else if (leanNum !== profile.lean_mass_kg) {
         body.lean_mass_kg = leanNum;
-      } else {
-        body.lean_mass_kg = null;
       }
-      body.units = units;
+
+      if (units !== (profile.units ?? 'metric')) body.units = units;
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        onError('Fix the highlighted fields.');
+        return;
+      }
       if (Object.keys(body).length === 0) {
         onSuccess('No changes to save.');
         return;
@@ -163,7 +191,10 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             max={120}
             value={age}
             onChange={(e) => setAge(e.target.value)}
+            aria-invalid={fieldErrors.age ? true : undefined}
+            aria-describedby={fieldErrors.age ? 'settings-age-error' : undefined}
           />
+          <InlineFieldError id="settings-age-error" message={fieldErrors.age} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-sex">Sex</label>
@@ -200,7 +231,10 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
                 setHeightCm(v);
               }
             }}
+            aria-invalid={fieldErrors.height ? true : undefined}
+            aria-describedby={fieldErrors.height ? 'settings-height-error' : undefined}
           />
+          <InlineFieldError id="settings-height-error" message={fieldErrors.height} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-weight">
@@ -225,7 +259,10 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
                 setCurrentWeightKg(v);
               }
             }}
+            aria-invalid={fieldErrors.currentWeight ? true : undefined}
+            aria-describedby={fieldErrors.currentWeight ? 'settings-weight-error' : undefined}
           />
+          <InlineFieldError id="settings-weight-error" message={fieldErrors.currentWeight} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-target-bf">Target body fat (%)</label>
@@ -238,7 +275,10 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             step={0.5}
             value={targetBodyFatPercent}
             onChange={(e) => setTargetBodyFatPercent(e.target.value)}
+            aria-invalid={fieldErrors.targetBodyFat ? true : undefined}
+            aria-describedby={fieldErrors.targetBodyFat ? 'settings-target-bf-error' : undefined}
           />
+          <InlineFieldError id="settings-target-bf-error" message={fieldErrors.targetBodyFat} />
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-activity">Activity level</label>
@@ -256,7 +296,9 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label" htmlFor="settings-lean">Lean mass (kg, optional)</label>
+          <label className="form-label" htmlFor="settings-lean">
+            Lean mass ({units === 'imperial' ? 'lb' : 'kg'}, optional)
+          </label>
           <input
             id="settings-lean"
             type="number"
@@ -265,9 +307,27 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             max={500}
             step={0.1}
             placeholder="Leave blank to estimate"
-            value={leanMassKg}
-            onChange={(e) => setLeanMassKg(e.target.value)}
+            value={
+              units === 'imperial'
+                ? (() => {
+                    const n = Number(leanMassKg);
+                    return Number.isNaN(n) ? '' : Math.round(kgToLb(n));
+                  })()
+                : leanMassKg
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              if (units === 'imperial') {
+                const n = Number(v);
+                setLeanMassKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
+              } else {
+                setLeanMassKg(v);
+              }
+            }}
+            aria-invalid={fieldErrors.leanMass ? true : undefined}
+            aria-describedby={fieldErrors.leanMass ? 'settings-lean-error' : undefined}
           />
+          <InlineFieldError id="settings-lean-error" message={fieldErrors.leanMass} />
         </div>
         <button type="submit" className="btn btn--primary form-submit-mt" disabled={saving}>
           {saving ? 'Saving…' : 'Save'}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { ExerciseListItem, WorkoutExerciseKind } from '../types/api';
 import {
@@ -10,6 +10,8 @@ import {
   removeExerciseFavorite,
 } from '../api/client';
 import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
+import InlineStatusCard from '../components/ui/InlineStatusCard';
+import EmptyState from '../components/ui/EmptyState';
 
 type FilterScope = 'all' | 'favorites' | 'custom';
 
@@ -43,18 +45,27 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
     returnToRaw && returnToRaw.startsWith('/') && !returnToRaw.startsWith('//') ? returnToRaw : null;
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [scope, setScope] = useState<FilterScope>('all');
   const [items, setItems] = useState<ExerciseListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editKind, setEditKind] = useState<WorkoutExerciseKind>('weight_reps');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const editNameRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 275);
+    return () => window.clearTimeout(id);
+  }, [search]);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const q = search.trim() || undefined;
+      const q = debouncedSearch || undefined;
       const list = await listExercises(userId, {
         ...(q ? { q } : {}),
         ...(scope === 'favorites' ? { favorites_only: true } : {}),
@@ -63,12 +74,14 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
       setItems(list);
       onError?.(null);
     } catch (e) {
-      onError?.(e instanceof Error ? e.message : 'Failed to load exercises');
+      const msg = e instanceof Error ? e.message : 'Failed to load exercises';
+      setLoadError(msg);
+      onError?.(msg);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [userId, search, scope, onError]);
+  }, [userId, debouncedSearch, scope, onError]);
 
   useEffect(() => {
     void load();
@@ -87,6 +100,7 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
     setEditingId(ex.id);
     setEditName(ex.name);
     setEditKind(ex.kind);
+    requestAnimationFrame(() => editNameRef.current?.focus());
   };
 
   const cancelEdit = () => {
@@ -129,6 +143,10 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
     try {
       await duplicateExercise(userId, ex.id, {});
       onSuccess?.('Added to your exercises.');
+      if (safeReturnTo) {
+        navigate(safeReturnTo);
+        return;
+      }
       await load();
     } catch (e) {
       onError?.(e instanceof Error ? e.message : 'Duplicate failed');
@@ -158,13 +176,20 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
     const busy = busyId === ex.id;
 
     if (isEditing) {
+      const trimmed = editName.trim();
+      const unchanged = trimmed === ex.name && editKind === ex.kind;
       return (
         <li key={ex.id} className="workout-exercise-list__item exercise-catalog__edit-row">
           <div className="exercise-catalog__edit-fields">
             <input
+              ref={editNameRef}
               className="form-input"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') cancelEdit();
+                if (e.key === 'Enter') void saveEdit();
+              }}
               maxLength={120}
               disabled={busy}
             />
@@ -181,7 +206,12 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
             </select>
           </div>
           <div className="exercise-catalog__edit-actions">
-            <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void saveEdit()}>
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              disabled={busy || trimmed === '' || unchanged}
+              onClick={() => void saveEdit()}
+            >
               Save
             </button>
             <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={cancelEdit}>
@@ -245,7 +275,7 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   return (
     <div className="exercise-catalog">
       <p className="progress-text" style={{ marginBottom: '0.75rem' }}>
-        <Link to="/workouts">← Workouts</Link>
+        {safeReturnTo ? <Link to={safeReturnTo}>← Back</Link> : <Link to="/workouts">← Workouts</Link>}
       </p>
 
       <section className="app__card">
@@ -286,6 +316,8 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
 
         {loading ? (
           <p className="progress-text">Loading…</p>
+        ) : loadError ? (
+          <InlineStatusCard variant="error" title="Exercise catalog" message={loadError} actionLabel="Retry" onAction={() => void load()} />
         ) : (
           <>
             {builtin.length > 0 && (
@@ -301,7 +333,16 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
               </div>
             )}
             {builtin.length === 0 && mine.length === 0 && (
-              <p className="progress-text">No exercises match your filters.</p>
+              <EmptyState
+                message={debouncedSearch ? 'No exercises match your search and filters.' : 'No exercises match your filters.'}
+                {...((scope !== 'all' || debouncedSearch) && {
+                  actionLabel: 'Clear filters',
+                  onAction: () => {
+                    setScope('all');
+                    setSearch('');
+                  },
+                })}
+              />
             )}
           </>
         )}
