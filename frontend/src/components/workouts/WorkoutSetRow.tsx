@@ -343,12 +343,12 @@ export default function WorkoutSetRow({
               : 'workout-set-row__table-grid workout-set-row__table-grid--weight'
         }
       >
-        <span className="workout-set-row__set-num" aria-hidden>
+        <span className="workout-set-row__set-num workout-set-row__cell-num" aria-hidden>
           {set.set_index + 1}
         </span>
 
         {line.exercise.kind === 'time' ? (
-          <div className="workout-set-field workout-set-field--table">
+          <div className="workout-set-field workout-set-field--table workout-set-row__cell-load">
             <label className="form-label workout-set-field__label">Sec</label>
             <input
               className="form-input workout-set-input"
@@ -365,7 +365,7 @@ export default function WorkoutSetRow({
             {fieldErrors.duration && <p className="progress-text workout-set-row__field-error">{fieldErrors.duration}</p>}
           </div>
         ) : (
-          <div className="workout-set-field workout-set-field--table">
+          <div className="workout-set-field workout-set-field--table workout-set-row__cell-load">
             <label className="form-label workout-set-field__label">{units === 'imperial' ? 'lb' : 'kg'}</label>
             {line.exercise.kind === 'bodyweight_reps' ? (
               <span className="workout-set-row__dash">—</span>
@@ -422,7 +422,7 @@ export default function WorkoutSetRow({
         )}
 
         {line.exercise.kind !== 'time' && (
-          <div className="workout-set-field workout-set-field--table">
+          <div className="workout-set-field workout-set-field--table workout-set-row__cell-reps">
             <label className="form-label workout-set-field__label">Reps</label>
             <div className="workout-stepper workout-stepper--compact">
               <button
@@ -472,7 +472,7 @@ export default function WorkoutSetRow({
         )}
 
         {line.exercise.kind === 'weight_reps' && (
-          <div className="workout-set-field workout-set-field--table">
+          <div className="workout-set-field workout-set-field--table workout-set-row__cell-rir">
             <label className="form-label workout-set-field__label">RIR</label>
             <div className="workout-stepper workout-stepper--compact">
               <button
@@ -521,7 +521,7 @@ export default function WorkoutSetRow({
         )}
 
         {line.exercise.kind !== 'time' && (
-          <div className="workout-set-field workout-set-field--table workout-set-field--kind">
+          <div className="workout-set-field workout-set-field--table workout-set-field--kind workout-set-row__cell-kind">
             <label className="form-label workout-set-field__label">Kind</label>
             <select
               className="form-input workout-set-input workout-set-row__kind-select"
@@ -542,7 +542,7 @@ export default function WorkoutSetRow({
           </div>
         )}
 
-        <div className="workout-set-field workout-set-field--table workout-set-field--done">
+        <div className="workout-set-field workout-set-field--table workout-set-field--done workout-set-row__cell-done">
           <label className="form-label workout-set-field__label">Done</label>
           {!completed && (
             <button
@@ -557,7 +557,7 @@ export default function WorkoutSetRow({
         </div>
 
         {!completed && (
-          <div className="workout-set-actions workout-set-actions--table">
+          <div className="workout-set-actions workout-set-actions--table workout-set-row__cell-actions">
             <span className="workout-set-actions__rest-hint">~{defaultRestSec}s</span>
             <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => fireRest(defaultRestSec)}>
               Rest

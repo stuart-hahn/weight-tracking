@@ -502,21 +502,22 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         <Link to="/workouts">← Workouts</Link>
       </p>
 
-      {restSeconds != null && (
-        <RestTimer
-          seconds={restSeconds}
-          onDone={() => setRestSeconds(null)}
-          onDismiss={() => setRestSeconds(null)}
+      <div className="workout-session__sticky-stack">
+        <WorkoutSessionChrome
+          workoutName={workout.name || 'Workout'}
+          completed={completed}
+          saving={saving}
+          onFinish={() => void handleComplete()}
+          onRepeat={() => void handleRepeat()}
         />
-      )}
-
-      <WorkoutSessionChrome
-        workoutName={workout.name || 'Workout'}
-        completed={completed}
-        saving={saving}
-        onFinish={() => void handleComplete()}
-        onRepeat={() => void handleRepeat()}
-      />
+        {restSeconds != null && (
+          <RestTimer
+            seconds={restSeconds}
+            onDone={() => setRestSeconds(null)}
+            onDismiss={() => setRestSeconds(null)}
+          />
+        )}
+      </div>
 
       {!completed && finishConfirmOpen && (
         <section className="app__card workout-session__finish-confirm" role="dialog" aria-label="Finish workout confirmation">
