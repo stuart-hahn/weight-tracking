@@ -685,148 +685,192 @@
   grid-template-columns: 1.75rem minmax(5rem, 1fr) auto minmax(7rem, 1.2fr);
 }
 
-/* Narrow viewports: stack set row into two (or three) readable bands */
+/* Narrow viewports: one column "set card" — full-width steppers, # + Done top bar */
 @media (max-width: 639px) {
   .workout-sets--table .workout-set-row__table-head {
     display: none;
   }
 
+  .workout-set-row__targets {
+    margin-bottom: 0.45rem;
+  }
+
+  /* weight_reps: DOM is #, load, reps, rir, kind, done, actions — visual order via explicit rows */
   .workout-set-row__table-grid--weight {
-    grid-template-columns: 1.5rem repeat(3, minmax(0, 1fr));
-    grid-template-rows: auto auto;
-    align-items: end;
+    grid-template-columns: auto 1fr;
+    grid-auto-rows: auto;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
   }
 
   .workout-set-row__table-grid--weight .workout-set-row__cell-num {
     grid-column: 1;
     grid-row: 1;
-    align-self: end;
-    padding-bottom: 0.35rem;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-row__cell-load {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-row__cell-reps {
-    grid-column: 3;
-    grid-row: 1;
-    min-width: 0;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-row__cell-rir {
-    grid-column: 4;
-    grid-row: 1;
-    min-width: 0;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-row__cell-kind {
-    grid-column: 1 / 3;
-    grid-row: 2;
-    min-width: 0;
+    align-self: center;
+    padding-bottom: 0;
+    justify-self: start;
   }
 
   .workout-set-row__table-grid--weight .workout-set-row__cell-done {
-    grid-column: 3;
-    grid-row: 2;
-    justify-self: center;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-row__cell-actions {
-    grid-column: 4;
-    grid-row: 2;
+    grid-column: 2;
+    grid-row: 1;
     justify-self: end;
     align-self: center;
   }
 
-  .workout-set-row__table-grid--weight:not(:has(.workout-set-row__cell-actions)) .workout-set-row__cell-done {
-    grid-column: 3 / -1;
-    justify-self: start;
+  .workout-set-row__table-grid--weight .workout-set-row__cell-load {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
   }
 
+  .workout-set-row__table-grid--weight .workout-set-row__cell-reps {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workout-set-row__table-grid--weight .workout-set-row__cell-rir {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workout-set-row__table-grid--weight .workout-set-row__cell-kind {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workout-set-row__table-grid--weight .workout-set-row__cell-actions {
+    grid-column: 1 / -1;
+    grid-row: 6;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
+
+  .workout-set-row__table-grid--weight:not(:has(.workout-set-row__cell-actions)) .workout-set-row__cell-done {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  /* bodyweight_reps */
   .workout-set-row__table-grid--bw {
-    grid-template-columns: 1.5rem minmax(2rem, auto) minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
+    grid-template-columns: auto 1fr;
+    grid-auto-rows: auto;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
   }
 
   .workout-set-row__table-grid--bw .workout-set-row__cell-num {
     grid-column: 1;
     grid-row: 1;
-    align-self: end;
-    padding-bottom: 0.35rem;
+    align-self: center;
+    padding-bottom: 0;
+  }
+
+  .workout-set-row__table-grid--bw .workout-set-row__cell-done {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
   }
 
   .workout-set-row__table-grid--bw .workout-set-row__cell-load {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
   }
 
   .workout-set-row__table-grid--bw .workout-set-row__cell-reps {
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
     min-width: 0;
   }
 
   .workout-set-row__table-grid--bw .workout-set-row__cell-kind {
     grid-column: 1 / -1;
-    grid-row: 2;
+    grid-row: 4;
+    width: 100%;
     min-width: 0;
   }
 
-  .workout-set-row__table-grid--bw .workout-set-row__cell-done {
-    grid-column: 1;
-    grid-row: 3;
-    justify-self: start;
-  }
-
   .workout-set-row__table-grid--bw .workout-set-row__cell-actions {
-    grid-column: 2 / -1;
-    grid-row: 3;
-    justify-self: end;
-    align-self: center;
+    grid-column: 1 / -1;
+    grid-row: 5;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
   }
 
   .workout-set-row__table-grid--bw:not(:has(.workout-set-row__cell-actions)) .workout-set-row__cell-done {
-    grid-column: 1 / -1;
-    grid-row: 3;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
   }
 
+  /* time */
   .workout-set-row__table-grid--time {
-    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
+    grid-template-columns: auto 1fr;
+    grid-auto-rows: auto;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
   }
 
   .workout-set-row__table-grid--time .workout-set-row__cell-num {
     grid-column: 1;
     grid-row: 1;
-    align-self: end;
-    padding-bottom: 0.35rem;
-  }
-
-  .workout-set-row__table-grid--time .workout-set-row__cell-load {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
+    align-self: center;
+    padding-bottom: 0;
   }
 
   .workout-set-row__table-grid--time .workout-set-row__cell-done {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
     justify-self: end;
   }
 
-  .workout-set-row__table-grid--time .workout-set-row__cell-actions {
+  .workout-set-row__table-grid--time .workout-set-row__cell-load {
     grid-column: 1 / -1;
     grid-row: 2;
-    justify-content: flex-end;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workout-set-row__table-grid--time .workout-set-row__cell-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
     justify-self: stretch;
   }
 
   .workout-set-row__table-grid--time:not(:has(.workout-set-row__cell-actions)) .workout-set-row__cell-done {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
+    justify-self: end;
+  }
+
+  /* Full-width steppers: flex input between − / + */
+  .workout-set-row__table-grid--weight .workout-stepper--compact,
+  .workout-set-row__table-grid--bw .workout-stepper--compact {
+    width: 100%;
+    max-width: none;
+    justify-content: space-between;
+  }
+
+  .workout-set-row__table-grid--time .workout-set-field--table .form-input.workout-set-input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .workout-stepper--compact .workout-set-input {
@@ -835,15 +879,39 @@
     min-width: 2.5rem;
   }
 
-  .workout-set-field--done .btn {
+  .workout-set-row__table-grid--weight .workout-stepper--compact .workout-set-input,
+  .workout-set-row__table-grid--bw .workout-stepper--compact .workout-set-input {
+    flex: 1 1 auto;
+    min-width: 0;
     max-width: none;
-    min-width: var(--touch-target-min, 44px);
+    width: auto;
   }
 
   .workout-set-actions--table {
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.35rem;
     max-width: 100%;
+    width: 100%;
+  }
+
+  /* Session target / last lines: slightly smaller + clamp long "Last" on small screens */
+  .exercise-session-header {
+    padding: 0.45rem 0;
+  }
+
+  .exercise-session-header__target,
+  .exercise-session-header__last {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .exercise-session-header__last {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 
@@ -872,8 +940,15 @@
 }
 
 .workout-set-field--done .btn {
-  width: 100%;
-  max-width: 4.5rem;
+  min-width: var(--touch-target-min, 44px);
+  width: auto;
+}
+
+@media (min-width: 640px) {
+  .workout-set-field--done .btn {
+    width: 100%;
+    max-width: 4.5rem;
+  }
 }
 
 .workout-set-row__done-lock {
