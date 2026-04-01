@@ -4,4 +4,7 @@ export const queryKeys = {
   workoutsHub: (userId: string) => ['workoutsHub', userId] as const,
   exercisesPicker: (userId: string, q: string, favoritesOnly: boolean) =>
     ['exercisesPicker', userId, q, favoritesOnly] as const,
+  exerciseHistory: (userId: string, exerciseId: string) => ['exerciseHistory', userId, exerciseId] as const,
+  exerciseSubstitutions: (userId: string, exerciseId: string) =>
+    ['exerciseSubstitutions', userId, exerciseId] as const,
 };

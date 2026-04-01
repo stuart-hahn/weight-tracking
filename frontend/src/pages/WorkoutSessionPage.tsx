@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { UnitsPreference, WorkoutDetailResponse, ProgressionVariant, WorkoutExerciseNested, WorkoutSetResponse } from '../types/api';
+import type {
+  UnitsPreference,
+  WorkoutDetailResponse,
+  ProgressionVariant,
+  WorkoutExerciseNested,
+  WorkoutSetResponse,
+  PatchWorkoutSetRequest,
+} from '../types/api';
 import {
   getUser,
   getWorkout,
   patchWorkout,
   addWorkoutExercise,
+  patchWorkoutExercise,
   patchWorkoutSet,
   addWorkoutSet,
   deleteWorkoutSet,
@@ -38,7 +46,7 @@ interface WorkoutSessionPageProps {
 
 type InsightsState = Record<
   string,
-  { last: string; suggestion: string; variant?: string } | undefined
+  { last: string; suggestion: string; variant?: string; suggested_weight_kg?: number | null } | undefined
 >;
 
 const FAVORITES_ONLY_PICKER_KEY = 'workout-exercise-picker-favorites-only';
@@ -51,6 +59,7 @@ function humanizeVariant(v: string): string {
 }
 
 function isSetIncomplete(line: WorkoutExerciseNested, set: WorkoutSetResponse): boolean {
+  if (set.completed_at != null) return false;
   const k = line.exercise.kind;
   if (k === 'time') return set.duration_sec == null || set.duration_sec <= 0;
   if (k === 'bodyweight_reps') return set.reps == null;
@@ -113,8 +122,11 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const [removeConfirmLineId, setRemoveConfirmLineId] = useState<string | null>(null);
   const [savingSetId, setSavingSetId] = useState<string | null>(null);
   const [setPatchErrors, setSetPatchErrors] = useState<Record<string, string>>({});
-  const [focusMode, setFocusMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(true);
   const [focusExerciseIdx, setFocusExerciseIdx] = useState(0);
+  const [focusRepsSetId, setFocusRepsSetId] = useState<string | null>(null);
+  const swipeRef = useRef<{ x: number } | null>(null);
+  const pagerRestoredForWorkoutRef = useRef<string | null>(null);
 
   const prevInsightsKeyRef = useRef<string>('');
 
@@ -150,6 +162,8 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   });
 
   const lines = workout?.exercises ?? [];
+  const completed = workout?.completed_at != null;
+  const fromProgram = Boolean(workout?.program_day_id);
   const exerciseIdsFingerprint = useMemo(
     () => lines.map((e) => e.exercise_id).join('\0'),
     [lines]
@@ -175,8 +189,15 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
             continue;
           }
           const lp = ins.last_performance;
-          const lastStr = lp
-            ? lp.sets
+          let lastStr = '—';
+          if (lp && lp.sets.length > 0) {
+            const weights = lp.sets.map((s) => s.weight_kg).filter((w): w is number => w != null && w > 0);
+            const allSameW = weights.length > 0 && weights.every((w) => w === weights[0]);
+            const repStrs = lp.sets.map((s) => (s.reps != null ? String(s.reps) : '—'));
+            if (allSameW) {
+              lastStr = `${formatWeight(weights[0]!, unitsForDisplay)} × ${repStrs.join(', ')}`;
+            } else {
+              lastStr = lp.sets
                 .map((s) => {
                   const parts: string[] = [];
                   if (s.weight_kg != null) parts.push(formatWeight(s.weight_kg, unitsForDisplay));
@@ -186,12 +207,14 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                   return parts.join(' ');
                 })
                 .filter(Boolean)
-                .join(' · ')
-            : '—';
+                .join(' · ');
+            }
+          }
           next[line.id] = {
             last: lastStr || '—',
             suggestion: ins.suggestion.hint,
             variant: ins.progression_variant as ProgressionVariant,
+            suggested_weight_kg: ins.suggestion.suggested_weight_kg,
           };
         }
         setInsights(next);
@@ -240,8 +263,35 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     });
   }, [lines.length]);
 
-  const completed = workout?.completed_at != null;
-  const fromProgram = Boolean(workout?.program_day_id);
+  useEffect(() => {
+    pagerRestoredForWorkoutRef.current = null;
+  }, [workoutId]);
+
+  useEffect(() => {
+    if (!workoutId || completed || lines.length === 0) return;
+    if (pagerRestoredForWorkoutRef.current === workoutId) return;
+    pagerRestoredForWorkoutRef.current = workoutId;
+    try {
+      const raw = sessionStorage.getItem(`workout-pager-idx:${workoutId}`);
+      if (raw == null) return;
+      const n = Number(raw);
+      if (Number.isNaN(n)) return;
+      setFocusExerciseIdx(Math.min(lines.length - 1, Math.max(0, n)));
+    } catch {
+      /* ignore */
+    }
+  }, [workoutId, completed, lines.length]);
+
+  useEffect(() => {
+    if (!workoutId || completed) return;
+    try {
+      sessionStorage.setItem(`workout-pager-idx:${workoutId}`, String(focusExerciseIdx));
+    } catch {
+      /* ignore */
+    }
+  }, [workoutId, completed, focusExerciseIdx]);
+
+  const effectiveFocus = focusMode && !completed;
 
   const scrollToExercise = useCallback(
     (lineId: string) => {
@@ -264,7 +314,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     for (const line of workout.exercises) {
       for (const set of line.sets) {
         if (isSetIncomplete(line, set)) {
-          if (focusMode) {
+          if (effectiveFocus) {
             const idx = lines.findIndex((l) => l.id === line.id);
             if (idx >= 0) setFocusExerciseIdx(idx);
           }
@@ -273,7 +323,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         }
       }
     }
-  }, [workout, focusMode, lines, scrollToExercise]);
+  }, [workout, effectiveFocus, lines, scrollToExercise]);
 
   const invalidateWorkout = useCallback(() => {
     if (workoutId) {
@@ -465,7 +515,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         <section className="app__card workout-session__finish-confirm" role="dialog" aria-label="Finish workout confirmation">
           <h3 className="app__card-title">Finish workout?</h3>
           <p className="progress-text">
-            {finishIncompleteCount} set(s) still missing weight, reps, or duration.
+            {finishIncompleteCount} set(s) still missing required fields or not marked Done.
           </p>
           <div className="workout-start-actions">
             <button type="button" className="btn btn--secondary" disabled={saving} onClick={() => setFinishConfirmOpen(false)}>
@@ -530,77 +580,246 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         </p>
       )}
 
-      {lines.map((line) => {
-        const focusHidden = focusMode && line.id !== lines[focusExerciseIdx]?.id;
-        const lineInsights = insights[line.id];
-        return (
-          <WorkoutExerciseCard
-            key={line.id}
-            line={line}
-            completed={completed}
-            fromProgram={fromProgram}
-            focusHidden={focusHidden}
-            removeConfirmActive={removeConfirmLineId === line.id}
-            onRequestRemove={() => setRemoveConfirmLineId(line.id)}
-            onCancelRemove={() => setRemoveConfirmLineId(null)}
-            onConfirmRemove={() => {
-              void (async () => {
+      <div className="workout-session__aria-live" aria-live="polite" aria-atomic="true">
+        {effectiveFocus && lines[focusExerciseIdx] != null
+          ? `Exercise ${focusExerciseIdx + 1} of ${lines.length}: ${lines[focusExerciseIdx]!.exercise.name}`
+          : ''}
+      </div>
+
+      {!completed && effectiveFocus && lines.length > 1 ? (
+        <div
+          className="workout-session__swipe-sheet"
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            if (t) swipeRef.current = { x: t.clientX };
+          }}
+          onTouchEnd={(e) => {
+            if (!swipeRef.current) return;
+            const dx = e.changedTouches[0].clientX - swipeRef.current.x;
+            swipeRef.current = null;
+            if (dx > 56) setFocusExerciseIdx((i) => Math.max(0, i - 1));
+            else if (dx < -56) setFocusExerciseIdx((i) => Math.min(lines.length - 1, i + 1));
+          }}
+        >
+          {lines[focusExerciseIdx] != null
+            ? (() => {
+                const line = lines[focusExerciseIdx]!;
+                const lineInsights = insights[line.id];
+                return (
+                  <WorkoutExerciseCard
+                    key={line.id}
+                    line={line}
+                    completed={completed}
+                    fromProgram={fromProgram}
+                    focusHidden={false}
+                    removeConfirmActive={removeConfirmLineId === line.id}
+                    onRequestRemove={() => setRemoveConfirmLineId(line.id)}
+                    onCancelRemove={() => setRemoveConfirmLineId(null)}
+                    onConfirmRemove={() => {
+                      void (async () => {
+                        if (!workoutId) return;
+                        try {
+                          await deleteWorkoutExercise(userId, workoutId, line.id);
+                          setRemoveConfirmLineId(null);
+                          prevInsightsKeyRef.current = '';
+                          invalidateWorkout();
+                        } catch (err) {
+                          onError?.(err instanceof Error ? err.message : 'Remove failed');
+                        }
+                      })();
+                    }}
+                    {...(lineInsights != null ? { insights: lineInsights } : {})}
+                    humanizeVariant={humanizeVariant}
+                    units={units}
+                    displayWeight={displayWeight}
+                    parseWeightInput={parseWeightInput}
+                    onPatchSet={(setId, patch) => void patchSetField(line.id, setId, patch as Parameters<typeof patchWorkoutSet>[4])}
+                    onAddSet={() => {
+                      void (async () => {
+                        if (!workoutId) return;
+                        try {
+                          const last = line.sets[line.sets.length - 1];
+                          const ins = insights[line.id];
+                          const body: PatchWorkoutSetRequest = {};
+                          if (last) {
+                            if (last.weight_kg != null && last.weight_kg > 0) body.weight_kg = last.weight_kg;
+                            if (last.rir != null) body.rir = last.rir;
+                          } else if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
+                            body.weight_kg = ins.suggested_weight_kg;
+                          }
+                          await addWorkoutSet(userId, workoutId, line.id, body);
+                          prevInsightsKeyRef.current = '';
+                          invalidateWorkout();
+                        } catch (err) {
+                          onError?.(err instanceof Error ? err.message : 'Add set failed');
+                        }
+                      })();
+                    }}
+                    onDeleteSet={(setId) => {
+                      void (async () => {
+                        if (!workoutId) return;
+                        try {
+                          await deleteWorkoutSet(userId, workoutId, line.id, setId);
+                          prevInsightsKeyRef.current = '';
+                          invalidateWorkout();
+                        } catch (err) {
+                          onError?.(err instanceof Error ? err.message : 'Delete set failed');
+                        }
+                      })();
+                    }}
+                    canDeleteSet={(setCount) => setCount > 1}
+                    onRest={(sec) => setRestSeconds(sec)}
+                    isPatchingSetId={savingSetId}
+                    patchErrorBySetId={setPatchErrors}
+                    onDismissPatchError={(setId) =>
+                      setSetPatchErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[setId];
+                        return next;
+                      })
+                    }
+                    ProgramExerciseNotes={ProgramExerciseNotes}
+                    userId={userId}
+                    focusRepsSetId={focusRepsSetId}
+                    onDoneCommitted={(lineId, setId) => {
+                      const ln = workout?.exercises.find((l) => l.id === lineId);
+                      if (!ln) return;
+                      const idx = ln.sets.findIndex((s) => s.id === setId);
+                      const nextSet = idx >= 0 ? ln.sets[idx + 1] : undefined;
+                      setFocusRepsSetId(nextSet?.id ?? null);
+                    }}
+                    onRestAfterSetDone={(sec) => setRestSeconds(sec)}
+                    onSubstituteExercise={async (lineId, substituteExerciseId) => {
+                      if (!workoutId) return;
+                      const ln = workout?.exercises.find((l) => l.id === lineId);
+                      if (!ln) return;
+                      try {
+                        await patchWorkoutExercise(userId, workoutId, lineId, {
+                          exercise_id: substituteExerciseId,
+                          substituted_from_exercise_id: ln.exercise_id,
+                        });
+                        prevInsightsKeyRef.current = '';
+                        setFocusRepsSetId(null);
+                        invalidateWorkout();
+                        onError?.(null);
+                      } catch (err) {
+                        onError?.(err instanceof Error ? err.message : 'Substitute failed');
+                      }
+                    }}
+                  />
+                );
+              })()
+            : null}
+        </div>
+      ) : (
+        lines.map((line) => {
+          const focusHidden = effectiveFocus && line.id !== lines[focusExerciseIdx]?.id;
+          const lineInsights = insights[line.id];
+          return (
+            <WorkoutExerciseCard
+              key={line.id}
+              line={line}
+              completed={completed}
+              fromProgram={fromProgram}
+              focusHidden={focusHidden}
+              removeConfirmActive={removeConfirmLineId === line.id}
+              onRequestRemove={() => setRemoveConfirmLineId(line.id)}
+              onCancelRemove={() => setRemoveConfirmLineId(null)}
+              onConfirmRemove={() => {
+                void (async () => {
+                  if (!workoutId) return;
+                  try {
+                    await deleteWorkoutExercise(userId, workoutId, line.id);
+                    setRemoveConfirmLineId(null);
+                    prevInsightsKeyRef.current = '';
+                    invalidateWorkout();
+                  } catch (err) {
+                    onError?.(err instanceof Error ? err.message : 'Remove failed');
+                  }
+                })();
+              }}
+              {...(lineInsights != null ? { insights: lineInsights } : {})}
+              humanizeVariant={humanizeVariant}
+              units={units}
+              displayWeight={displayWeight}
+              parseWeightInput={parseWeightInput}
+              onPatchSet={(setId, patch) => void patchSetField(line.id, setId, patch as Parameters<typeof patchWorkoutSet>[4])}
+              onAddSet={() => {
+                void (async () => {
+                  if (!workoutId) return;
+                  try {
+                    const last = line.sets[line.sets.length - 1];
+                    const ins = insights[line.id];
+                    const body: PatchWorkoutSetRequest = {};
+                    if (last) {
+                      if (last.weight_kg != null && last.weight_kg > 0) body.weight_kg = last.weight_kg;
+                      if (last.rir != null) body.rir = last.rir;
+                    } else if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
+                      body.weight_kg = ins.suggested_weight_kg;
+                    }
+                    await addWorkoutSet(userId, workoutId, line.id, body);
+                    prevInsightsKeyRef.current = '';
+                    invalidateWorkout();
+                  } catch (err) {
+                    onError?.(err instanceof Error ? err.message : 'Add set failed');
+                  }
+                })();
+              }}
+              onDeleteSet={(setId) => {
+                void (async () => {
+                  if (!workoutId) return;
+                  try {
+                    await deleteWorkoutSet(userId, workoutId, line.id, setId);
+                    prevInsightsKeyRef.current = '';
+                    invalidateWorkout();
+                  } catch (err) {
+                    onError?.(err instanceof Error ? err.message : 'Delete set failed');
+                  }
+                })();
+              }}
+              canDeleteSet={(setCount) => setCount > 1}
+              onRest={(sec) => setRestSeconds(sec)}
+              isPatchingSetId={savingSetId}
+              patchErrorBySetId={setPatchErrors}
+              onDismissPatchError={(setId) =>
+                setSetPatchErrors((prev) => {
+                  const next = { ...prev };
+                  delete next[setId];
+                  return next;
+                })
+              }
+              ProgramExerciseNotes={ProgramExerciseNotes}
+              userId={userId}
+              focusRepsSetId={focusRepsSetId}
+              onDoneCommitted={(lineId, setId) => {
+                const ln = workout?.exercises.find((l) => l.id === lineId);
+                if (!ln) return;
+                const idx = ln.sets.findIndex((s) => s.id === setId);
+                const nextSet = idx >= 0 ? ln.sets[idx + 1] : undefined;
+                setFocusRepsSetId(nextSet?.id ?? null);
+              }}
+              onRestAfterSetDone={(sec) => setRestSeconds(sec)}
+              onSubstituteExercise={async (lineId, substituteExerciseId) => {
                 if (!workoutId) return;
+                const ln = workout?.exercises.find((l) => l.id === lineId);
+                if (!ln) return;
                 try {
-                  await deleteWorkoutExercise(userId, workoutId, line.id);
-                  setRemoveConfirmLineId(null);
+                  await patchWorkoutExercise(userId, workoutId, lineId, {
+                    exercise_id: substituteExerciseId,
+                    substituted_from_exercise_id: ln.exercise_id,
+                  });
                   prevInsightsKeyRef.current = '';
+                  setFocusRepsSetId(null);
                   invalidateWorkout();
+                  onError?.(null);
                 } catch (err) {
-                  onError?.(err instanceof Error ? err.message : 'Remove failed');
+                  onError?.(err instanceof Error ? err.message : 'Substitute failed');
                 }
-              })();
-            }}
-            {...(lineInsights != null ? { insights: lineInsights } : {})}
-            humanizeVariant={humanizeVariant}
-            units={units}
-            displayWeight={displayWeight}
-            parseWeightInput={parseWeightInput}
-            onPatchSet={(setId, patch) => void patchSetField(line.id, setId, patch as Parameters<typeof patchWorkoutSet>[4])}
-            onAddSet={() => {
-              void (async () => {
-                if (!workoutId) return;
-                try {
-                  await addWorkoutSet(userId, workoutId, line.id, {});
-                  prevInsightsKeyRef.current = '';
-                  invalidateWorkout();
-                } catch (err) {
-                  onError?.(err instanceof Error ? err.message : 'Add set failed');
-                }
-              })();
-            }}
-            onDeleteSet={(setId) => {
-              void (async () => {
-                if (!workoutId) return;
-                try {
-                  await deleteWorkoutSet(userId, workoutId, line.id, setId);
-                  prevInsightsKeyRef.current = '';
-                  invalidateWorkout();
-                } catch (err) {
-                  onError?.(err instanceof Error ? err.message : 'Delete set failed');
-                }
-              })();
-            }}
-            canDeleteSet={(setCount) => setCount > 1}
-            onRest={(sec) => setRestSeconds(sec)}
-            isPatchingSetId={savingSetId}
-            patchErrorBySetId={setPatchErrors}
-            onDismissPatchError={(setId) =>
-              setSetPatchErrors((prev) => {
-                const next = { ...prev };
-                delete next[setId];
-                return next;
-              })
-            }
-            ProgramExerciseNotes={ProgramExerciseNotes}
-          />
-        );
-      })}
+              }}
+            />
+          );
+        })
+      )}
 
       {workout.exercises.length === 0 && (
         <p className="progress-text">No exercises yet. Add one to start logging sets.</p>

@@ -15,6 +15,7 @@ import type {
   WorkoutSetCreateInput,
   WorkoutSetUpdateInput,
   ExerciseBatchInsightsInput,
+  ExerciseSubstitutionCreateInput,
 } from '../types/index.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,6 +67,24 @@ const SET_ROLES = ['top', 'backoff', 'working'] as const;
 function validOptionalSetRole(v: unknown): boolean {
   if (v === undefined || v === null) return true;
   return typeof v === 'string' && SET_ROLES.includes(v as (typeof SET_ROLES)[number]);
+}
+
+/** User-facing set kind (distinct from progression set_role) */
+const USER_SET_KINDS = ['warmup', 'working', 'drop', 'rest_pause'] as const;
+
+function validOptionalUserSetKind(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'string' && USER_SET_KINDS.includes(v as (typeof USER_SET_KINDS)[number]);
+}
+
+function validOptionalCompletedAt(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'string' && !Number.isNaN(Date.parse(v));
+}
+
+function validOptionalActualRestSec(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 3600;
 }
 
 function validOptionalTargetInt(v: unknown): boolean {
@@ -375,6 +394,13 @@ export function validateCreateWorkoutExercise(
   if (body.default_rest_seconds != null && body.default_rest_seconds !== undefined && !validRestSec(body.default_rest_seconds)) {
     errors.push('default_rest_seconds must be 0–3600 or null');
   }
+  if (
+    body.substituted_from_exercise_id != null &&
+    body.substituted_from_exercise_id !== undefined &&
+    (typeof body.substituted_from_exercise_id !== 'string' || !isUuid(body.substituted_from_exercise_id))
+  ) {
+    errors.push('substituted_from_exercise_id must be a valid UUID or null');
+  }
   if (body.sets !== undefined) {
     if (!Array.isArray(body.sets)) {
       errors.push('sets must be an array');
@@ -403,6 +429,9 @@ export function validateCreateWorkoutExercise(
         if (set.calibration_to_failure !== undefined && typeof set.calibration_to_failure !== 'boolean') {
           errors.push('calibration_to_failure must be boolean');
         }
+        if (!validOptionalCompletedAt(set.completed_at)) errors.push('Invalid completed_at in sets');
+        if (!validOptionalUserSetKind(set.set_kind)) errors.push('Invalid set_kind in sets');
+        if (!validOptionalActualRestSec(set.actual_rest_seconds)) errors.push('Invalid actual_rest_seconds in sets');
       }
     }
   }
@@ -433,8 +462,24 @@ export function validateUpdateWorkoutExercise(
   if (body.order_index !== undefined && (!Number.isInteger(body.order_index) || body.order_index < 0 || body.order_index > 500)) {
     errors.push('order_index must be an integer 0–500');
   }
-  if (body.notes === undefined && body.default_rest_seconds === undefined && body.order_index === undefined) {
-    errors.push('At least one of notes, default_rest_seconds, order_index required');
+  if (body.exercise_id !== undefined && (typeof body.exercise_id !== 'string' || !isUuid(body.exercise_id))) {
+    errors.push('exercise_id must be a valid UUID');
+  }
+  if (
+    body.substituted_from_exercise_id !== undefined &&
+    body.substituted_from_exercise_id !== null &&
+    (typeof body.substituted_from_exercise_id !== 'string' || !isUuid(body.substituted_from_exercise_id))
+  ) {
+    errors.push('substituted_from_exercise_id must be a valid UUID or null');
+  }
+  if (
+    body.notes === undefined &&
+    body.default_rest_seconds === undefined &&
+    body.order_index === undefined &&
+    body.exercise_id === undefined &&
+    body.substituted_from_exercise_id === undefined
+  ) {
+    errors.push('At least one of notes, default_rest_seconds, order_index, exercise_id, substituted_from_exercise_id required');
   }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
@@ -470,6 +515,9 @@ export function validateCreateWorkoutSet(
   if (body.calibration_to_failure !== undefined && typeof body.calibration_to_failure !== 'boolean') {
     errors.push('calibration_to_failure must be boolean');
   }
+  if (!validOptionalCompletedAt(body.completed_at)) errors.push('Invalid completed_at');
+  if (!validOptionalUserSetKind(body.set_kind)) errors.push('Invalid set_kind');
+  if (!validOptionalActualRestSec(body.actual_rest_seconds)) errors.push('Invalid actual_rest_seconds');
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;
@@ -526,6 +574,19 @@ export function validateUpdateWorkoutSet(
   if (body.calibration_to_failure !== undefined && typeof body.calibration_to_failure !== 'boolean') {
     errors.push('calibration_to_failure must be boolean');
   }
+  if (body.completed_at !== undefined && body.completed_at !== null && !validOptionalCompletedAt(body.completed_at)) {
+    errors.push('Invalid completed_at');
+  }
+  if (body.set_kind !== undefined && body.set_kind !== null && !validOptionalUserSetKind(body.set_kind)) {
+    errors.push('Invalid set_kind');
+  }
+  if (
+    body.actual_rest_seconds !== undefined &&
+    body.actual_rest_seconds !== null &&
+    !validOptionalActualRestSec(body.actual_rest_seconds)
+  ) {
+    errors.push('Invalid actual_rest_seconds');
+  }
   if (
     body.weight_kg === undefined &&
     body.reps === undefined &&
@@ -538,7 +599,10 @@ export function validateUpdateWorkoutSet(
     body.target_reps_max === undefined &&
     body.target_rir_min === undefined &&
     body.target_rir_max === undefined &&
-    body.calibration_to_failure === undefined
+    body.calibration_to_failure === undefined &&
+    body.completed_at === undefined &&
+    body.set_kind === undefined &&
+    body.actual_rest_seconds === undefined
   ) {
     errors.push('At least one field to update required');
   }
@@ -558,6 +622,23 @@ const PROGRESSION_VARIANTS = new Set([
   'isolation_calibration_candidate',
   'custom',
 ]);
+
+export function validateCreateExerciseSubstitution(
+  req: Request<{ id: string; exerciseId: string }, unknown, ExerciseSubstitutionCreateInput>,
+  res: Response,
+  next: NextFunction
+): void {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'Request body must be a JSON object' });
+    return;
+  }
+  if (typeof body.substitute_exercise_id !== 'string' || !isUuid(body.substitute_exercise_id)) {
+    res.status(400).json({ error: 'substitute_exercise_id must be a UUID' });
+    return;
+  }
+  next();
+}
 
 export function validateBatchExerciseInsights(
   req: Request<{ id: string }, unknown, ExerciseBatchInsightsInput>,

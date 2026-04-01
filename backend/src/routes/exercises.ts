@@ -7,16 +7,19 @@ import {
   validateUpdateExercise,
   validateBatchExerciseInsights,
   validateDuplicateExercise,
+  validateCreateExerciseSubstitution,
 } from '../middleware/validate.js';
 import type {
   ExerciseCreateInput,
   ExerciseUpdateInput,
   ExerciseBatchInsightsInput,
   ExerciseDuplicateInput,
+  ExerciseSubstitutionCreateInput,
 } from '../types/index.js';
 import type { ExerciseKind } from '../services/workoutProgression.js';
 import { buildExerciseInsight } from '../services/workoutInsights.js';
 import type { ProgressionVariant } from '../services/workoutProgressionStrategies.js';
+import { detectPlateau, getExerciseSessionHistory } from '../services/exerciseHistory.js';
 
 const router = Router({ mergeParams: true });
 
@@ -148,6 +151,137 @@ router.get('/:exerciseId/insights', requireAuth, async (req: AuthRequest, res: R
   const payload = await buildExerciseInsight(userId, exerciseId, exercise.kind as ExerciseKind, exercise.name);
   res.json(payload);
 });
+
+router.get('/:exerciseId/history', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = assertUser(req, res);
+  if (!userId) return;
+  const { exerciseId } = req.params;
+  const exercise = await prisma.exercise.findFirst({
+    where: { id: exerciseId, OR: [{ userId: null }, { userId }] },
+  });
+  if (!exercise) {
+    res.status(404).json({ error: 'Exercise not found' });
+    return;
+  }
+  const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : 10;
+  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, Math.floor(limitRaw))) : 10;
+  const excludeSubstituted =
+    req.query.exclude_substituted === '0' || req.query.exclude_substituted === 'false' ? false : true;
+  const rowsNewestFirst = await getExerciseSessionHistory(userId, exerciseId, limit, excludeSubstituted);
+  const chronological = [...rowsNewestFirst].reverse();
+  const { plateau, plateau_hint } = detectPlateau(chronological);
+  res.json({ rows: rowsNewestFirst, plateau, plateau_hint });
+});
+
+router.get('/:exerciseId/substitutions', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = assertUser(req, res);
+  if (!userId) return;
+  const { exerciseId } = req.params;
+  const primary = await prisma.exercise.findFirst({
+    where: { id: exerciseId, OR: [{ userId: null }, { userId }] },
+  });
+  if (!primary) {
+    res.status(404).json({ error: 'Exercise not found' });
+    return;
+  }
+  const rows = await prisma.exerciseSubstitution.findMany({
+    where: { primaryExerciseId: exerciseId },
+    orderBy: { orderIndex: 'asc' },
+    include: { substituteExercise: true },
+  });
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      substitute_exercise_id: r.substituteExerciseId,
+      order_index: r.orderIndex,
+      name: r.substituteExercise.name,
+      kind: r.substituteExercise.kind,
+    }))
+  );
+});
+
+router.post(
+  '/:exerciseId/substitutions',
+  requireAuth,
+  validateCreateExerciseSubstitution,
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const userId = assertUser(req, res);
+    if (!userId) return;
+    const { exerciseId } = req.params;
+    const body = req.body as ExerciseSubstitutionCreateInput;
+    const primary = await prisma.exercise.findFirst({
+      where: { id: exerciseId, OR: [{ userId: null }, { userId }] },
+    });
+    if (!primary) {
+      res.status(404).json({ error: 'Exercise not found' });
+      return;
+    }
+    if (body.substitute_exercise_id === exerciseId) {
+      res.status(400).json({ error: 'Cannot substitute an exercise with itself' });
+      return;
+    }
+    const sub = await prisma.exercise.findFirst({
+      where: { id: body.substitute_exercise_id, OR: [{ userId: null }, { userId }] },
+    });
+    if (!sub) {
+      res.status(404).json({ error: 'Substitute exercise not found' });
+      return;
+    }
+    try {
+      const maxRow = await prisma.exerciseSubstitution.aggregate({
+        where: { primaryExerciseId: exerciseId },
+        _max: { orderIndex: true },
+      });
+      const nextOrder = (maxRow._max.orderIndex ?? -1) + 1;
+      const row = await prisma.exerciseSubstitution.create({
+        data: {
+          primaryExerciseId: exerciseId,
+          substituteExerciseId: body.substitute_exercise_id,
+          orderIndex: nextOrder,
+        },
+        include: { substituteExercise: true },
+      });
+      res.status(201).json({
+        id: row.id,
+        substitute_exercise_id: row.substituteExerciseId,
+        order_index: row.orderIndex,
+        name: row.substituteExercise.name,
+        kind: row.substituteExercise.kind,
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        res.status(409).json({ error: 'That substitute is already in the list' });
+        return;
+      }
+      next(err as Error);
+    }
+  }
+);
+
+router.delete(
+  '/:exerciseId/substitutions/:substituteExerciseId',
+  requireAuth,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = assertUser(req, res);
+    if (!userId) return;
+    const { exerciseId, substituteExerciseId } = req.params;
+    const primary = await prisma.exercise.findFirst({
+      where: { id: exerciseId, OR: [{ userId: null }, { userId }] },
+    });
+    if (!primary) {
+      res.status(404).json({ error: 'Exercise not found' });
+      return;
+    }
+    const del = await prisma.exerciseSubstitution.deleteMany({
+      where: { primaryExerciseId: exerciseId, substituteExerciseId },
+    });
+    if (del.count === 0) {
+      res.status(404).json({ error: 'Substitution not found' });
+      return;
+    }
+    res.status(204).send();
+  }
+);
 
 router.post('/:exerciseId/favorite', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const userId = assertUser(req, res);

@@ -173,6 +173,8 @@ export interface BatchExerciseInsightsResponse {
   insights: Record<string, ExerciseInsightsResponse>;
 }
 
+export type UserSetKind = 'warmup' | 'working' | 'drop' | 'rest_pause';
+
 export interface WorkoutSetResponse {
   id: string;
   set_index: number;
@@ -188,6 +190,9 @@ export interface WorkoutSetResponse {
   target_rir_min: number | null;
   target_rir_max: number | null;
   calibration_to_failure: boolean;
+  completed_at: string | null;
+  set_kind: UserSetKind | string | null;
+  actual_rest_seconds: number | null;
 }
 
 export interface WorkoutExerciseNested {
@@ -196,6 +201,7 @@ export interface WorkoutExerciseNested {
   order_index: number;
   notes: string | null;
   default_rest_seconds: number | null;
+  substituted_from_exercise_id: string | null;
   exercise: {
     id: string;
     user_id: string | null;
@@ -266,6 +272,7 @@ export interface AddWorkoutExerciseRequest {
   exercise_id: string;
   notes?: string | null;
   default_rest_seconds?: number | null;
+  substituted_from_exercise_id?: string | null;
   sets?: {
     weight_kg?: number | null;
     reps?: number | null;
@@ -279,6 +286,8 @@ export interface PatchWorkoutExerciseRequest {
   notes?: string | null;
   default_rest_seconds?: number | null;
   order_index?: number;
+  exercise_id?: string;
+  substituted_from_exercise_id?: string | null;
 }
 
 export interface PatchWorkoutSetRequest {
@@ -294,6 +303,38 @@ export interface PatchWorkoutSetRequest {
   target_rir_min?: number | null;
   target_rir_max?: number | null;
   calibration_to_failure?: boolean;
+  completed_at?: string | null;
+  set_kind?: UserSetKind | string | null;
+  actual_rest_seconds?: number | null;
+}
+
+export interface ExerciseSessionHistoryRow {
+  workout_id: string;
+  completed_at: string;
+  top_set_weight_kg: number | null;
+  top_set_reps: number | null;
+  reps_per_set: string;
+  avg_rir: number | null;
+  volume_kg: number;
+  substituted: boolean;
+}
+
+export interface ExerciseHistoryResponse {
+  rows: ExerciseSessionHistoryRow[];
+  plateau: boolean;
+  plateau_hint: string | null;
+}
+
+export interface ExerciseSubstitutionRow {
+  id: string;
+  substitute_exercise_id: string;
+  order_index: number;
+  name: string;
+  kind: WorkoutExerciseKind;
+}
+
+export interface CreateExerciseSubstitutionRequest {
+  substitute_exercise_id: string;
 }
 
 export interface WorkoutProgramListItem {

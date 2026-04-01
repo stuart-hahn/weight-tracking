@@ -53,11 +53,28 @@ model Exercise {
   favorites         UserExerciseFavorite[]
   workoutExercises  WorkoutExercise[]
   programDayExercises ProgramDayExercise[]
+  substitutionsFrom ExerciseSubstitution[] @relation("SubstitutionPrimary")
+  substitutionsTo   ExerciseSubstitution[] @relation("SubstitutionSubstitute")
 
   @@index([userId])
   @@index([name])
   @@unique([userId, name])
   @@map("exercises")
+}
+
+/// Ordered list of substitute exercises for a primary exercise (same user or global catalog).
+model ExerciseSubstitution {
+  id                   String   @id @default(uuid())
+  primaryExerciseId    String   @map("primary_exercise_id")
+  substituteExerciseId String   @map("substitute_exercise_id")
+  orderIndex           Int      @map("order_index")
+
+  primaryExercise    Exercise @relation("SubstitutionPrimary", fields: [primaryExerciseId], references: [id], onDelete: Cascade)
+  substituteExercise Exercise @relation("SubstitutionSubstitute", fields: [substituteExerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([primaryExerciseId, substituteExerciseId])
+  @@index([primaryExerciseId, orderIndex])
+  @@map("exercise_substitutions")
 }
 
 model UserExerciseFavorite {
@@ -165,12 +182,14 @@ model Workout {
 }
 
 model WorkoutExercise {
-  id                  String   @id @default(uuid())
-  workoutId           String   @map("workout_id")
-  exerciseId          String   @map("exercise_id")
-  orderIndex          Int      @map("order_index")
-  notes               String?
-  defaultRestSeconds  Int?     @map("default_rest_seconds")
+  id                       String   @id @default(uuid())
+  workoutId                String   @map("workout_id")
+  exerciseId                 String   @map("exercise_id")
+  orderIndex                 Int      @map("order_index")
+  notes                      String?
+  defaultRestSeconds         Int?     @map("default_rest_seconds")
+  /// When set, this line was chosen as a substitute for the given primary exercise (progression graphs may exclude).
+  substitutedFromExerciseId  String?  @map("substituted_from_exercise_id")
 
   workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
@@ -181,21 +200,27 @@ model WorkoutExercise {
 }
 
 model WorkoutSet {
-  id                   String   @id @default(uuid())
-  workoutExerciseId    String   @map("workout_exercise_id")
-  setIndex             Int      @map("set_index")
-  weightKg             Float?   @map("weight_kg")
+  id                   String    @id @default(uuid())
+  workoutExerciseId    String    @map("workout_exercise_id")
+  setIndex             Int       @map("set_index")
+  weightKg             Float?    @map("weight_kg")
   reps                 Int?
-  durationSec          Int?     @map("duration_sec")
+  durationSec          Int?      @map("duration_sec")
   notes                String?
-  restSecondsAfter     Int?     @map("rest_seconds_after")
-  rir                  Int?     @map("rir")
-  setRole              String?  @map("set_role")
-  targetRepsMin        Int?     @map("target_reps_min")
-  targetRepsMax        Int?     @map("target_reps_max")
-  targetRirMin         Int?     @map("target_rir_min")
-  targetRirMax         Int?     @map("target_rir_max")
-  calibrationToFailure Boolean  @default(false) @map("calibration_to_failure")
+  restSecondsAfter     Int?      @map("rest_seconds_after")
+  rir                  Int?      @map("rir")
+  setRole              String?   @map("set_role")
+  targetRepsMin        Int?      @map("target_reps_min")
+  targetRepsMax        Int?      @map("target_reps_max")
+  targetRirMin         Int?      @map("target_rir_min")
+  targetRirMax         Int?      @map("target_rir_max")
+  calibrationToFailure Boolean   @default(false) @map("calibration_to_failure")
+  /// User-marked completion time for the set (enables rest timer + clearer session state).
+  completedAt          DateTime? @map("completed_at")
+  /// User-facing set kind: warmup | working | drop | rest_pause (distinct from progression set_role).
+  setKind              String?   @map("set_kind")
+  /// Observed or user-entered rest after this set (seconds).
+  actualRestSeconds    Int?      @map("actual_rest_seconds")
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
 

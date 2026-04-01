@@ -170,6 +170,8 @@ export interface WorkoutExerciseCreateInput {
   exercise_id: string;
   notes?: string | null;
   default_rest_seconds?: number | null;
+  /** If this line uses a substitute exercise, primary exercise id for analytics */
+  substituted_from_exercise_id?: string | null;
   /** Pre-fill sets (e.g. from template); otherwise one empty set is created */
   sets?: WorkoutSetCreateInput[];
 }
@@ -178,6 +180,9 @@ export interface WorkoutExerciseUpdateInput {
   notes?: string | null;
   default_rest_seconds?: number | null;
   order_index?: number;
+  /** Swap to another exercise (e.g. substitute); resets sets to one empty row */
+  exercise_id?: string;
+  substituted_from_exercise_id?: string | null;
 }
 
 export interface WorkoutSetCreateInput {
@@ -193,6 +198,9 @@ export interface WorkoutSetCreateInput {
   target_rir_min?: number | null;
   target_rir_max?: number | null;
   calibration_to_failure?: boolean;
+  completed_at?: string | null;
+  set_kind?: string | null;
+  actual_rest_seconds?: number | null;
 }
 
 export interface WorkoutSetUpdateInput {
@@ -208,6 +216,14 @@ export interface WorkoutSetUpdateInput {
   target_rir_min?: number | null;
   target_rir_max?: number | null;
   calibration_to_failure?: boolean;
+  completed_at?: string | null;
+  set_kind?: string | null;
+  actual_rest_seconds?: number | null;
+}
+
+/** POST /exercises/:id/substitutions */
+export interface ExerciseSubstitutionCreateInput {
+  substitute_exercise_id: string;
 }
 
 /** POST /exercises/batch-insights */

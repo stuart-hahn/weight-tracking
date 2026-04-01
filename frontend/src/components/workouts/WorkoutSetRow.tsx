@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { UnitsPreference, WorkoutExerciseNested, WorkoutSetResponse } from '../../types/api';
+import type { UnitsPreference, WorkoutExerciseNested, WorkoutSetResponse, UserSetKind } from '../../types/api';
 import { lbToKg } from '../../utils/units';
 
 const DEBOUNCE_MS = 350;
 const LAST_REST_STORAGE_KEY = 'workout-last-rest-seconds';
+const AUTO_REST_ON_DONE_KEY = 'workout-auto-rest-on-done';
+
+const USER_SET_KINDS: (UserSetKind | '')[] = ['', 'warmup', 'working', 'drop', 'rest_pause'];
 
 function formatSetRoleLabel(role: string | null | undefined): string | null {
   if (!role) return null;
@@ -33,6 +36,16 @@ function writeLastRestSeconds(sec: number): void {
   }
 }
 
+function readAutoRestOnDone(): boolean {
+  try {
+    const v = localStorage.getItem(AUTO_REST_ON_DONE_KEY);
+    if (v === null) return true;
+    return v !== '0' && v !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 interface WorkoutSetRowProps {
   line: WorkoutExerciseNested;
   set: WorkoutSetResponse;
@@ -44,12 +57,14 @@ interface WorkoutSetRowProps {
   onRest: (seconds: number) => void;
   onDelete?: () => void;
   canDeleteSet: boolean;
-  /** Program sessions: hide per-set notes to reduce clutter */
   hideSetNote?: boolean;
-  /** Row-level save feedback (avoids global banner for patch failures) */
   isPatching?: boolean;
   patchError?: string | null;
   onDismissPatchError?: () => void;
+  /** Focus the reps input (e.g. after completing previous set) */
+  focusReps?: boolean;
+  onDoneCommitted?: (setId: string) => void;
+  onRestAfterSetDone?: (seconds: number) => void;
 }
 
 export default function WorkoutSetRow({
@@ -67,12 +82,13 @@ export default function WorkoutSetRow({
   isPatching = false,
   patchError = null,
   onDismissPatchError,
+  focusReps = false,
+  onDoneCommitted,
+  onRestAfterSetDone,
 }: WorkoutSetRowProps) {
   const targetBits: string[] = [];
   if (set.target_reps_min != null || set.target_reps_max != null) {
-    targetBits.push(
-      `Reps ${set.target_reps_min ?? '—'}–${set.target_reps_max ?? '—'}`
-    );
+    targetBits.push(`Reps ${set.target_reps_min ?? '—'}–${set.target_reps_max ?? '—'}`);
   }
   if (set.target_rir_min != null || set.target_rir_max != null) {
     targetBits.push(`RIR ${set.target_rir_min ?? '—'}–${set.target_rir_max ?? '—'}`);
@@ -85,6 +101,7 @@ export default function WorkoutSetRow({
 
   const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<Partial<import('../../types/api').PatchWorkoutSetRequest>>({});
+  const repsInputRef = useRef<HTMLInputElement | null>(null);
 
   const [weightDraft, setWeightDraft] = useState(() => displayWeight(set.weight_kg));
   const [repsDraft, setRepsDraft] = useState(() => (set.reps != null ? String(set.reps) : ''));
@@ -109,6 +126,12 @@ export default function WorkoutSetRow({
   useEffect(() => {
     setDurationDraft(set.duration_sec != null ? String(set.duration_sec) : '');
   }, [set.id, set.duration_sec]);
+
+  useEffect(() => {
+    if (!focusReps || completed) return;
+    const id = window.requestAnimationFrame(() => repsInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(id);
+  }, [focusReps, completed, set.id]);
 
   useEffect(
     () => () => {
@@ -213,8 +236,27 @@ export default function WorkoutSetRow({
     [onRest]
   );
 
+  const markDone = useCallback(() => {
+    if (completed) return;
+    queuePatch({ completed_at: new Date().toISOString() }, { flush: true });
+    onDoneCommitted?.(set.id);
+    if (readAutoRestOnDone()) {
+      onRestAfterSetDone?.(defaultRestSec);
+    }
+  }, [completed, queuePatch, onDoneCommitted, set.id, onRestAfterSetDone, defaultRestSec]);
+
+  const clearDone = useCallback(() => {
+    if (completed) return;
+    queuePatch({ completed_at: null }, { flush: true });
+  }, [completed, queuePatch]);
+
+  const kind = set.set_kind ?? '';
+  const isDone = set.completed_at != null;
+
+  const gridKind = line.exercise.kind;
+
   return (
-    <div className="workout-set-row workout-set-row--stack-sm" aria-busy={isPatching || undefined}>
+    <div className="workout-set-row workout-set-row--table" aria-busy={isPatching || undefined}>
       {(isPatching || patchError) && (
         <div className="workout-set-row__status">
           {isPatching && <span className="workout-set-row__saving">Saving…</span>}
@@ -233,14 +275,44 @@ export default function WorkoutSetRow({
       {targetBits.length > 0 && (
         <p className="workout-set-row__targets">{targetBits.join(' · ')}</p>
       )}
-      <div className="workout-set-row__grid">
-        {line.exercise.kind !== 'time' && (
-          <div className="workout-set-field">
-            <label className="form-label workout-set-field__label">
-              {line.exercise.kind === 'bodyweight_reps' ? '—' : units === 'imperial' ? 'lb' : 'kg'}
-            </label>
-            {line.exercise.kind !== 'bodyweight_reps' && (
-              <div className="workout-stepper">
+
+      <div
+        className={
+          gridKind === 'time'
+            ? 'workout-set-row__table-grid workout-set-row__table-grid--time'
+            : gridKind === 'bodyweight_reps'
+              ? 'workout-set-row__table-grid workout-set-row__table-grid--bw'
+              : 'workout-set-row__table-grid workout-set-row__table-grid--weight'
+        }
+      >
+        <span className="workout-set-row__set-num" aria-hidden>
+          {set.set_index + 1}
+        </span>
+
+        {line.exercise.kind === 'time' ? (
+          <div className="workout-set-field workout-set-field--table">
+            <label className="form-label workout-set-field__label">Sec</label>
+            <input
+              className="form-input workout-set-input"
+              type="number"
+              min={0}
+              disabled={completed}
+              value={durationDraft}
+              onChange={(e) => {
+                setDurationDraft(e.target.value);
+                queueIntFromDraft('duration', e.target.value, 'duration_sec');
+              }}
+              onBlur={() => queueIntFromDraft('duration', durationDraft, 'duration_sec', { flush: true })}
+            />
+            {fieldErrors.duration && <p className="progress-text workout-set-row__field-error">{fieldErrors.duration}</p>}
+          </div>
+        ) : (
+          <div className="workout-set-field workout-set-field--table">
+            <label className="form-label workout-set-field__label">{units === 'imperial' ? 'lb' : 'kg'}</label>
+            {line.exercise.kind === 'bodyweight_reps' ? (
+              <span className="workout-set-row__dash">—</span>
+            ) : (
+              <div className="workout-stepper workout-stepper--compact">
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm btn--touch"
@@ -290,10 +362,11 @@ export default function WorkoutSetRow({
             {fieldErrors.weight && <p className="progress-text workout-set-row__field-error">{fieldErrors.weight}</p>}
           </div>
         )}
+
         {line.exercise.kind !== 'time' && (
-          <div className="workout-set-field">
+          <div className="workout-set-field workout-set-field--table">
             <label className="form-label workout-set-field__label">Reps</label>
-            <div className="workout-stepper">
+            <div className="workout-stepper workout-stepper--compact">
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
@@ -309,6 +382,7 @@ export default function WorkoutSetRow({
                 −
               </button>
               <input
+                ref={repsInputRef}
                 className="form-input workout-set-input"
                 type="number"
                 min={0}
@@ -338,10 +412,11 @@ export default function WorkoutSetRow({
             {fieldErrors.reps && <p className="progress-text workout-set-row__field-error">{fieldErrors.reps}</p>}
           </div>
         )}
+
         {line.exercise.kind === 'weight_reps' && (
-          <div className="workout-set-field">
+          <div className="workout-set-field workout-set-field--table">
             <label className="form-label workout-set-field__label">RIR</label>
-            <div className="workout-stepper">
+            <div className="workout-stepper workout-stepper--compact">
               <button
                 type="button"
                 className="btn btn--secondary btn--sm btn--touch"
@@ -386,59 +461,75 @@ export default function WorkoutSetRow({
             {fieldErrors.rir && <p className="progress-text workout-set-row__field-error">{fieldErrors.rir}</p>}
           </div>
         )}
-        {line.exercise.kind === 'time' && (
-          <div className="workout-set-field">
-            <label className="form-label workout-set-field__label">Sec</label>
-            <input
-              className="form-input workout-set-input"
-              type="number"
-              min={0}
+
+        {line.exercise.kind !== 'time' && (
+          <div className="workout-set-field workout-set-field--table workout-set-field--kind">
+            <label className="form-label workout-set-field__label">Kind</label>
+            <select
+              className="form-input workout-set-input workout-set-row__kind-select"
               disabled={completed}
-              value={durationDraft}
+              value={kind}
+              aria-label="Set kind"
               onChange={(e) => {
-                setDurationDraft(e.target.value);
-                queueIntFromDraft('duration', e.target.value, 'duration_sec');
+                const v = e.target.value;
+                onPatch({ set_kind: v === '' ? null : (v as UserSetKind) });
               }}
-              onBlur={() => queueIntFromDraft('duration', durationDraft, 'duration_sec', { flush: true })}
-            />
-            {fieldErrors.duration && <p className="progress-text workout-set-row__field-error">{fieldErrors.duration}</p>}
+            >
+              {USER_SET_KINDS.map((k) => (
+                <option key={k || 'default'} value={k}>
+                  {k === '' ? '—' : k.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
           </div>
         )}
-        {!hideSetNote && (
-          <div className="workout-set-field workout-set-field--grow">
-            <label className="form-label workout-set-field__label">Note</label>
-            <input
-              key={`n-${set.id}-${set.notes ?? ''}`}
-              className="form-input"
-              disabled={completed}
-              defaultValue={set.notes ?? ''}
-              onBlur={(e) => onPatch({ notes: e.target.value.trim() || null })}
-            />
-          </div>
-        )}
+
+        <div className="workout-set-field workout-set-field--table workout-set-field--done">
+          <label className="form-label workout-set-field__label">Done</label>
+          {!completed && (
+            <button
+              type="button"
+              className={`btn btn--sm btn--touch ${isDone ? 'btn--secondary' : 'btn--primary'}`}
+              onClick={() => (isDone ? clearDone() : markDone())}
+            >
+              {isDone ? 'Undo' : 'Done'}
+            </button>
+          )}
+          {completed && <span className="workout-set-row__done-lock">{isDone ? '✓' : '—'}</span>}
+        </div>
+
         {!completed && (
-          <div className="workout-set-actions workout-set-actions--with-hint">
-            <span className="workout-set-actions__rest-hint">Rest ~{defaultRestSec}s</span>
+          <div className="workout-set-actions workout-set-actions--table">
+            <span className="workout-set-actions__rest-hint">~{defaultRestSec}s</span>
             <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => fireRest(defaultRestSec)}>
               Rest
             </button>
             {lastRestSec != null && lastRestSec !== defaultRestSec && (
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm btn--touch"
-                onClick={() => fireRest(lastRestSec)}
-              >
+              <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => fireRest(lastRestSec)}>
                 Last ({lastRestSec}s)
               </button>
             )}
             {canDeleteSet && onDelete && (
-              <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onDelete}>
+              <button type="button" className="btn btn--secondary btn--sm btn--touch" aria-label="Remove set" onClick={onDelete}>
                 ✕
               </button>
             )}
           </div>
         )}
       </div>
+
+      {!hideSetNote && (
+        <div className="workout-set-row__note-row">
+          <label className="form-label workout-set-field__label">Note</label>
+          <input
+            key={`n-${set.id}-${set.notes ?? ''}`}
+            className="form-input"
+            disabled={completed}
+            defaultValue={set.notes ?? ''}
+            onBlur={(e) => onPatch({ notes: e.target.value.trim() || null })}
+          />
+        </div>
+      )}
     </div>
   );
 }

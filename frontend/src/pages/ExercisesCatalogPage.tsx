@@ -8,12 +8,16 @@ import {
   duplicateExercise,
   addExerciseFavorite,
   removeExerciseFavorite,
+  listExerciseSubstitutions,
+  addExerciseSubstitution,
+  deleteExerciseSubstitution,
 } from '../api/client';
 import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
 import InlineStatusCard from '../components/ui/InlineStatusCard';
 import EmptyState from '../components/ui/EmptyState';
 import SegmentedControl from '../components/ui/SegmentedControl';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Dialog from '../components/ui/Dialog';
 import Page from '../components/layout/Page';
 import PageHeader from '../components/layout/PageHeader';
 
@@ -60,6 +64,11 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   const [busyId, setBusyId] = useState<string | null>(null);
   const editNameRef = useRef<HTMLInputElement | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ex: ExerciseListItem | null }>({ open: false, ex: null });
+  const [subDialogEx, setSubDialogEx] = useState<ExerciseListItem | null>(null);
+  const [subRows, setSubRows] = useState<{ substitute_exercise_id: string; name: string }[]>([]);
+  const [subPickId, setSubPickId] = useState('');
+  const [subLoading, setSubLoading] = useState(false);
+  const [subBusy, setSubBusy] = useState(false);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 275);
@@ -91,6 +100,26 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadSubsFor = useCallback(
+    async (primary: ExerciseListItem) => {
+      setSubLoading(true);
+      try {
+        const rows = await listExerciseSubstitutions(userId, primary.id);
+        setSubRows(rows.map((r) => ({ substitute_exercise_id: r.substitute_exercise_id, name: r.name })));
+      } catch (e) {
+        onError?.(e instanceof Error ? e.message : 'Failed to load substitutes');
+        setSubRows([]);
+      } finally {
+        setSubLoading(false);
+      }
+    },
+    [userId, onError]
+  );
+
+  useEffect(() => {
+    if (subDialogEx) void loadSubsFor(subDialogEx);
+  }, [subDialogEx, loadSubsFor]);
 
   const handleCreated = (_ex: ExerciseListItem) => {
     onSuccess?.('Exercise created.');
@@ -233,6 +262,20 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
           <span className="workout-exercise-list__meta">{exerciseKindLabel(ex.kind)}</span>
         </div>
         <div className="exercise-catalog__actions">
+          <Link to={`/exercises/${ex.id}/history`} className="btn btn--secondary btn--sm">
+            History
+          </Link>
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm exercise-catalog__substitute-btn"
+            disabled={busy}
+            onClick={() => {
+              setSubPickId('');
+              setSubDialogEx(ex);
+            }}
+          >
+            Substitutes
+          </button>
           <button
             type="button"
             className="btn btn--secondary btn--sm btn--touch"
@@ -313,6 +356,85 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
             void handleDelete(ex).finally(() => setConfirmDelete({ open: false, ex: null }));
           }}
         />
+
+        <Dialog
+          open={subDialogEx != null}
+          title={subDialogEx ? `Substitutes for ${subDialogEx.name}` : 'Substitutes'}
+          description="These exercises appear when you substitute during a session."
+          onClose={() => {
+            setSubDialogEx(null);
+            setSubPickId('');
+          }}
+          size="sm"
+        >
+          {subLoading && <p className="progress-text">Loading…</p>}
+          {!subLoading && subDialogEx && (
+            <>
+              <ul className="workout-substitute-list">
+                {subRows.map((r) => (
+                  <li key={r.substitute_exercise_id} className="exercise-catalog__sub-row">
+                    <span>{r.name}</span>
+                    <button
+                      type="button"
+                      className="btn btn--secondary btn--sm"
+                      disabled={subBusy}
+                      onClick={() => {
+                        setSubBusy(true);
+                        void deleteExerciseSubstitution(userId, subDialogEx.id, r.substitute_exercise_id)
+                          .then(() => loadSubsFor(subDialogEx))
+                          .catch((e) => onError?.(e instanceof Error ? e.message : 'Remove failed'))
+                          .finally(() => setSubBusy(false));
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {subRows.length === 0 && <p className="progress-text">No substitutes yet.</p>}
+              <div className="exercise-catalog__sub-add">
+                <label className="form-label" htmlFor="sub-pick">
+                  Add substitute
+                </label>
+                <select
+                  id="sub-pick"
+                  className="form-input"
+                  value={subPickId}
+                  disabled={subBusy}
+                  onChange={(e) => setSubPickId(e.target.value)}
+                >
+                  <option value="">Choose exercise…</option>
+                  {items
+                    .filter((x) => x.id !== subDialogEx.id && !subRows.some((s) => s.substitute_exercise_id === x.id))
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={subBusy || subPickId === ''}
+                  onClick={() => {
+                    if (!subDialogEx || subPickId === '') return;
+                    setSubBusy(true);
+                    void addExerciseSubstitution(userId, subDialogEx.id, { substitute_exercise_id: subPickId })
+                      .then(() => {
+                        setSubPickId('');
+                        return loadSubsFor(subDialogEx);
+                      })
+                      .then(() => onSuccess?.('Substitute added.'))
+                      .catch((e) => onError?.(e instanceof Error ? e.message : 'Add failed'))
+                      .finally(() => setSubBusy(false));
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </>
+          )}
+        </Dialog>
 
         <ExerciseCreateInline
           userId={userId}

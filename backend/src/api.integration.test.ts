@@ -192,6 +192,21 @@ describe('API integration', () => {
     expect(patchSet.body.weight_kg).toBe(50);
     expect(patchSet.body.reps).toBe(10);
 
+    const iso = new Date().toISOString();
+    const patchMeta = await request(app)
+      .patch(`/api/users/${userId}/workouts/${workoutId}/exercises/${lineId}/sets/${setId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({
+        completed_at: iso,
+        set_kind: 'working',
+        actual_rest_seconds: 90,
+      });
+    expect(patchMeta.status).toBe(200);
+    expect(patchMeta.body.completed_at).toBeTruthy();
+    expect(patchMeta.body.set_kind).toBe('working');
+    expect(patchMeta.body.actual_rest_seconds).toBe(90);
+
     const done = await request(app)
       .patch(`/api/users/${userId}/workouts/${workoutId}`)
       .set('Authorization', `Bearer ${token}`)
@@ -206,6 +221,13 @@ describe('API integration', () => {
     expect(ins.status).toBe(200);
     expect(ins.body.last_performance).not.toBeNull();
     expect(ins.body.last_performance.sets.length).toBeGreaterThanOrEqual(1);
+
+    const histAfter = await request(app)
+      .get(`/api/users/${userId}/exercises/${exerciseId}/history?limit=5`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(histAfter.status).toBe(200);
+    expect(histAfter.body.rows.length).toBeGreaterThanOrEqual(1);
+    expect(histAfter.body.rows[0].volume_kg).toBeGreaterThan(0);
 
     const clone = await request(app)
       .post(`/api/users/${userId}/workouts`)
@@ -343,6 +365,53 @@ describe('API integration', () => {
 
     await prisma.exercise.delete({ where: { id: dup.body.id } });
     await prisma.exercise.delete({ where: { id: globalEx.id } });
+  });
+
+  it('exercise substitutions: list, add, delete', async () => {
+    if (!userId || !token) {
+      expect.fail('userId/token not set');
+      return;
+    }
+    const primary = await request(app)
+      .post(`/api/users/${userId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `SubPrimary-${Date.now()}`, kind: 'weight_reps' });
+    expect(primary.status).toBe(201);
+    const sub = await request(app)
+      .post(`/api/users/${userId}/exercises`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `SubAlt-${Date.now()}`, kind: 'weight_reps' });
+    expect(sub.status).toBe(201);
+
+    const empty = await request(app)
+      .get(`/api/users/${userId}/exercises/${primary.body.id}/substitutions`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+
+    const add = await request(app)
+      .post(`/api/users/${userId}/exercises/${primary.body.id}/substitutions`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ substitute_exercise_id: sub.body.id });
+    expect(add.status).toBe(201);
+    expect(add.body.substitute_exercise_id).toBe(sub.body.id);
+
+    const list = await request(app)
+      .get(`/api/users/${userId}/exercises/${primary.body.id}/substitutions`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(list.status).toBe(200);
+    expect(list.body.length).toBe(1);
+
+    const del = await request(app)
+      .delete(`/api/users/${userId}/exercises/${primary.body.id}/substitutions/${sub.body.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(del.status).toBe(204);
+
+    await prisma.exercise.delete({ where: { id: primary.body.id } });
+    await prisma.exercise.delete({ where: { id: sub.body.id } });
   });
 
   it('POST /api/auth/verify-email verifies with valid token', async () => {

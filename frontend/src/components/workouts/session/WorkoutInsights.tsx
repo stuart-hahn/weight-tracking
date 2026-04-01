@@ -3,14 +3,24 @@ interface WorkoutInsightsProps {
   suggestion: string;
   variant?: string;
   humanizeVariant: (v: string) => string;
+  /** When true, omit the “Last time” line (shown elsewhere, e.g. session header). */
+  hideLast?: boolean;
 }
 
-export default function WorkoutInsights({ last, suggestion, variant, humanizeVariant }: WorkoutInsightsProps) {
+export default function WorkoutInsights({
+  last,
+  suggestion,
+  variant,
+  humanizeVariant,
+  hideLast = false,
+}: WorkoutInsightsProps) {
   return (
     <div className="progress-text workout-session__insight">
-      <p className="workout-session__insight-last">
-        <strong>Last time:</strong> {last}
-      </p>
+      {!hideLast && (
+        <p className="workout-session__insight-last">
+          <strong>Last time:</strong> {last}
+        </p>
+      )}
       {(suggestion || (variant != null && variant !== '')) && (
         <details className="workout-session__insight-details">
           <summary className="workout-session__insight-more">More</summary>

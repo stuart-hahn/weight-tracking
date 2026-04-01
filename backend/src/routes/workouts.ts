@@ -63,6 +63,9 @@ function serializeSet(s: {
   targetRirMin: number | null;
   targetRirMax: number | null;
   calibrationToFailure: boolean;
+  completedAt: Date | null;
+  setKind: string | null;
+  actualRestSeconds: number | null;
 }) {
   return {
     id: s.id,
@@ -79,6 +82,9 @@ function serializeSet(s: {
     target_rir_min: s.targetRirMin,
     target_rir_max: s.targetRirMax,
     calibration_to_failure: s.calibrationToFailure,
+    completed_at: s.completedAt?.toISOString() ?? null,
+    set_kind: s.setKind,
+    actual_rest_seconds: s.actualRestSeconds,
   };
 }
 
@@ -100,6 +106,7 @@ function serializeLine(line: WorkoutWithNested['exercises'][number]) {
     order_index: line.orderIndex,
     notes: line.notes,
     default_rest_seconds: line.defaultRestSeconds,
+    substituted_from_exercise_id: line.substitutedFromExerciseId ?? null,
     exercise: serializeExerciseRef(line.exercise),
     sets: line.sets.map(serializeSet),
   };
@@ -309,6 +316,7 @@ router.post('/:workoutId/exercises', requireAuth, validateCreateWorkoutExercise,
           orderIndex: nextOrder,
           notes: body.notes ?? null,
           defaultRestSeconds: body.default_rest_seconds ?? null,
+          substitutedFromExerciseId: body.substituted_from_exercise_id ?? null,
         },
       });
       const setsInput = body.sets && body.sets.length > 0 ? body.sets : [{}];
@@ -331,6 +339,9 @@ router.post('/:workoutId/exercises', requireAuth, validateCreateWorkoutExercise,
             targetRirMin: si.target_rir_min ?? null,
             targetRirMax: si.target_rir_max ?? null,
             calibrationToFailure: si.calibration_to_failure ?? false,
+            completedAt: si.completed_at != null && si.completed_at !== undefined ? new Date(si.completed_at) : null,
+            setKind: si.set_kind ?? null,
+            actualRestSeconds: si.actual_rest_seconds ?? null,
           },
         });
         idx += 1;
@@ -363,6 +374,44 @@ router.patch('/:workoutId/exercises/:lineId', requireAuth, validateUpdateWorkout
     if (!line) {
       res.status(404).json({ error: 'Workout line not found' });
       return;
+    }
+    if (line.workout.completedAt != null && body.exercise_id !== undefined) {
+      res.status(409).json({ error: 'Cannot swap exercise on a completed workout' });
+      return;
+    }
+    if (body.exercise_id !== undefined && body.exercise_id !== line.exerciseId) {
+      const nextExerciseId = body.exercise_id;
+      const ex = await prisma.exercise.findFirst({
+        where: { id: nextExerciseId, OR: [{ userId: null }, { userId }] },
+      });
+      if (!ex) {
+        res.status(404).json({ error: 'Exercise not found' });
+        return;
+      }
+      const subId =
+        body.substituted_from_exercise_id === undefined ? null : body.substituted_from_exercise_id;
+      await prisma.$transaction(async (tx) => {
+        await tx.workoutSet.deleteMany({ where: { workoutExerciseId: lineId } });
+        await tx.workoutExercise.update({
+          where: { id: lineId },
+          data: {
+            exerciseId: nextExerciseId,
+            substitutedFromExerciseId: subId,
+          },
+        });
+        await tx.workoutSet.create({
+          data: {
+            workoutExerciseId: lineId,
+            setIndex: 0,
+            calibrationToFailure: false,
+          },
+        });
+      });
+    } else if (body.substituted_from_exercise_id !== undefined && body.exercise_id === undefined) {
+      await prisma.workoutExercise.update({
+        where: { id: lineId },
+        data: { substitutedFromExerciseId: body.substituted_from_exercise_id },
+      });
     }
     if (body.order_index !== undefined) {
       await prisma.$transaction(async (tx) => {
@@ -475,6 +524,9 @@ router.post('/:workoutId/exercises/:lineId/sets', requireAuth, validateCreateWor
         targetRirMin: body.target_rir_min ?? null,
         targetRirMax: body.target_rir_max ?? null,
         calibrationToFailure: body.calibration_to_failure ?? false,
+        completedAt: body.completed_at != null && body.completed_at !== undefined ? new Date(body.completed_at) : null,
+        setKind: body.set_kind ?? null,
+        actualRestSeconds: body.actual_rest_seconds ?? null,
       },
     });
     res.status(201).json(serializeSet(set));
@@ -513,6 +565,9 @@ router.patch('/:workoutId/exercises/:lineId/sets/:setId', requireAuth, validateU
       targetRirMin?: number | null;
       targetRirMax?: number | null;
       calibrationToFailure?: boolean;
+      completedAt?: Date | null;
+      setKind?: string | null;
+      actualRestSeconds?: number | null;
     } = {};
     if (body.weight_kg !== undefined) data.weightKg = body.weight_kg;
     if (body.reps !== undefined) data.reps = body.reps;
@@ -526,6 +581,13 @@ router.patch('/:workoutId/exercises/:lineId/sets/:setId', requireAuth, validateU
     if (body.target_rir_min !== undefined) data.targetRirMin = body.target_rir_min;
     if (body.target_rir_max !== undefined) data.targetRirMax = body.target_rir_max;
     if (body.calibration_to_failure !== undefined) data.calibrationToFailure = body.calibration_to_failure;
+    if (body.completed_at !== undefined) {
+      data.completedAt = body.completed_at === null ? null : new Date(body.completed_at);
+    }
+    if (body.set_kind !== undefined) data.setKind = body.set_kind === null ? null : body.set_kind;
+    if (body.actual_rest_seconds !== undefined) {
+      data.actualRestSeconds = body.actual_rest_seconds === null ? null : body.actual_rest_seconds;
+    }
 
     await prisma.workoutSet.update({
       where: { id: setId },

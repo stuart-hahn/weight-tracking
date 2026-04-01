@@ -12,6 +12,7 @@ import WorkoutSessionPage from './pages/WorkoutSessionPage';
 import ProgramsPage from './pages/ProgramsPage';
 import ProgramEditPage from './pages/ProgramEditPage';
 import ExercisesCatalogPage from './pages/ExercisesCatalogPage';
+import ExerciseHistoryPage from './pages/ExerciseHistoryPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -324,6 +325,7 @@ function AppContent({
               />
               <Route path="/workouts" element={<WorkoutsPage userId={userId!} onError={setError} />} />
               <Route path="/exercises" element={<ExercisesCatalogPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
+              <Route path="/exercises/:exerciseId/history" element={<ExerciseHistoryPage userId={userId!} />} />
               <Route path="/workouts/programs" element={<ProgramsPage userId={userId!} onError={setError} />} />
               <Route path="/workouts/programs/:programId/edit" element={<ProgramEditPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />
               <Route path="/workouts/:workoutId" element={<WorkoutSessionPage userId={userId!} onError={setError} onSuccess={setSuccess} />} />

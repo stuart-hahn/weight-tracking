@@ -26,6 +26,9 @@ import type {
   WorkoutSetResponse,
   BatchExerciseInsightsRequest,
   BatchExerciseInsightsResponse,
+  ExerciseHistoryResponse,
+  ExerciseSubstitutionRow,
+  CreateExerciseSubstitutionRequest,
   WorkoutProgramListItem,
   WorkoutProgramDetailResponse,
 } from '../types/api';
@@ -308,6 +311,65 @@ export async function postBatchExerciseInsights(
   const data = (await res.json()) as BatchExerciseInsightsResponse | ApiError;
   if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercise insights'));
   return data as BatchExerciseInsightsResponse;
+}
+
+export async function getExerciseHistory(
+  userId: string,
+  exerciseId: string,
+  params?: { limit?: number; exclude_substituted?: boolean }
+): Promise<ExerciseHistoryResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set('limit', String(params.limit));
+  if (params?.exclude_substituted === false) sp.set('exclude_substituted', 'false');
+  const q = sp.toString();
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/history${q ? `?${q}` : ''}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = (await res.json()) as ExerciseHistoryResponse | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to fetch exercise history'));
+  return data as ExerciseHistoryResponse;
+}
+
+export async function listExerciseSubstitutions(
+  userId: string,
+  exerciseId: string
+): Promise<ExerciseSubstitutionRow[]> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/substitutions`, {
+    headers: getAuthHeaders(),
+  });
+  const data = (await res.json()) as ExerciseSubstitutionRow[] | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to list substitutions'));
+  return data as ExerciseSubstitutionRow[];
+}
+
+export async function addExerciseSubstitution(
+  userId: string,
+  exerciseId: string,
+  body: CreateExerciseSubstitutionRequest
+): Promise<ExerciseSubstitutionRow> {
+  const res = await fetch(`${API_BASE}/users/${userId}/exercises/${exerciseId}/substitutions`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as ExerciseSubstitutionRow | ApiError;
+  if (!res.ok) throw new Error(getErrorMessage(res, data, 'Failed to add substitution'));
+  return data as ExerciseSubstitutionRow;
+}
+
+export async function deleteExerciseSubstitution(
+  userId: string,
+  exerciseId: string,
+  substituteExerciseId: string
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/users/${userId}/exercises/${exerciseId}/substitutions/${substituteExerciseId}`,
+    { method: 'DELETE', headers: getAuthHeaders() }
+  );
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to remove substitution'));
+  }
 }
 
 export async function addExerciseFavorite(userId: string, exerciseId: string): Promise<void> {
