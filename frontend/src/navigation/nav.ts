@@ -21,7 +21,12 @@ export const moreNavItems: NavItem[] = [
   { to: '/settings', label: 'Settings', title: 'Settings' },
 ];
 
+const EXERCISE_HISTORY_PATH = /^\/exercises\/[^/]+\/history\/?$/;
+
 export function getPageTitle(pathname: string): string {
+  if (EXERCISE_HISTORY_PATH.test(pathname)) {
+    return 'Exercise history';
+  }
   for (const item of [...primaryNavItems, ...moreNavItems]) {
     if (item.to === pathname) return item.title;
     if (item.to !== '/' && pathname.startsWith(`${item.to}/`)) return item.title;

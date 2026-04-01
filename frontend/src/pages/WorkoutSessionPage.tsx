@@ -46,7 +46,13 @@ interface WorkoutSessionPageProps {
 
 type InsightsState = Record<
   string,
-  { last: string; suggestion: string; variant?: string; suggested_weight_kg?: number | null } | undefined
+  {
+    last: string;
+    suggestion: string;
+    variant?: string;
+    suggested_weight_kg?: number | null;
+    suggested_reps?: number | null;
+  } | undefined
 >;
 
 const FAVORITES_ONLY_PICKER_KEY = 'workout-exercise-picker-favorites-only';
@@ -185,7 +191,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
         for (const line of exLines) {
           const ins = res.insights[line.exercise_id];
           if (!ins) {
-            next[line.id] = { last: '—', suggestion: '' };
+            next[line.id] = { last: '—', suggestion: '', suggested_reps: null };
             continue;
           }
           const lp = ins.last_performance;
@@ -215,12 +221,13 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
             suggestion: ins.suggestion.hint,
             variant: ins.progression_variant as ProgressionVariant,
             suggested_weight_kg: ins.suggestion.suggested_weight_kg,
+            suggested_reps: ins.suggestion.suggested_reps,
           };
         }
         setInsights(next);
       } catch {
         for (const line of exLines) {
-          next[line.id] = { last: '—', suggestion: '' };
+          next[line.id] = { last: '—', suggestion: '', suggested_reps: null };
         }
         setInsights(next);
       }
@@ -531,6 +538,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       {!completed && lines.length > 0 && (
         <WorkoutSessionNavCard
           lines={lines}
+          slimMode={effectiveFocus}
           focusMode={focusMode}
           focusExerciseIdx={focusExerciseIdx}
           onToggleFocusMode={setFocusMode}
@@ -644,8 +652,14 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                           if (last) {
                             if (last.weight_kg != null && last.weight_kg > 0) body.weight_kg = last.weight_kg;
                             if (last.rir != null) body.rir = last.rir;
-                          } else if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
-                            body.weight_kg = ins.suggested_weight_kg;
+                            if (last.reps != null) body.reps = last.reps;
+                          } else {
+                            if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
+                              body.weight_kg = ins.suggested_weight_kg;
+                            }
+                            if (ins?.suggested_reps != null && ins.suggested_reps > 0) {
+                              body.reps = ins.suggested_reps;
+                            }
                           }
                           await addWorkoutSet(userId, workoutId, line.id, body);
                           prevInsightsKeyRef.current = '';
@@ -679,6 +693,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                       })
                     }
                     ProgramExerciseNotes={ProgramExerciseNotes}
+                    compactHeaderActions={effectiveFocus && !completed}
                     userId={userId}
                     focusRepsSetId={focusRepsSetId}
                     onDoneCommitted={(lineId, setId) => {
@@ -754,8 +769,14 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                     if (last) {
                       if (last.weight_kg != null && last.weight_kg > 0) body.weight_kg = last.weight_kg;
                       if (last.rir != null) body.rir = last.rir;
-                    } else if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
-                      body.weight_kg = ins.suggested_weight_kg;
+                      if (last.reps != null) body.reps = last.reps;
+                    } else {
+                      if (ins?.suggested_weight_kg != null && ins.suggested_weight_kg > 0) {
+                        body.weight_kg = ins.suggested_weight_kg;
+                      }
+                      if (ins?.suggested_reps != null && ins.suggested_reps > 0) {
+                        body.reps = ins.suggested_reps;
+                      }
                     }
                     await addWorkoutSet(userId, workoutId, line.id, body);
                     prevInsightsKeyRef.current = '';
@@ -789,6 +810,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
                 })
               }
               ProgramExerciseNotes={ProgramExerciseNotes}
+              compactHeaderActions={effectiveFocus && !completed}
               userId={userId}
               focusRepsSetId={focusRepsSetId}
               onDoneCommitted={(lineId, setId) => {

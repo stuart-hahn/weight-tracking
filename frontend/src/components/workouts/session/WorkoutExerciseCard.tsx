@@ -31,6 +31,8 @@ interface WorkoutExerciseCardProps {
   patchErrorBySetId: Record<string, string>;
   onDismissPatchError: (setId: string) => void;
   ProgramExerciseNotes: (props: { text: string; fromProgram: boolean }) => JSX.Element;
+  /** Gym mode: History / Substitute / Remove behind one "Exercise" menu. */
+  compactHeaderActions?: boolean;
   userId: string;
   focusRepsSetId: string | null;
   onDoneCommitted: (lineId: string, setId: string) => void;
@@ -61,12 +63,14 @@ export default function WorkoutExerciseCard({
   patchErrorBySetId,
   onDismissPatchError,
   ProgramExerciseNotes,
+  compactHeaderActions = false,
   userId,
   focusRepsSetId,
   onDoneCommitted,
   onRestAfterSetDone,
   onSubstituteExercise,
 }: WorkoutExerciseCardProps) {
+  const [exMenuOpen, setExMenuOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [subRows, setSubRows] = useState<{ substitute_exercise_id: string; name: string }[]>([]);
   const [subLoading, setSubLoading] = useState(false);
@@ -104,42 +108,64 @@ export default function WorkoutExerciseCard({
         <h3 className="app__card-title workout-session__ex-title">{line.exercise.name}</h3>
         <span className="workout-kind-badge">{exerciseKindLabel(line.exercise.kind)}</span>
         <div className="workout-session__ex-header-actions">
-          <Link to={`/exercises/${line.exercise_id}/history`} className="btn btn--secondary btn--sm btn--touch">
-            History
-          </Link>
-          {!completed && !fromProgram && (
+          {compactHeaderActions ? (
+            <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => setExMenuOpen(true)}>
+              Exercise
+            </button>
+          ) : (
             <>
-              <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => setSubOpen(true)}>
-                Substitute
-              </button>
-              <div className="workout-session__remove-wrap">
-                {removeConfirmActive ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
-                      onClick={onConfirmRemove}
-                    >
-                      Confirm remove
-                    </button>
-                    <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onCancelRemove}>
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
-                    onClick={onRequestRemove}
-                  >
-                    Remove
+              <Link to={`/exercises/${line.exercise_id}/history`} className="btn btn--secondary btn--sm btn--touch">
+                History
+              </Link>
+              {!completed && !fromProgram && (
+                <>
+                  <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={() => setSubOpen(true)}>
+                    Substitute
                   </button>
-                )}
-              </div>
+                  <div className="workout-session__remove-wrap">
+                    {removeConfirmActive ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
+                          onClick={onConfirmRemove}
+                        >
+                          Confirm remove
+                        </button>
+                        <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onCancelRemove}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--sm btn--touch workout-session__remove-ex"
+                        onClick={onRequestRemove}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {compactHeaderActions && removeConfirmActive && !fromProgram && (
+        <div className="workout-session__ex-remove-strip" role="status">
+          <span className="workout-session__ex-remove-strip-label">Remove this exercise?</span>
+          <div className="workout-session__ex-remove-strip-actions">
+            <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onConfirmRemove}>
+              Confirm remove
+            </button>
+            <button type="button" className="btn btn--secondary btn--sm btn--touch" onClick={onCancelRemove}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {line.notes != null && line.notes.trim() !== '' && <ProgramExerciseNotes text={line.notes} fromProgram={fromProgram} />}
 
@@ -223,6 +249,48 @@ export default function WorkoutExerciseCard({
           </button>
         )}
       </div>
+
+      <Dialog open={exMenuOpen} title="Exercise" onClose={() => setExMenuOpen(false)} size="sm">
+        <ul className="workout-session__overflow-list">
+          <li>
+            <Link
+              to={`/exercises/${line.exercise_id}/history`}
+              className="btn btn--secondary btn--sm btn--touch workout-session__overflow-list-btn"
+              onClick={() => setExMenuOpen(false)}
+            >
+              History
+            </Link>
+          </li>
+          {!completed && !fromProgram && (
+            <>
+              <li>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm btn--touch workout-session__overflow-list-btn"
+                  onClick={() => {
+                    setExMenuOpen(false);
+                    setSubOpen(true);
+                  }}
+                >
+                  Substitute
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm btn--touch workout-session__overflow-list-btn workout-session__remove-ex"
+                  onClick={() => {
+                    onRequestRemove();
+                    setExMenuOpen(false);
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            </>
+          )}
+        </ul>
+      </Dialog>
 
       <Dialog
         open={subOpen}

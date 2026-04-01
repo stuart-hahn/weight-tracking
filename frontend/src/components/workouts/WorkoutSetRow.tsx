@@ -245,6 +245,58 @@ export default function WorkoutSetRow({
     }
   }, [completed, queuePatch, onDoneCommitted, set.id, onRestAfterSetDone, defaultRestSec]);
 
+  const swipePointerIdRef = useRef<number | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onSwipePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (completed || set.completed_at != null) return;
+      const t = e.target as HTMLElement;
+      if (t.closest('button, input, select, textarea, a, label')) return;
+      swipeStartRef.current = { x: e.clientX, y: e.clientY };
+      swipePointerIdRef.current = e.pointerId;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [completed, set.completed_at]
+  );
+
+  const endSwipeTracking = useCallback((el: HTMLDivElement, pointerId: number) => {
+    swipeStartRef.current = null;
+    swipePointerIdRef.current = null;
+    try {
+      el.releasePointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const onSwipePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (swipePointerIdRef.current !== e.pointerId) return;
+      const start = swipeStartRef.current;
+      endSwipeTracking(e.currentTarget, e.pointerId);
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (dx >= 48 && Math.abs(dx) >= Math.abs(dy) * 1.1) {
+        markDone();
+      }
+    },
+    [endSwipeTracking, markDone]
+  );
+
+  const onSwipePointerCancel = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (swipePointerIdRef.current !== e.pointerId) return;
+      endSwipeTracking(e.currentTarget, e.pointerId);
+    },
+    [endSwipeTracking]
+  );
+
   const clearDone = useCallback(() => {
     if (completed) return;
     queuePatch({ completed_at: null }, { flush: true });
@@ -276,6 +328,12 @@ export default function WorkoutSetRow({
         <p className="workout-set-row__targets">{targetBits.join(' · ')}</p>
       )}
 
+      <div
+        className="workout-set-row__swipe"
+        onPointerDown={onSwipePointerDown}
+        onPointerUp={onSwipePointerUp}
+        onPointerCancel={onSwipePointerCancel}
+      >
       <div
         className={
           gridKind === 'time'
@@ -516,6 +574,7 @@ export default function WorkoutSetRow({
             )}
           </div>
         )}
+      </div>
       </div>
 
       {!hideSetNote && (
