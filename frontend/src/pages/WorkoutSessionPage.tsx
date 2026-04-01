@@ -22,6 +22,9 @@ import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import RestTimer from '../components/workouts/RestTimer';
 import WorkoutSessionChrome from '../components/workouts/WorkoutSessionChrome';
 import PageLoading from '../components/PageLoading';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
+import InlineStatusCard from '../components/ui/InlineStatusCard';
 import WorkoutSessionNavCard from '../components/workouts/session/WorkoutSessionNavCard';
 import WorkoutExercisePickerCard from '../components/workouts/session/WorkoutExercisePickerCard';
 import WorkoutSessionMetaCard from '../components/workouts/session/WorkoutSessionMetaCard';
@@ -414,10 +417,22 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
 
   if (isError || !workout) {
     return (
-      <p className="progress-text">
-        <Link to="/workouts">← Workouts</Link>
-        {' · '}Could not load this workout.
-      </p>
+      <Page>
+        <PageHeader title="Workout session" description={<>Couldn’t load this workout. Check your connection, then retry.</>} />
+        <InlineStatusCard
+          variant="error"
+          title="Workout session"
+          message="Could not load this workout."
+          actionLabel="Retry"
+          onAction={() => {
+            if (!workoutId) return;
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workout(userId, workoutId) });
+          }}
+        />
+        <p className="progress-text">
+          <Link to="/workouts">← Back to Workouts</Link>
+        </p>
+      </Page>
     );
   }
 

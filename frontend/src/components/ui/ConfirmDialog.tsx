@@ -36,11 +36,10 @@ export default function ConfirmDialog({
       size="sm"
       {...(initialFocusRef ? { initialFocusRef } : {})}
     >
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+      <div className="ui-dialog__actions">
         <button
           type="button"
-          className={variant === 'danger' ? 'btn btn--primary' : 'btn btn--primary'}
-          style={variant === 'danger' ? { background: 'var(--danger)', color: 'var(--bg)' } : undefined}
+          className={variant === 'danger' ? 'btn btn--danger' : 'btn btn--primary'}
           disabled={busy}
           onClick={onConfirm}
         >

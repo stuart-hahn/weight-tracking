@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry } from '../api/client';
+import { getEntries, getProgress, getOptionalMetrics, updateEntry, deleteEntry, upsertOptionalMetric, deleteOptionalMetric } from '../api/client';
 import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
@@ -29,6 +29,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [bodyFatByDate, setBodyFatByDate] = useState<Record<string, number>>({});
+  const [optionalMetricsLoadError, setOptionalMetricsLoadError] = useState<string | null>(null);
+  const [optionalMetricsLoading, setOptionalMetricsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<DailyEntryResponse | null>(null);
@@ -36,6 +38,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editCalories, setEditCalories] = useState('');
   const [editWaist, setEditWaist] = useState('');
   const [editHip, setEditHip] = useState('');
+  const [editBodyFat, setEditBodyFat] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -45,20 +48,40 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const chartWrapRef = useRef<HTMLElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(320);
 
+  const loadOptionalMetrics = useCallback(() => {
+    let cancelled = false;
+    setOptionalMetricsLoading(true);
+    setOptionalMetricsLoadError(null);
+    getOptionalMetrics(userId)
+      .then((om) => {
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        for (const m of om) {
+          if (m.body_fat_percent != null) map[m.date] = m.body_fat_percent;
+        }
+        setBodyFatByDate(map);
+        setOptionalMetricsLoadError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) setOptionalMetricsLoadError(e instanceof Error ? e.message : 'Failed to load optional metrics');
+      })
+      .finally(() => {
+        if (!cancelled) setOptionalMetricsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   const loadAll = useCallback(() => {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
-    Promise.all([getEntries(userId), getProgress(userId), getOptionalMetrics(userId)])
-      .then(([e, p, om]) => {
+    Promise.all([getEntries(userId), getProgress(userId)])
+      .then(([e, p]) => {
         if (!cancelled) {
           setEntries(e);
           setProgress(p);
-          const map: Record<string, number> = {};
-          for (const m of om) {
-            if (m.body_fat_percent != null) map[m.date] = m.body_fat_percent;
-          }
-          setBodyFatByDate(map);
           setLoadError(null);
         }
       })
@@ -75,6 +98,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     const cleanup = loadAll();
     return cleanup;
   }, [loadAll, refreshTrigger]);
+
+  useEffect(() => {
+    if (loadError) return;
+    const cleanup = loadOptionalMetrics();
+    return cleanup;
+  }, [loadOptionalMetrics, loadError, refreshTrigger]);
 
   useEffect(() => {
     const editDate = (location.state as { editDate?: string } | null)?.editDate;
@@ -115,8 +144,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     setEditCalories(editingEntry.calories != null ? String(editingEntry.calories) : '');
     setEditWaist(editingEntry.waist_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.waist_cm) * 10) / 10) : String(editingEntry.waist_cm)) : '');
     setEditHip(editingEntry.hip_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.hip_cm) * 10) / 10) : String(editingEntry.hip_cm)) : '');
+    setEditBodyFat(bodyFatByDate[editingEntry.date] != null ? String(bodyFatByDate[editingEntry.date]) : '');
     setEditError(null);
-  }, [editingEntry, progress]);
+  }, [editingEntry, progress, bodyFatByDate]);
 
   const closeEdit = () => {
     if (editSaving) return;
@@ -137,9 +167,19 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         setEditError('Please enter a valid weight.');
         return;
       }
+
+      const caloriesValue = (() => {
+        const s = editCalories.trim();
+        if (s === '') return null;
+        const n = Number(s);
+        if (Number.isNaN(n)) return null;
+        if (n < 0 || n > 10000) return null;
+        return n;
+      })();
+
       const body: { weight_kg: number; calories: number | null; waist_cm: number | null; hip_cm: number | null } = {
         weight_kg: weightKg,
-        calories: editCalories.trim() === '' ? null : (Number(editCalories) || null),
+        calories: caloriesValue,
         waist_cm: null,
         hip_cm: null,
       };
@@ -151,9 +191,25 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         const h = u === 'imperial' ? inToCm(Number(editHip)) : Number(editHip);
         if (!Number.isNaN(h) && h > 0 && h <= 200) body.hip_cm = h;
       }
+
+      const existingBodyFat = bodyFatByDate[editingEntry.date];
+      const nextBodyFat = (() => {
+        const s = editBodyFat.trim();
+        if (s === '') return null;
+        const n = Number(s);
+        if (Number.isNaN(n)) return null;
+        if (n < 0 || n > 100) return null;
+        return n;
+      })();
+
       setEditSaving(true);
       try {
         await updateEntry(userId, editingEntry.id, body);
+        if (nextBodyFat != null) {
+          await upsertOptionalMetric(userId, editingEntry.date, nextBodyFat);
+        } else if (existingBodyFat != null) {
+          await deleteOptionalMetric(userId, editingEntry.date);
+        }
         onEntryUpdated?.();
         closeEdit();
       } catch (err) {
@@ -162,7 +218,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
         setEditSaving(false);
       }
     },
-    [editingEntry, progress, editWeight, editCalories, editWaist, editHip, userId, onEntryUpdated]
+    [editingEntry, progress, editWeight, editCalories, editWaist, editHip, editBodyFat, userId, onEntryUpdated, bodyFatByDate]
   );
 
   const handleDeleteEntry = useCallback(async () => {
@@ -171,6 +227,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     setEditSaving(true);
     try {
       await deleteEntry(userId, editingEntry.id);
+      if (bodyFatByDate[editingEntry.date] != null) {
+        await deleteOptionalMetric(userId, editingEntry.date);
+      }
       onEntryUpdated?.();
       closeEdit();
     } catch (err) {
@@ -178,7 +237,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     } finally {
       setEditSaving(false);
     }
-  }, [editingEntry, userId, onEntryUpdated]);
+  }, [editingEntry, userId, onEntryUpdated, bodyFatByDate]);
 
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -269,6 +328,18 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
 
       {!loading && !loadError && sortedEntries.length > 0 && chartModel && (
         <>
+          {optionalMetricsLoadError && (
+            <InlineStatusCard
+              variant="error"
+              title="Body fat metrics"
+              message={optionalMetricsLoadError}
+              actionLabel={optionalMetricsLoading ? 'Loading…' : 'Retry'}
+              onAction={() => {
+                if (optionalMetricsLoading) return;
+                void loadOptionalMetrics();
+              }}
+            />
+          )}
           {progress != null && !hasEntryToday && (
             <section className="app__card retention-banner" role="status" aria-live="polite">
               <p className="retention-banner__text">
@@ -445,9 +516,29 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                         disabled={editSaving}
                       />
                     </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-entry-bodyfat">
+                        Body fat % (optional)
+                      </label>
+                      <input
+                        id="edit-entry-bodyfat"
+                        type="number"
+                        className="form-input"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={editBodyFat}
+                        onChange={(e) => setEditBodyFat(e.target.value)}
+                        disabled={editSaving}
+                        placeholder="e.g. 22"
+                      />
+                      <div className="form-hint form-hint--tight">
+                        Leave blank to clear.
+                      </div>
+                    </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                      <button type="submit" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} disabled={editSaving}>
+                    <div className="ui-dialog__actions ui-dialog__actions--spread">
+                      <button type="submit" className="btn btn--primary" disabled={editSaving}>
                         {editSaving ? 'Saving…' : 'Save'}
                       </button>
                       <button type="button" className="btn btn--secondary" onClick={closeEdit} disabled={editSaving}>
@@ -455,10 +546,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                       </button>
                       <button
                         type="button"
-                        className="btn btn--secondary"
+                        className="btn btn--danger"
                         onClick={() => setConfirmDeleteOpen(true)}
                         disabled={editSaving}
-                        style={{ color: 'var(--danger)' }}
                       >
                         Delete…
                       </button>

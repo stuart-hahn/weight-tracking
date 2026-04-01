@@ -189,6 +189,18 @@
   min-width: 0;
 }
 
+.ui-dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.ui-dialog__actions--spread > *:first-child {
+  flex: 1;
+  min-width: 6rem;
+}
+
 @media (min-width: 640px) {
   .ui-dialog {
     align-items: center;
@@ -382,6 +394,15 @@
 
 .btn--primary:hover {
   background: var(--accent-hover);
+}
+
+.btn--danger {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 86%, #fff);
 }
 
 .btn--secondary {

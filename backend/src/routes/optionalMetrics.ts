@@ -6,6 +6,12 @@ import type { OptionalMetricCreateInput } from '../types/index.js';
 
 const router = Router({ mergeParams: true });
 
+function isValidIsoDate(s: unknown): s is string {
+  if (typeof s !== 'string') return false;
+  const d = new Date(s);
+  return !Number.isNaN(d.getTime()) && s === d.toISOString().slice(0, 10);
+}
+
 /** POST /api/users/:id/optional-metrics - Upsert body fat % for a date (protected) */
 router.post('/', requireAuth, validateOptionalMetric, async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.params.id;
@@ -40,6 +46,27 @@ router.post('/', requireAuth, validateOptionalMetric, async (req: AuthRequest, r
     body_fat_percent: row.bodyFatPercent,
     created_at: row.createdAt.toISOString(),
   });
+});
+
+/** DELETE /api/users/:id/optional-metrics?date=YYYY-MM-DD - Delete optional metric for a date (protected) */
+router.delete('/', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.params.id;
+  if (req.userId !== userId) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  const dateStr = req.query.date;
+  if (!isValidIsoDate(dateStr)) {
+    res.status(400).json({ error: 'Valid date (YYYY-MM-DD) required' });
+    return;
+  }
+
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  await prisma.optionalMetric.deleteMany({
+    where: { userId, date },
+  });
+  res.status(204).send();
 });
 
 /** GET /api/users/:id/optional-metrics - List optional metrics (protected) */

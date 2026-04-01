@@ -203,6 +203,18 @@ export async function upsertOptionalMetric(
   return data as OptionalMetricResponse;
 }
 
+export async function deleteOptionalMetric(userId: string, date: string): Promise<void> {
+  const sp = new URLSearchParams({ date });
+  const res = await fetch(`${API_BASE}/users/${userId}/optional-metrics?${sp.toString()}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json()) as ApiError;
+    throw new Error(getErrorMessage(res, data, 'Failed to delete body fat'));
+  }
+}
+
 export async function listExercises(
   userId: string,
   params?: { q?: string; favorites_only?: boolean; custom_only?: boolean }

@@ -3,18 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomTabs from './BottomTabs';
 import MoreMenu from './MoreMenu';
 import ErrorBoundary from '../ui/ErrorBoundary';
-
-function titleForPath(pathname: string): string {
-  if (pathname === '/log') return 'Log';
-  if (pathname === '/progress') return 'Progress';
-  if (pathname === '/workouts') return 'Workouts';
-  if (pathname.startsWith('/workouts/programs')) return 'Programs';
-  if (pathname === '/exercises') return 'Exercises';
-  if (pathname.startsWith('/workouts/')) return 'Workout session';
-  if (pathname === '/settings') return 'Settings';
-  if (pathname === '/onboarding') return 'Onboarding';
-  return 'Body Fat Tracker';
-}
+import { getPageTitle, primaryNavItems } from '../../navigation/nav';
 
 export default function AppShell({
   email,
@@ -29,7 +18,7 @@ export default function AppShell({
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
   const bottomMoreButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
+  const pageTitle = useMemo(() => getPageTitle(location.pathname), [location.pathname]);
 
   // Close overflow menu on navigation.
   useEffect(() => {
@@ -49,15 +38,16 @@ export default function AppShell({
           </div>
 
           <nav className="shell__nav" aria-label="Primary">
-            <NavLink to="/log" className={({ isActive }) => `shell__nav-link ${isActive ? 'shell__nav-link--active' : ''}`}>
-              Log
-            </NavLink>
-            <NavLink to="/progress" className={({ isActive }) => `shell__nav-link ${isActive ? 'shell__nav-link--active' : ''}`}>
-              Progress
-            </NavLink>
-            <NavLink to="/workouts" className={({ isActive }) => `shell__nav-link ${isActive ? 'shell__nav-link--active' : ''}`}>
-              Workouts
-            </NavLink>
+            {primaryNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                {...(item.end ? { end: true } : {})}
+                className={({ isActive }) => `shell__nav-link ${isActive ? 'shell__nav-link--active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
 
           <div className="shell__actions">

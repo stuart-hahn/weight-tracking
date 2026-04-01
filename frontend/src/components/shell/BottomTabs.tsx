@@ -1,5 +1,6 @@
 import type { Ref } from 'react';
 import { NavLink } from 'react-router-dom';
+import { primaryNavItems } from '../../navigation/nav';
 
 export default function BottomTabs({
   onOpenMore,
@@ -10,25 +11,16 @@ export default function BottomTabs({
 }) {
   return (
     <nav className="bottom-tabs" aria-label="Primary">
-      <NavLink
-        to="/log"
-        end
-        className={({ isActive }) => `bottom-tabs__tab ${isActive ? 'bottom-tabs__tab--active' : ''}`}
-      >
-        Log
-      </NavLink>
-      <NavLink
-        to="/progress"
-        className={({ isActive }) => `bottom-tabs__tab ${isActive ? 'bottom-tabs__tab--active' : ''}`}
-      >
-        Progress
-      </NavLink>
-      <NavLink
-        to="/workouts"
-        className={({ isActive }) => `bottom-tabs__tab ${isActive ? 'bottom-tabs__tab--active' : ''}`}
-      >
-        Workouts
-      </NavLink>
+      {primaryNavItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          {...(item.end ? { end: true } : {})}
+          className={({ isActive }) => `bottom-tabs__tab ${isActive ? 'bottom-tabs__tab--active' : ''}`}
+        >
+          {item.label}
+        </NavLink>
+      ))}
       <button
         ref={moreButtonRef}
         type="button"

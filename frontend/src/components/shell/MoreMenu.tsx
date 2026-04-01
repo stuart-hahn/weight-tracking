@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { moreNavItems } from '../../navigation/nav';
 
 function useOnClickOutside(
   refs: Array<RefObject<HTMLElement | null>>,
@@ -136,15 +137,18 @@ export default function MoreMenu({
     >
       {displayEmail && <div className="more-menu__email" aria-label="Signed in as">{displayEmail}</div>}
 
-      <Link ref={firstItemRef} to="/exercises" role="menuitem" className="more-menu__item">
-        Exercises
-      </Link>
-      <Link to="/workouts/programs" role="menuitem" className="more-menu__item">
-        Programs
-      </Link>
-      <Link to="/settings" role="menuitem" className="more-menu__item">
-        Settings
-      </Link>
+      {moreNavItems.map((item, idx) => (
+        <Link
+          // Keep first-item focus behavior.
+          ref={idx === 0 ? firstItemRef : undefined}
+          key={item.to}
+          to={item.to}
+          role="menuitem"
+          className="more-menu__item"
+        >
+          {item.label}
+        </Link>
+      ))}
 
       <button
         type="button"
