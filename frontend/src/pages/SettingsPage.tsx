@@ -4,6 +4,8 @@ import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } f
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
 import PageLoading from '../components/PageLoading';
 import InlineFieldError from '../components/ui/InlineFieldError';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
 
 interface SettingsPageProps {
   userId: string;
@@ -163,183 +165,190 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   if (!profile) return null;
 
   return (
-    <section className="app__card" aria-label="Settings">
-      <h2 className="app__card-title">Settings</h2>
-      <p className="progress-text progress-text--mb-lg">
-        {profile.email}
-      </p>
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-units">Units</label>
-          <select
-            id="settings-units"
-            className="form-input"
-            value={units}
-            onChange={(e) => setUnits(e.target.value as UnitsPreference)}
-          >
-            <option value="metric">Metric (kg, cm)</option>
-            <option value="imperial">Imperial (lb, in)</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-age">Age</label>
-          <input
-            id="settings-age"
-            type="number"
-            className="form-input"
-            min={10}
-            max={120}
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            aria-invalid={fieldErrors.age ? true : undefined}
-            aria-describedby={fieldErrors.age ? 'settings-age-error' : undefined}
-          />
-          <InlineFieldError id="settings-age-error" message={fieldErrors.age} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-sex">Sex</label>
-          <select
-            id="settings-sex"
-            className="form-input"
-            value={sex}
-            onChange={(e) => setSex(e.target.value as 'male' | 'female')}
-          >
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-height">
-            Height ({units === 'imperial' ? 'in' : 'cm'})
-          </label>
-          <input
-            id="settings-height"
-            type="number"
-            className="form-input"
-            min={units === 'imperial' ? 20 : 1}
-            max={units === 'imperial' ? 120 : 300}
-            step={units === 'imperial' ? 1 : 0.1}
-            value={units === 'imperial'
-              ? (() => { const n = Number(heightCm); return Number.isNaN(n) ? '' : Math.round(cmToIn(n) * 10) / 10; })()
-              : heightCm}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (units === 'imperial') {
-                const n = Number(v);
-                setHeightCm(Number.isNaN(n) ? '' : String(inToCm(n)));
-              } else {
-                setHeightCm(v);
+    <Page>
+      <PageHeader
+        title="Settings"
+        description={
+          <>
+            Update your profile, units, and training block start. Your email is <strong>{profile.email}</strong>.
+          </>
+        }
+      />
+
+      <section className="app__card" aria-label="Profile">
+        <h2 className="app__card-title">Profile</h2>
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-units">Units</label>
+            <select
+              id="settings-units"
+              className="form-input"
+              value={units}
+              onChange={(e) => setUnits(e.target.value as UnitsPreference)}
+            >
+              <option value="metric">Metric (kg, cm)</option>
+              <option value="imperial">Imperial (lb, in)</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-age">Age</label>
+            <input
+              id="settings-age"
+              type="number"
+              className="form-input"
+              min={10}
+              max={120}
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              aria-invalid={fieldErrors.age ? true : undefined}
+              aria-describedby={fieldErrors.age ? 'settings-age-error' : undefined}
+            />
+            <InlineFieldError id="settings-age-error" message={fieldErrors.age} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-sex">Sex</label>
+            <select
+              id="settings-sex"
+              className="form-input"
+              value={sex}
+              onChange={(e) => setSex(e.target.value as 'male' | 'female')}
+            >
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-height">
+              Height ({units === 'imperial' ? 'in' : 'cm'})
+            </label>
+            <input
+              id="settings-height"
+              type="number"
+              className="form-input"
+              min={units === 'imperial' ? 20 : 1}
+              max={units === 'imperial' ? 120 : 300}
+              step={units === 'imperial' ? 1 : 0.1}
+              value={units === 'imperial'
+                ? (() => { const n = Number(heightCm); return Number.isNaN(n) ? '' : Math.round(cmToIn(n) * 10) / 10; })()
+                : heightCm}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (units === 'imperial') {
+                  const n = Number(v);
+                  setHeightCm(Number.isNaN(n) ? '' : String(inToCm(n)));
+                } else {
+                  setHeightCm(v);
+                }
+              }}
+              aria-invalid={fieldErrors.height ? true : undefined}
+              aria-describedby={fieldErrors.height ? 'settings-height-error' : undefined}
+            />
+            <InlineFieldError id="settings-height-error" message={fieldErrors.height} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-weight">
+              Current weight ({units === 'imperial' ? 'lb' : 'kg'})
+            </label>
+            <input
+              id="settings-weight"
+              type="number"
+              className="form-input"
+              min={units === 'imperial' ? 44 : 1}
+              max={units === 'imperial' ? 1100 : 500}
+              step={units === 'imperial' ? 1 : 0.1}
+              value={units === 'imperial'
+                ? (() => { const n = Number(currentWeightKg); return Number.isNaN(n) ? '' : Math.round(kgToLb(n)); })()
+                : currentWeightKg}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (units === 'imperial') {
+                  const n = Number(v);
+                  setCurrentWeightKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
+                } else {
+                  setCurrentWeightKg(v);
+                }
+              }}
+              aria-invalid={fieldErrors.currentWeight ? true : undefined}
+              aria-describedby={fieldErrors.currentWeight ? 'settings-weight-error' : undefined}
+            />
+            <InlineFieldError id="settings-weight-error" message={fieldErrors.currentWeight} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-target-bf">Target body fat (%)</label>
+            <input
+              id="settings-target-bf"
+              type="number"
+              className="form-input"
+              min={1}
+              max={99}
+              step={0.5}
+              value={targetBodyFatPercent}
+              onChange={(e) => setTargetBodyFatPercent(e.target.value)}
+              aria-invalid={fieldErrors.targetBodyFat ? true : undefined}
+              aria-describedby={fieldErrors.targetBodyFat ? 'settings-target-bf-error' : undefined}
+            />
+            <InlineFieldError id="settings-target-bf-error" message={fieldErrors.targetBodyFat} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-activity">Activity level</label>
+            <select
+              id="settings-activity"
+              className="form-input"
+              value={activityLevel}
+              onChange={(e) => setActivityLevel(e.target.value)}
+            >
+              <option value="">—</option>
+              <option value="sedentary">Sedentary</option>
+              <option value="light">Light</option>
+              <option value="moderate">Moderate</option>
+              <option value="very_active">Very active</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-lean">
+              Lean mass ({units === 'imperial' ? 'lb' : 'kg'}, optional)
+            </label>
+            <input
+              id="settings-lean"
+              type="number"
+              className="form-input"
+              min={1}
+              max={500}
+              step={0.1}
+              placeholder="Leave blank to estimate"
+              value={
+                units === 'imperial'
+                  ? (() => {
+                      const n = Number(leanMassKg);
+                      return Number.isNaN(n) ? '' : Math.round(kgToLb(n));
+                    })()
+                  : leanMassKg
               }
-            }}
-            aria-invalid={fieldErrors.height ? true : undefined}
-            aria-describedby={fieldErrors.height ? 'settings-height-error' : undefined}
-          />
-          <InlineFieldError id="settings-height-error" message={fieldErrors.height} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-weight">
-            Current weight ({units === 'imperial' ? 'lb' : 'kg'})
-          </label>
-          <input
-            id="settings-weight"
-            type="number"
-            className="form-input"
-            min={units === 'imperial' ? 44 : 1}
-            max={units === 'imperial' ? 1100 : 500}
-            step={units === 'imperial' ? 1 : 0.1}
-            value={units === 'imperial'
-              ? (() => { const n = Number(currentWeightKg); return Number.isNaN(n) ? '' : Math.round(kgToLb(n)); })()
-              : currentWeightKg}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (units === 'imperial') {
-                const n = Number(v);
-                setCurrentWeightKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
-              } else {
-                setCurrentWeightKg(v);
-              }
-            }}
-            aria-invalid={fieldErrors.currentWeight ? true : undefined}
-            aria-describedby={fieldErrors.currentWeight ? 'settings-weight-error' : undefined}
-          />
-          <InlineFieldError id="settings-weight-error" message={fieldErrors.currentWeight} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-target-bf">Target body fat (%)</label>
-          <input
-            id="settings-target-bf"
-            type="number"
-            className="form-input"
-            min={1}
-            max={99}
-            step={0.5}
-            value={targetBodyFatPercent}
-            onChange={(e) => setTargetBodyFatPercent(e.target.value)}
-            aria-invalid={fieldErrors.targetBodyFat ? true : undefined}
-            aria-describedby={fieldErrors.targetBodyFat ? 'settings-target-bf-error' : undefined}
-          />
-          <InlineFieldError id="settings-target-bf-error" message={fieldErrors.targetBodyFat} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-activity">Activity level</label>
-          <select
-            id="settings-activity"
-            className="form-input"
-            value={activityLevel}
-            onChange={(e) => setActivityLevel(e.target.value)}
-          >
-            <option value="">—</option>
-            <option value="sedentary">Sedentary</option>
-            <option value="light">Light</option>
-            <option value="moderate">Moderate</option>
-            <option value="very_active">Very active</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="settings-lean">
-            Lean mass ({units === 'imperial' ? 'lb' : 'kg'}, optional)
-          </label>
-          <input
-            id="settings-lean"
-            type="number"
-            className="form-input"
-            min={1}
-            max={500}
-            step={0.1}
-            placeholder="Leave blank to estimate"
-            value={
-              units === 'imperial'
-                ? (() => {
-                    const n = Number(leanMassKg);
-                    return Number.isNaN(n) ? '' : Math.round(kgToLb(n));
-                  })()
-                : leanMassKg
-            }
-            onChange={(e) => {
-              const v = e.target.value;
-              if (units === 'imperial') {
-                const n = Number(v);
-                setLeanMassKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
-              } else {
-                setLeanMassKg(v);
-              }
-            }}
-            aria-invalid={fieldErrors.leanMass ? true : undefined}
-            aria-describedby={fieldErrors.leanMass ? 'settings-lean-error' : undefined}
-          />
-          <InlineFieldError id="settings-lean-error" message={fieldErrors.leanMass} />
-        </div>
-        <button type="submit" className="btn btn--primary form-submit-mt" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </form>
-      <div className="settings-section">
-        <h3 className="app__card-title app__card-title--sub">
-          Strength training block
-        </h3>
+              onChange={(e) => {
+                const v = e.target.value;
+                if (units === 'imperial') {
+                  const n = Number(v);
+                  setLeanMassKg(Number.isNaN(n) ? '' : String(lbToKg(n)));
+                } else {
+                  setLeanMassKg(v);
+                }
+              }}
+              aria-invalid={fieldErrors.leanMass ? true : undefined}
+              aria-describedby={fieldErrors.leanMass ? 'settings-lean-error' : undefined}
+            />
+            <InlineFieldError id="settings-lean-error" message={fieldErrors.leanMass} />
+          </div>
+          <button type="submit" className="btn btn--primary btn--block form-submit-mt" disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </form>
+      </section>
+
+      <section className="app__card settings-section" aria-label="Strength training block">
+        <h2 className="app__card-title">Strength training block</h2>
         <p className="progress-text progress-text--mb-md progress-text--fine">
-          Set the start date of your current mesocycle. Week index (for deload on week 6 and calibration cues) is computed as
-          full weeks since this date. Leave empty to default to week 1 behavior.
+          Set the start date of your current mesocycle. Week index (for deload on week 6 and calibration cues) is computed as full weeks since this date.
+          Leave empty to default to week 1 behavior.
         </p>
         <div className="form-group">
           <label className="form-label" htmlFor="settings-block-start">
@@ -353,14 +362,16 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             onChange={(e) => setBlockStart(e.target.value)}
           />
         </div>
-        <button type="button" className="btn btn--secondary" disabled={savingBlock} onClick={() => void saveTrainingBlock()}>
+        <button type="button" className="btn btn--secondary btn--block" disabled={savingBlock} onClick={() => void saveTrainingBlock()}>
           {savingBlock ? 'Saving…' : 'Save block start'}
         </button>
-      </div>
-      <div className="settings-section">
+      </section>
+
+      <section className="app__card settings-section" aria-label="Export data">
+        <h2 className="app__card-title">Export</h2>
         <button
           type="button"
-          className="btn btn--secondary"
+          className="btn btn--secondary btn--block"
           onClick={handleExport}
           disabled={exporting}
         >
@@ -369,7 +380,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         <p className="form-hint form-hint--tight">
           Export your profile, entries, workouts, programs, and optional metrics as JSON.
         </p>
-      </div>
-    </section>
+      </section>
+    </Page>
   );
 }

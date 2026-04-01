@@ -2,6 +2,7 @@ import { useState, useCallback, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api/client';
 import InlineFieldError from '../components/ui/InlineFieldError';
+import CenteredCardPage from '../components/layout/CenteredCardPage';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -30,10 +31,15 @@ export default function ForgotPasswordPage() {
   );
 
   return (
-    <div className="app__card">
-      <h2 className="app__card-title" style={{ marginTop: 0 }}>
-        Forgot password
-      </h2>
+    <CenteredCardPage
+      title="Forgot password"
+      description={<>Enter your email and we&apos;ll send you a link to reset your password.</>}
+      footer={
+        <p className="progress-text" style={{ marginTop: '1rem' }}>
+          <Link to="/">Back to log in</Link>
+        </p>
+      }
+    >
       {submitted ? (
         <>
           <p className="app__success" role="status">
@@ -42,49 +48,36 @@ export default function ForgotPasswordPage() {
           <p className="progress-text" style={{ marginTop: '0.75rem' }}>
             Didn&apos;t get it? Check spam or try again with your email.
           </p>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            style={{ marginTop: '1rem' }}
-            onClick={() => setSubmitted(false)}
-          >
+          <button type="button" className="btn btn--secondary btn--block" style={{ marginTop: '1rem' }} onClick={() => setSubmitted(false)}>
             Try again
           </button>
         </>
       ) : (
-        <>
-          <p style={{ marginBottom: '1rem' }}>
-            Enter your email and we&apos;ll send you a link to reset your password.
-          </p>
-          <form onSubmit={handleSubmit} noValidate>
-            {error && <div className="app__error" role="alert">{error}</div>}
-            <div className="form-group">
-              <label className="form-label" htmlFor="forgot-email">
-                Email
-              </label>
-              <input
-                id="forgot-email"
-                type="email"
-                className="form-input"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                aria-invalid={emailRequired ? true : undefined}
-                aria-describedby={emailRequired ? 'forgot-email-error' : undefined}
-              />
-              <InlineFieldError id="forgot-email-error" message={emailRequired ? 'Email is required.' : null} />
-            </div>
-            <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={!email.trim()}>
-              Send reset link
-            </button>
-          </form>
-        </>
+        <form onSubmit={handleSubmit} noValidate>
+          {error && <div className="app__error" role="alert">{error}</div>}
+          <div className="form-group">
+            <label className="form-label" htmlFor="forgot-email">
+              Email
+            </label>
+            <input
+              id="forgot-email"
+              type="email"
+              className="form-input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              aria-invalid={emailRequired ? true : undefined}
+              aria-describedby={emailRequired ? 'forgot-email-error' : undefined}
+            />
+            <InlineFieldError id="forgot-email-error" message={emailRequired ? 'Email is required.' : null} />
+          </div>
+          <button type="submit" className="btn btn--primary btn--block form-submit-mt" disabled={!email.trim()}>
+            Send reset link
+          </button>
+        </form>
       )}
-      <p style={{ marginTop: '1.5rem' }}>
-        <Link to="/">Back to log in</Link>
-      </p>
-    </div>
+    </CenteredCardPage>
   );
 }

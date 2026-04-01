@@ -1,5 +1,4 @@
-import { Outlet } from 'react-router-dom';
-import Nav from '../components/Nav';
+import AppShell from '../components/shell/AppShell';
 
 interface AuthenticatedLayoutProps {
   onLogout: () => void;
@@ -8,10 +7,7 @@ interface AuthenticatedLayoutProps {
 
 export default function AuthenticatedLayout({ onLogout, email }: AuthenticatedLayoutProps) {
   return (
-    <>
-      <Nav onLogout={onLogout} email={email ?? null} />
-      <Outlet />
-    </>
+    <AppShell email={email ?? null} onLogout={onLogout} />
   );
 }
 

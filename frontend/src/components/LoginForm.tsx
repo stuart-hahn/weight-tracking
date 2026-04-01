@@ -70,7 +70,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
             <Link to="/forgot-password">Forgot password?</Link>
           </p>
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={!canSubmit}>
+        <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: '1rem' }} disabled={!canSubmit}>
           Log in
         </button>
       </form>

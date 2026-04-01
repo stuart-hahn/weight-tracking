@@ -205,7 +205,7 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           <InlineFieldError id="signup-target-bf-error" message={fieldErrors.targetBf} />
           <p className="form-hint">e.g. 15 for 15%</p>
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+        <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: '1rem' }}>
           Create account
         </button>
       </form>

@@ -2,6 +2,7 @@ import { useState, useCallback, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../api/client';
 import InlineFieldError from '../components/ui/InlineFieldError';
+import CenteredCardPage from '../components/layout/CenteredCardPage';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -43,41 +44,50 @@ export default function ResetPasswordPage() {
 
   if (!tokenFromUrl && !success) {
     return (
-      <div className="app__card">
-        <h2 className="app__card-title" style={{ marginTop: 0 }}>
-          Reset password
-        </h2>
+      <CenteredCardPage
+        title="Reset password"
+        description={<>Use the link from your email to set a new password.</>}
+        footer={
+          <p className="progress-text" style={{ marginTop: '1rem' }}>
+            <Link to="/">Back to log in</Link>
+          </p>
+        }
+      >
         <p className="app__error" role="alert">
           Invalid or missing reset link. Use the link from your email or <Link to="/forgot-password">request a new one</Link>.
         </p>
-        <p style={{ marginTop: '1rem' }}>
-          <Link to="/">Back to log in</Link>
-        </p>
-      </div>
+      </CenteredCardPage>
     );
   }
 
   if (success) {
     return (
-      <div className="app__card">
-        <h2 className="app__card-title" style={{ marginTop: 0 }}>
-          Password reset
-        </h2>
+      <CenteredCardPage
+        title="Password reset"
+        description={<>Your password has been reset. You can log in with your new password.</>}
+        footer={
+          <p className="progress-text" style={{ marginTop: '1rem' }}>
+            <Link to="/">Log in</Link>
+          </p>
+        }
+      >
         <p className="app__success" role="status">
-          Your password has been reset. You can log in with your new password.
+          Success.
         </p>
-        <p style={{ marginTop: '1.5rem' }}>
-          <Link to="/">Log in</Link>
-        </p>
-      </div>
+      </CenteredCardPage>
     );
   }
 
   return (
-    <div className="app__card">
-      <h2 className="app__card-title" style={{ marginTop: 0 }}>
-        Set new password
-      </h2>
+    <CenteredCardPage
+      title="Set new password"
+      description={<>Choose a password with at least 8 characters.</>}
+      footer={
+        <p className="progress-text" style={{ marginTop: '1rem' }}>
+          <Link to="/">Back to log in</Link>
+        </p>
+      }
+    >
       <form onSubmit={handleSubmit} noValidate>
         {error && <div className="app__error" role="alert">{error}</div>}
         <div className="form-group">
@@ -116,13 +126,10 @@ export default function ResetPasswordPage() {
           />
           <InlineFieldError id="reset-confirm-error" message={fieldErrors.confirm ?? null} />
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+        <button type="submit" className="btn btn--primary btn--block form-submit-mt">
           Reset password
         </button>
       </form>
-      <p style={{ marginTop: '1.5rem' }}>
-        <Link to="/">Back to log in</Link>
-      </p>
-    </div>
+    </CenteredCardPage>
   );
 }

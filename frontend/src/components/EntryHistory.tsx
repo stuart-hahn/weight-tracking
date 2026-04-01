@@ -5,6 +5,10 @@ import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
 import InlineStatusCard from './ui/InlineStatusCard';
+import Page from './layout/Page';
+import PageHeader from './layout/PageHeader';
+import Dialog from './ui/Dialog';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -18,6 +22,8 @@ interface EntryHistoryProps {
 
 const CHART_HEIGHT = 180;
 const CHART_PADDING = { top: 8, right: 8, bottom: 24, left: 36 };
+const CHART_MIN_WIDTH = 280;
+const CHART_MAX_WIDTH = 720;
 
 export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdated }: EntryHistoryProps) {
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
@@ -32,10 +38,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const [editHip, setEditHip] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const lastFocusRef = useRef<HTMLButtonElement | null>(null);
   const editWeightRef = useRef<HTMLInputElement | null>(null);
+  const chartWrapRef = useRef<HTMLElement | null>(null);
+  const [chartWidth, setChartWidth] = useState<number>(320);
 
   const loadAll = useCallback(() => {
     let cancelled = false;
@@ -78,6 +86,29 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   }, [location.state, entries, editingEntry, navigate, location.pathname]);
 
   useEffect(() => {
+    const el = chartWrapRef.current;
+    if (!el) return;
+
+    const clamp = (n: number) => Math.max(CHART_MIN_WIDTH, Math.min(CHART_MAX_WIDTH, n));
+
+    const update = () => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setChartWidth(clamp(w));
+    };
+
+    update();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [entries.length]);
+
+  useEffect(() => {
     if (!editingEntry || !progress) return;
     const u = progress.units;
     setEditWeight(u === 'imperial' ? String(Math.round(kgToLb(editingEntry.weight_kg))) : String(editingEntry.weight_kg));
@@ -86,6 +117,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     setEditHip(editingEntry.hip_cm != null ? (u === 'imperial' ? String(Math.round(cmToIn(editingEntry.hip_cm) * 10) / 10) : String(editingEntry.hip_cm)) : '');
     setEditError(null);
   }, [editingEntry, progress]);
+
+  const closeEdit = () => {
+    if (editSaving) return;
+    setEditError(null);
+    setConfirmDeleteOpen(false);
+    setEditingEntry(null);
+  };
 
   const handleEditSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
@@ -117,7 +155,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
       try {
         await updateEntry(userId, editingEntry.id, body);
         onEntryUpdated?.();
-        setEditingEntry(null);
+        closeEdit();
       } catch (err) {
         setEditError(err instanceof Error ? err.message : 'Failed to update entry');
       } finally {
@@ -129,13 +167,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
 
   const handleDeleteEntry = useCallback(async () => {
     if (!editingEntry) return;
-    if (!window.confirm(`Delete entry for ${editingEntry.date}?`)) return;
     setEditError(null);
     setEditSaving(true);
     try {
       await deleteEntry(userId, editingEntry.id);
       onEntryUpdated?.();
-      setEditingEntry(null);
+      closeEdit();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : 'Failed to delete entry');
     } finally {
@@ -147,34 +184,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  if (loading) {
-    return <PageLoading title="Progress" />;
-  }
-
-  if (loadError) {
-    return (
-      <InlineStatusCard
-        variant="error"
-        title="Progress"
-        message={loadError}
-        actionLabel="Retry"
-        onAction={() => void loadAll()}
-      />
-    );
-  }
-
-  if (sortedEntries.length === 0) {
-    return (
-      <section className="app__card" aria-label="Progress">
-        <h2 className="app__card-title">Progress</h2>
-        <p className="progress-text">
-          No entries yet. <Link to="/log">Log your first weight</Link>.
-        </p>
-      </section>
-    );
-  }
-
   const chartModel = useMemo(() => {
+    if (sortedEntries.length === 0) return null;
     const weights = sortedEntries.map((e) => e.weight_kg);
     const minW = Math.min(...weights);
     const maxW = Math.max(...weights);
@@ -189,9 +200,16 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     return { weights, minW, maxW, goalKg, minY, maxY, range, minD, maxD, dateRange };
   }, [sortedEntries, progress?.goal_weight_kg]);
 
-  const { minW, maxW, goalKg, minY, maxY, range, minD, dateRange } = chartModel;
+  const minW = chartModel?.minW ?? 0;
+  const maxW = chartModel?.maxW ?? 0;
+  const goalKg = chartModel?.goalKg ?? null;
+  const minY = chartModel?.minY ?? 0;
+  const maxY = chartModel?.maxY ?? 0;
+  const range = chartModel?.range ?? 1;
+  const minD = chartModel?.minD ?? 0;
+  const dateRange = chartModel?.dateRange ?? 1;
 
-  const width = 320;
+  const width = chartWidth;
   const innerW = width - CHART_PADDING.left - CHART_PADDING.right;
   const innerH = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
 
@@ -201,8 +219,8 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     CHART_PADDING.top + innerH - (innerH * (kg - minY)) / range;
 
   const points = useMemo(
-    () => sortedEntries.map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`).join(' '),
-    [sortedEntries, toX, toY]
+    () => (chartModel ? sortedEntries.map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`).join(' ') : ''),
+    [sortedEntries, chartModel, minD, dateRange, minY, range]
   );
   const goalY = goalKg != null ? toY(goalKg) : null;
   const hasEntryToday =
@@ -218,231 +236,262 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const svgTitleId = 'progress-chart-title';
   const svgDescId = 'progress-chart-desc';
 
-  useEffect(() => {
-    if (!editingEntry) return;
-    const id = requestAnimationFrame(() => editWeightRef.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, [editingEntry]);
-
-  useEffect(() => {
-    if (editingEntry) return;
-    lastFocusRef.current?.focus();
-  }, [editingEntry]);
-
-  useEffect(() => {
-    if (!editingEntry) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setEditingEntry(null);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [editingEntry]);
-
   return (
-    <>
-      {progress != null && !hasEntryToday && (
-        <section className="app__card retention-banner" role="status" aria-live="polite">
-          <p className="retention-banner__text">
-            Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
+    <Page>
+      <PageHeader
+        title="Progress"
+        description={<>Review your trend, then click any day to edit weight, calories, or measurements.</>}
+        actions={
+          <Link to="/log" className="btn btn--secondary btn--sm">
+            Log today
+          </Link>
+        }
+      />
+
+      {loading && <PageLoading title="Progress" />}
+      {!loading && loadError && (
+        <InlineStatusCard
+          variant="error"
+          title="Progress"
+          message={loadError}
+          actionLabel="Retry"
+          onAction={() => void loadAll()}
+        />
+      )}
+      {!loading && !loadError && sortedEntries.length === 0 && (
+        <section className="app__card" aria-label="Progress">
+          <h2 className="app__card-title">History</h2>
+          <p className="progress-text">
+            No entries yet. <Link to="/log">Log your first weight</Link>.
           </p>
         </section>
       )}
-      <section className="app__card" aria-label="Progress">
-      <h2 className="app__card-title">Progress</h2>
-      <figure className="chart-wrap" style={{ width: '100%', maxWidth: width, margin: '0 auto 1rem' }} aria-label="Weight over time">
-        <svg
-          viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="weight-chart"
-          role="img"
-          aria-labelledby={`${svgTitleId} ${svgDescId}`}
-        >
-          <title id={svgTitleId}>Weight over time</title>
-          <desc id={svgDescId}>{chartSummary}</desc>
-          {yTicks.map((kg) => (
-            <text
-              key={kg}
-              x={CHART_PADDING.left - 4}
-              y={toY(kg) + 4}
-              textAnchor="end"
-              fontSize="10"
-              fill="var(--muted)"
-            >
-              {progress ? formatWeight(kg, progress.units).replace(/\s/g, '') : `${kg}`}
-            </text>
-          ))}
-          {xTicks.map((d) => (
-            <text
-              key={d}
-              x={toX(new Date(d))}
-              y={CHART_HEIGHT - 4}
-              textAnchor="middle"
-              fontSize="10"
-              fill="var(--muted)"
-            >
-              {d}
-            </text>
-          ))}
-          {goalY != null && goalY >= CHART_PADDING.top && goalY <= CHART_HEIGHT - CHART_PADDING.bottom && (
-            <line
-              x1={CHART_PADDING.left}
-              y1={goalY}
-              x2={width - CHART_PADDING.right}
-              y2={goalY}
-              stroke="var(--warn)"
-              strokeDasharray="4 2"
-              strokeWidth="1"
-            />
+
+      {!loading && !loadError && sortedEntries.length > 0 && chartModel && (
+        <>
+          {progress != null && !hasEntryToday && (
+            <section className="app__card retention-banner" role="status" aria-live="polite">
+              <p className="retention-banner__text">
+                Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
+              </p>
+            </section>
           )}
-          <polyline
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="2"
-            points={points}
-          />
-          {sortedEntries.map((e) => (
-            <circle
-              key={e.id}
-              cx={toX(new Date(e.date))}
-              cy={toY(e.weight_kg)}
-              r="3"
-              fill="var(--accent)"
-            />
-          ))}
-        </svg>
-        <figcaption className="progress-text" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
-          {chartSummary}
-        </figcaption>
-      </figure>
-      <h3 className="app__card-title" style={{ fontSize: '0.9rem', marginTop: '1rem' }}>Weight history</h3>
-      {progress && (
-        <p className="progress-text" style={{ marginTop: '-0.5rem' }}>
-          Latest: {formatWeight(sortedEntries[sortedEntries.length - 1].weight_kg, progress.units)} · Range: {formatWeight(minW, progress.units)}–{formatWeight(maxW, progress.units)}
-          {goalKg != null ? ` · Goal: ${formatWeight(goalKg, progress.units)}` : ''}
-        </p>
-      )}
-      {editingEntry && progress && (
-        <section
-          className="app__card"
-          style={{ marginTop: '1rem' }}
-          role="dialog"
-          aria-modal="false"
-          aria-labelledby="edit-entry-title"
-        >
-          <h4 id="edit-entry-title" className="app__card-title" style={{ fontSize: '0.9rem' }}>
-            Edit entry ({editingEntry.date})
-          </h4>
-          {editError && <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>{editError}</div>}
-          <form onSubmit={handleEditSubmit} noValidate>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-entry-weight">
-                Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})
-              </label>
-              <input
-                ref={editWeightRef}
-                id="edit-entry-weight"
-                type="number"
-                className="form-input"
-                min={progress.units === 'imperial' ? 20 : 1}
-                max={progress.units === 'imperial' ? 1100 : 500}
-                step={progress.units === 'imperial' ? 1 : 0.1}
-                value={editWeight}
-                onChange={(e) => setEditWeight(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-entry-calories">Calories (optional)</label>
-              <input
-                id="edit-entry-calories"
-                type="number"
-                className="form-input"
-                min={0}
-                max={10000}
-                value={editCalories}
-                onChange={(e) => setEditCalories(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-entry-waist">
-                Waist ({progress.units === 'imperial' ? 'in' : 'cm'})
-              </label>
-              <input
-                id="edit-entry-waist"
-                type="number"
-                className="form-input"
-                min={1}
-                max={200}
-                step={0.1}
-                value={editWaist}
-                onChange={(e) => setEditWaist(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-entry-hip">
-                Hip ({progress.units === 'imperial' ? 'in' : 'cm'})
-              </label>
-              <input
-                id="edit-entry-hip"
-                type="number"
-                className="form-input"
-                min={1}
-                max={200}
-                step={0.1}
-                value={editHip}
-                onChange={(e) => setEditHip(e.target.value)}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-              <button type="submit" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} disabled={editSaving}>
-                {editSaving ? 'Saving…' : 'Save'}
-              </button>
-              <button type="button" className="btn btn--secondary" onClick={() => setEditingEntry(null)} disabled={editSaving}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--secondary" onClick={handleDeleteEntry} disabled={editSaving} style={{ color: 'var(--danger)' }}>
-                Delete
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
-      <ul className="entry-list" style={{ listStyle: 'none', margin: 0, padding: 0, marginTop: '0.5rem' }}>
-        {[...sortedEntries].reverse().map((e) => (
-          <li key={e.id}>
-            <button
-              type="button"
-              className="entry-row"
-              onClick={(ev) => {
-                lastFocusRef.current = ev.currentTarget;
-                setEditingEntry(e);
+
+          <section className="app__card" aria-label="Progress">
+            <h2 className="app__card-title">Trend</h2>
+            <figure
+              ref={(el) => {
+                chartWrapRef.current = el;
               }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid var(--border)',
-                gap: '1rem',
-                background: 'transparent',
-                borderLeft: 'none',
-                borderRight: 'none',
-                borderTop: 'none',
-                color: 'inherit',
-                font: 'inherit',
-                textAlign: 'left',
-                cursor: 'pointer',
-              }}
+              className="progress-chart"
+              aria-label="Weight over time"
             >
-              <span>{e.date}</span>
-              <span><strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong></span>
-              {e.calories != null && <span>{e.calories} kcal</span>}
-              {bodyFatByDate[e.date] != null && <span>{bodyFatByDate[e.date]}% BF</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-    </>
+              <svg
+                viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
+                preserveAspectRatio="xMidYMid meet"
+                className="weight-chart"
+                role="img"
+                aria-labelledby={`${svgTitleId} ${svgDescId}`}
+              >
+                <title id={svgTitleId}>Weight over time</title>
+                <desc id={svgDescId}>{chartSummary}</desc>
+                {yTicks.map((kg) => (
+                  <text
+                    key={kg}
+                    x={CHART_PADDING.left - 4}
+                    y={toY(kg) + 4}
+                    textAnchor="end"
+                    fontSize="10"
+                    fill="var(--muted)"
+                  >
+                    {progress ? formatWeight(kg, progress.units).replace(/\s/g, '') : `${kg}`}
+                  </text>
+                ))}
+                {xTicks.map((d) => (
+                  <text key={d} x={toX(new Date(d))} y={CHART_HEIGHT - 4} textAnchor="middle" fontSize="10" fill="var(--muted)">
+                    {d}
+                  </text>
+                ))}
+                {goalY != null && goalY >= CHART_PADDING.top && goalY <= CHART_HEIGHT - CHART_PADDING.bottom && (
+                  <line
+                    x1={CHART_PADDING.left}
+                    y1={goalY}
+                    x2={width - CHART_PADDING.right}
+                    y2={goalY}
+                    stroke="var(--warn)"
+                    strokeDasharray="4 2"
+                    strokeWidth="1"
+                  />
+                )}
+                <polyline fill="none" stroke="var(--accent)" strokeWidth="2" points={points} />
+                {sortedEntries.map((e) => (
+                  <circle key={e.id} cx={toX(new Date(e.date))} cy={toY(e.weight_kg)} r="3" fill="var(--accent)" />
+                ))}
+              </svg>
+              <figcaption className="progress-text progress-chart__caption">
+                {chartSummary}
+              </figcaption>
+            </figure>
+
+            <h3 className="app__card-title progress-history__title">History</h3>
+            {progress && (
+              <p className="progress-text progress-history__summary">
+                Latest: {formatWeight(sortedEntries[sortedEntries.length - 1].weight_kg, progress.units)} · Range: {formatWeight(minW, progress.units)}–
+                {formatWeight(maxW, progress.units)}
+                {goalKg != null ? ` · Goal: ${formatWeight(goalKg, progress.units)}` : ''}
+              </p>
+            )}
+
+            <Dialog
+              open={editingEntry != null && progress != null}
+              title={editingEntry ? <>Edit entry — {editingEntry.date}</> : 'Edit entry'}
+              description={<>Update weight, calories, or measurements. Press Esc to close.</>}
+              onClose={closeEdit}
+              initialFocusRef={editWeightRef}
+              closeOnBackdrop={!editSaving}
+              size="md"
+            >
+              {editingEntry && progress && (
+                <>
+                  <ConfirmDialog
+                    open={confirmDeleteOpen}
+                    title="Delete entry?"
+                    message={
+                      <>
+                        This will permanently delete the entry for <strong>{editingEntry.date}</strong>. This cannot be undone.
+                      </>
+                    }
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
+                    variant="danger"
+                    busy={editSaving}
+                    onClose={() => {
+                      if (editSaving) return;
+                      setConfirmDeleteOpen(false);
+                    }}
+                    onConfirm={() => {
+                      void handleDeleteEntry().finally(() => setConfirmDeleteOpen(false));
+                    }}
+                  />
+
+                  {editError && (
+                    <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>
+                      {editError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleEditSubmit} noValidate>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-entry-weight">
+                        Weight ({progress.units === 'imperial' ? 'lb' : 'kg'})
+                      </label>
+                      <input
+                        ref={editWeightRef}
+                        id="edit-entry-weight"
+                        type="number"
+                        className="form-input"
+                        min={progress.units === 'imperial' ? 20 : 1}
+                        max={progress.units === 'imperial' ? 1100 : 500}
+                        step={progress.units === 'imperial' ? 1 : 0.1}
+                        value={editWeight}
+                        onChange={(e) => setEditWeight(e.target.value)}
+                        disabled={editSaving}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-entry-calories">
+                        Calories (optional)
+                      </label>
+                      <input
+                        id="edit-entry-calories"
+                        type="number"
+                        className="form-input"
+                        min={0}
+                        max={10000}
+                        value={editCalories}
+                        onChange={(e) => setEditCalories(e.target.value)}
+                        disabled={editSaving}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-entry-waist">
+                        Waist ({progress.units === 'imperial' ? 'in' : 'cm'})
+                      </label>
+                      <input
+                        id="edit-entry-waist"
+                        type="number"
+                        className="form-input"
+                        min={1}
+                        max={200}
+                        step={0.1}
+                        value={editWaist}
+                        onChange={(e) => setEditWaist(e.target.value)}
+                        disabled={editSaving}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="edit-entry-hip">
+                        Hip ({progress.units === 'imperial' ? 'in' : 'cm'})
+                      </label>
+                      <input
+                        id="edit-entry-hip"
+                        type="number"
+                        className="form-input"
+                        min={1}
+                        max={200}
+                        step={0.1}
+                        value={editHip}
+                        onChange={(e) => setEditHip(e.target.value)}
+                        disabled={editSaving}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                      <button type="submit" className="btn btn--primary" style={{ flex: 1, minWidth: '6rem' }} disabled={editSaving}>
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button type="button" className="btn btn--secondary" onClick={closeEdit} disabled={editSaving}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => setConfirmDeleteOpen(true)}
+                        disabled={editSaving}
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        Delete…
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </Dialog>
+
+            <ul className="entry-list">
+              {[...sortedEntries].reverse().map((e) => (
+                <li key={e.id}>
+                  <button
+                    type="button"
+                    className="entry-row"
+                    onClick={(ev) => {
+                      void ev;
+                      setEditingEntry(e);
+                    }}
+                  >
+                    <span>{e.date}</span>
+                    <span>
+                      <strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong>
+                    </span>
+                    {e.calories != null && <span>{e.calories} kcal</span>}
+                    {bodyFatByDate[e.date] != null && <span>{bodyFatByDate[e.date]}% BF</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+    </Page>
   );
 }

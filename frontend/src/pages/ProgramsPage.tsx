@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { listWorkoutPrograms, createWorkoutProgram } from '../api/client';
 import type { WorkoutProgramListItem } from '../types/api';
 import PageLoading from '../components/PageLoading';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
 
 interface ProgramsPageProps {
   userId: string;
@@ -53,17 +55,23 @@ export default function ProgramsPage({ userId, onError }: ProgramsPageProps) {
   }
 
   return (
-    <div>
-      <p className="progress-text" style={{ marginBottom: '1rem' }}>
-        <Link to="/workouts">← Workouts</Link>
-      </p>
+    <Page>
+      <PageHeader
+        title="Programs"
+        description={
+          <>
+            Build training days with exercise order, set templates, and progression variants. Start sessions from the Workouts page.
+          </>
+        }
+        actions={
+          <Link to="/workouts" className="btn btn--secondary btn--sm">
+            ← Workouts
+          </Link>
+        }
+      />
+
       <section className="app__card">
-        <h2 className="app__card-title">Programs</h2>
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
-          Build named training days with exercise order, set templates (top / backoff / working), and progression variants.
-          Start a session from a day on the Workouts page.
-        </p>
-        <form onSubmit={(e) => void onCreate(e)} className="workout-inline" style={{ marginBottom: '1rem' }}>
+        <form onSubmit={(e) => void onCreate(e)} className="workout-inline programs-page__create">
           <input
             className="form-input"
             value={name}
@@ -93,6 +101,6 @@ export default function ProgramsPage({ userId, onError }: ProgramsPageProps) {
           </ul>
         )}
       </section>
-    </div>
+    </Page>
   );
 }

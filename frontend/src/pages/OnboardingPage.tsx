@@ -5,6 +5,7 @@ import type { ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import PageLoading from '../components/PageLoading';
 import InlineFieldError from '../components/ui/InlineFieldError';
+import CenteredCardPage from '../components/layout/CenteredCardPage';
 
 interface OnboardingPageProps {
   userId: string;
@@ -79,28 +80,27 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
 
   if (step === 0) {
     return (
-      <div className="app__card">
+      <CenteredCardPage
+        title="Onboarding"
+        description={<>Quick setup so your Log and Progress are meaningful from day one.</>}
+      >
         <h2 className="app__card-title" style={{ marginTop: 0 }}>
           Set your first goal
         </h2>
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
+        <p className="progress-text progress-text--mb-md">
           Current weight: {formatWeight(progress.current_weight_kg, units)}
           <br />
           Goal weight: {formatWeight(progress.goal_weight_kg, units)} (target {progress.target_body_fat_percent}% body fat)
         </p>
-        <p style={{ marginBottom: '1.5rem' }}>
-          You can adjust these in Settings anytime. When you’re ready, log your first entry below.
+        <p className="progress-text progress-text--mb-lg">
+          You can adjust these in Settings anytime. When you’re ready, log your first entry.
         </p>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => setStep(1)}
-        >
+        <button type="button" className="btn btn--primary btn--block" onClick={() => setStep(1)}>
           Continue
         </button>
         <button
           type="button"
-          className="btn btn--secondary"
+          className="btn btn--secondary btn--block"
           style={{ marginTop: '0.75rem' }}
           onClick={async () => {
             try {
@@ -114,17 +114,17 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         >
           Skip for now
         </button>
-      </div>
+      </CenteredCardPage>
     );
   }
 
   return (
-    <div className="app__card">
+    <CenteredCardPage title="Onboarding" description={<>Log your first entry to establish your baseline.</>}>
       <h2 className="app__card-title" style={{ marginTop: 0 }}>
         Log your first entry
       </h2>
-      <p style={{ marginBottom: '1rem' }}>
-        Enter today’s weight to start tracking. You can add calories and other metrics later.
+      <p className="progress-text progress-text--mb-md">
+        Enter today’s weight to start tracking. Calories are optional.
       </p>
       <form onSubmit={handleLogFirstEntry} noValidate>
         <div className="form-group">
@@ -161,10 +161,10 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
             onChange={(e) => setCalories(e.target.value)}
           />
         </div>
-        <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }}>
+        <button type="submit" className="btn btn--primary btn--block form-submit-mt">
           Save and continue
         </button>
       </form>
-    </div>
+    </CenteredCardPage>
   );
 }

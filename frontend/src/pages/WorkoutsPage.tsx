@@ -5,7 +5,10 @@ import { listWorkouts, createWorkout, listWorkoutPrograms, getWorkoutProgram } f
 import type { WorkoutProgramDetailResponse } from '../types/api';
 import { queryKeys } from '../api/queryKeys';
 import PageLoading from '../components/PageLoading';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
 import { FIXED_PROGRAM_NAME, weekdayToFixedProgramDayOrderIndex } from '../constants/fixedProgram';
+import Dialog from '../components/ui/Dialog';
 
 interface WorkoutsPageProps {
   userId: string;
@@ -131,18 +134,21 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   }
 
   return (
-    <div>
+    <Page>
+      <PageHeader
+        title="Workouts"
+        description={
+          <>
+            Choose the session you’re doing today. Each session shows targets; log load, reps, and RIR as you go.
+          </>
+        }
+      />
+
       <section className="app__card">
-        <h2 className="app__card-title">Workouts</h2>
-        <p className="progress-text workouts-page__lead">
-          Default plan: upper / lower split. Choose the session you&apos;re doing today; each screen lists every exercise and set with targets, then you log load, reps, and RIR.
-        </p>
 
         {fixedProgramDetail && sortedFixedDays.length > 0 && (
           <div className="workouts-page__start-block">
-            <h3 className="app__card-title workouts-page__subsection-title">
-              Start session
-            </h3>
+            <h2 className="app__card-title workouts-page__subsection-title">Start session</h2>
             {todayOrderIndex === null && (
               <p className="progress-text progress-text--mb-md">
                 Sunday is off. You can still start any session below if you&apos;re training on a different schedule.
@@ -210,74 +216,83 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
             </button>
           </div>
         </details>
-        {programPickerOpen && (
-          <div className="app__card program-start-modal">
-            <h3 className="app__card-title">Choose program day</h3>
-            {programLoading && !programDetail && <p className="progress-text">Loading…</p>}
-            {!programDetail && programs.length > 0 && (
-              <ul className="workout-history-list">
-                {programs.map((p) => (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      className="workout-history-list__link"
-                      onClick={() => void selectProgramForStart(p.id)}
-                    >
-                      <span>{p.name}</span>
-                      <span className="workout-history-list__meta">{p.day_count} days</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!programLoading && programs.length === 0 && (
-              <p className="progress-text">
-                No programs yet. <Link to="/workouts/programs">Create one under Programs</Link>.
+
+        <Dialog
+          open={programPickerOpen}
+          title="Choose program day"
+          description="Pick a program and day to start a session from its template."
+          onClose={() => {
+            if (starting) return;
+            setProgramPickerOpen(false);
+            setProgramDetail(null);
+          }}
+        >
+          {programLoading && !programDetail && <p className="progress-text">Loading…</p>}
+          {!programDetail && programs.length > 0 && (
+            <ul className="workout-history-list">
+              {programs.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="workout-history-list__link"
+                    onClick={() => void selectProgramForStart(p.id)}
+                    disabled={starting}
+                  >
+                    <span>{p.name}</span>
+                    <span className="workout-history-list__meta">{p.day_count} days</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!programLoading && programs.length === 0 && (
+            <p className="progress-text">
+              No programs yet. <Link to="/workouts/programs">Create one under Programs</Link>.
+            </p>
+          )}
+          {programDetail && (
+            <>
+              <button type="button" className="btn btn--secondary btn--sm workouts-page__modal-back" onClick={() => setProgramDetail(null)} disabled={starting}>
+                ← Back to programs
+              </button>
+              <p className="progress-text workouts-page__modal-pick-hint">
+                Pick a day for <strong>{programDetail.name}</strong>:
               </p>
-            )}
-            {programDetail && (
-              <>
-                <button type="button" className="btn btn--secondary btn--sm workouts-page__modal-back" onClick={() => setProgramDetail(null)}>
-                  ← Back to programs
-                </button>
-                <p className="progress-text workouts-page__modal-pick-hint">
-                  Pick a day for <strong>{programDetail.name}</strong>:
-                </p>
-                <div className="program-day-tabs">
-                  {programDetail.days.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      className="btn btn--secondary"
-                      disabled={starting}
-                      onClick={() => void startFromProgramDay(d.id)}
-                    >
-                      {d.name} ({d.exercises.length} ex.)
-                    </button>
-                  ))}
-                </div>
-                {programDetail.days.length === 0 && (
-                  <p className="progress-text">This program has no days yet. Edit it under Programs.</p>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm workouts-page__modal-cancel"
-              onClick={() => {
-                setProgramPickerOpen(false);
-                setProgramDetail(null);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
+              <div className="program-day-tabs">
+                {programDetail.days.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className="btn btn--secondary"
+                    disabled={starting}
+                    onClick={() => void startFromProgramDay(d.id)}
+                  >
+                    {d.name} ({d.exercises.length} ex.)
+                  </button>
+                ))}
+              </div>
+              {programDetail.days.length === 0 && (
+                <p className="progress-text">This program has no days yet. Edit it under Programs.</p>
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm workouts-page__modal-cancel"
+            disabled={starting}
+            onClick={() => {
+              setProgramPickerOpen(false);
+              setProgramDetail(null);
+            }}
+          >
+            Cancel
+          </button>
+        </Dialog>
       </section>
 
       {inProgress.length > 0 && (
         <section className="app__card">
-          <h3 className="app__card-title">In progress</h3>
+          <h2 className="app__card-title">In progress</h2>
           <ul className="workout-history-list">
             {inProgress.map((w) => (
               <li key={w.id}>
@@ -292,7 +307,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
       )}
 
       <section className="app__card">
-        <h3 className="app__card-title">History</h3>
+        <h2 className="app__card-title">History</h2>
         {completed.length === 0 ? (
           <p className="progress-text">No completed workouts yet. Finish a session to build history.</p>
         ) : (
@@ -311,6 +326,6 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
           </ul>
         )}
       </section>
-    </div>
+    </Page>
   );
 }

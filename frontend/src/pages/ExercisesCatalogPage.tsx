@@ -12,6 +12,10 @@ import {
 import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
 import InlineStatusCard from '../components/ui/InlineStatusCard';
 import EmptyState from '../components/ui/EmptyState';
+import SegmentedControl from '../components/ui/SegmentedControl';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
 
 type FilterScope = 'all' | 'favorites' | 'custom';
 
@@ -55,6 +59,7 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   const [editKind, setEditKind] = useState<WorkoutExerciseKind>('weight_reps');
   const [busyId, setBusyId] = useState<string | null>(null);
   const editNameRef = useRef<HTMLInputElement | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; ex: ExerciseListItem | null }>({ open: false, ex: null });
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 275);
@@ -125,7 +130,6 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   };
 
   const handleDelete = async (ex: ExerciseListItem) => {
-    if (!window.confirm(`Delete “${ex.name}”? This cannot be undone.`)) return;
     setBusyId(ex.id);
     try {
       await deleteExercise(userId, ex.id);
@@ -252,7 +256,7 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
                 type="button"
                 className="btn btn--secondary btn--sm"
                 disabled={busy}
-                onClick={() => void handleDelete(ex)}
+                onClick={() => setConfirmDelete({ open: true, ex })}
               >
                 Delete
               </button>
@@ -273,16 +277,42 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
   };
 
   return (
-    <div className="exercise-catalog">
-      <p className="progress-text" style={{ marginBottom: '0.75rem' }}>
-        {safeReturnTo ? <Link to={safeReturnTo}>← Back</Link> : <Link to="/workouts">← Workouts</Link>}
-      </p>
+    <Page>
+      <PageHeader
+        title="Exercises"
+        description={<>Built-in exercises are read-only. Duplicate one to customize.</>}
+        actions={
+          safeReturnTo ? (
+            <Link to={safeReturnTo} className="btn btn--secondary btn--sm">← Back</Link>
+          ) : (
+            <Link to="/workouts" className="btn btn--secondary btn--sm">← Workouts</Link>
+          )
+        }
+      />
 
-      <section className="app__card">
-        <h2 className="app__card-title">Exercise catalog</h2>
-        <p className="progress-text" style={{ marginBottom: '1rem' }}>
-          Built-in exercises are read-only. Duplicate one to customize the name or use it as a starting point.
-        </p>
+      <section className="app__card exercise-catalog">
+        <ConfirmDialog
+          open={confirmDelete.open && confirmDelete.ex != null}
+          title="Delete exercise?"
+          message={
+            <>
+              This will permanently delete <strong>{confirmDelete.ex?.name}</strong>. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          busy={confirmDelete.ex ? busyId === confirmDelete.ex.id : false}
+          onClose={() => {
+            if (confirmDelete.ex && busyId === confirmDelete.ex.id) return;
+            setConfirmDelete({ open: false, ex: null });
+          }}
+          onConfirm={() => {
+            const ex = confirmDelete.ex;
+            if (!ex) return;
+            void handleDelete(ex).finally(() => setConfirmDelete({ open: false, ex: null }));
+          }}
+        />
 
         <ExerciseCreateInline
           userId={userId}
@@ -292,18 +322,17 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
           className="exercise-catalog__create"
         />
 
-        <div className="exercise-catalog__filters" role="group" aria-label="Filter catalog">
-          {(['all', 'favorites', 'custom'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={`btn btn--sm ${scope === key ? 'btn--primary' : 'btn--secondary'}`}
-              onClick={() => setScope(key)}
-            >
-              {key === 'all' ? 'All' : key === 'favorites' ? 'Favorites' : 'My exercises'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<FilterScope>
+          value={scope}
+          onChange={setScope}
+          ariaLabel="Filter catalog"
+          className="exercise-catalog__filters"
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'favorites', label: 'Favorites' },
+            { value: 'custom', label: 'My exercises' },
+          ]}
+        />
 
         <input
           type="search"
@@ -347,6 +376,6 @@ export default function ExercisesCatalogPage({ userId, onError, onSuccess }: Exe
           </>
         )}
       </section>
-    </div>
+    </Page>
   );
 }

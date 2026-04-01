@@ -18,6 +18,10 @@ import PageLoading from '../components/PageLoading';
 import ExerciseCreateInline, { exerciseKindLabel } from '../components/exercises/ExerciseCreateInline';
 import InlineStatusCard from '../components/ui/InlineStatusCard';
 import EmptyState from '../components/ui/EmptyState';
+import SegmentedControl from '../components/ui/SegmentedControl';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import Page from '../components/layout/Page';
+import PageHeader from '../components/layout/PageHeader';
 
 interface ProgramEditPageProps {
   userId: string;
@@ -50,6 +54,8 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   const [hitsLoading, setHitsLoading] = useState(false);
   const [hitsError, setHitsError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDeleteProgramOpen, setConfirmDeleteProgramOpen] = useState(false);
+  const [confirmDeleteDay, setConfirmDeleteDay] = useState<{ open: boolean; dayId: string | null }>({ open: false, dayId: null });
 
   const load = useCallback(async () => {
     if (!programId) return;
@@ -153,7 +159,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   };
 
   const removeProgram = async () => {
-    if (!programId || !window.confirm('Delete this program and all its days?')) return;
+    if (!programId) return;
     setBusy(true);
     try {
       await deleteWorkoutProgram(userId, programId);
@@ -166,7 +172,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   };
 
   const removeDay = async (dayId: string) => {
-    if (!programId || !window.confirm('Delete this day and its exercises?')) return;
+    if (!programId) return;
     setBusy(true);
     try {
       await deleteProgramDay(userId, programId, dayId);
@@ -311,48 +317,95 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
   }
 
   return (
-    <div>
-      <p className="progress-text" style={{ marginBottom: '0.75rem' }}>
-        <Link to="/workouts/programs">← Programs</Link>
-      </p>
+    <Page>
+      <PageHeader
+        title="Edit program"
+        description={
+          <>
+            Update the program name, day structure, and set templates. Start sessions from <Link to="/workouts">Workouts</Link>.
+          </>
+        }
+        actions={
+          <Link to="/workouts/programs" className="btn btn--secondary btn--sm">
+            ← Programs
+          </Link>
+        }
+      />
 
-      <section className="app__card">
-        <div className="workout-session__ex-header" style={{ marginBottom: '1rem' }}>
+      <section className="app__card" aria-label="Program">
+        <ConfirmDialog
+          open={confirmDeleteProgramOpen}
+          title="Delete program?"
+          message={
+            <>
+              This will permanently delete <strong>{program.name}</strong> and all its days.
+            </>
+          }
+          confirmLabel="Delete program"
+          cancelLabel="Cancel"
+          variant="danger"
+          busy={busy}
+          onClose={() => {
+            if (busy) return;
+            setConfirmDeleteProgramOpen(false);
+          }}
+          onConfirm={() => {
+            void removeProgram().finally(() => setConfirmDeleteProgramOpen(false));
+          }}
+        />
+        <ConfirmDialog
+          open={confirmDeleteDay.open && confirmDeleteDay.dayId != null}
+          title="Delete day?"
+          message="This will permanently delete the selected day and its exercises."
+          confirmLabel="Delete day"
+          cancelLabel="Cancel"
+          variant="danger"
+          busy={busy}
+          onClose={() => {
+            if (busy) return;
+            setConfirmDeleteDay({ open: false, dayId: null });
+          }}
+          onConfirm={() => {
+            const dayId = confirmDeleteDay.dayId;
+            if (!dayId) return;
+            void removeDay(dayId).finally(() => setConfirmDeleteDay({ open: false, dayId: null }));
+          }}
+        />
+        <div className="program-edit__header">
           <input
-            className="form-input"
-            style={{ flex: '1 1 12rem', fontSize: '1.1rem', fontWeight: 600 }}
+            className="form-input program-edit__name"
             value={programName}
             onChange={(e) => setProgramName(e.target.value)}
             onBlur={() => void saveProgramName()}
             aria-label="Program name"
+            disabled={busy}
           />
-          <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void removeProgram()}>
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm program-edit__delete"
+            disabled={busy}
+            onClick={() => setConfirmDeleteProgramOpen(true)}
+          >
             Delete program
           </button>
         </div>
 
-        <h3 className="app__card-title" style={{ fontSize: '1rem' }}>
-          Days
-        </h3>
-        <div className="program-day-tabs">
-          {program.days.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              className={`btn btn--sm ${d.id === activeDayId ? 'btn--primary' : 'btn--secondary'}`}
-              onClick={() => setActiveDayId(d.id)}
-            >
-              {d.name}
-            </button>
-          ))}
-        </div>
-        <form onSubmit={(e) => void addDay(e)} className="workout-inline" style={{ marginTop: '0.75rem' }}>
+        <h2 className="app__card-title app__card-title--sub">Days</h2>
+        <SegmentedControl<string>
+          value={activeDayId ?? ''}
+          onChange={(id) => setActiveDayId(id)}
+          ariaLabel="Program days"
+          className="program-day-tabs"
+          options={program.days.map((d) => ({ value: d.id, label: d.name }))}
+        />
+        <form onSubmit={(e) => void addDay(e)} className="workout-inline program-edit__add-day">
           <input
             className="form-input"
             placeholder="New day name"
             value={newDayName}
             onChange={(e) => setNewDayName(e.target.value)}
             maxLength={80}
+            disabled={busy}
           />
           <button type="submit" className="btn btn--secondary" disabled={busy || !newDayName.trim()}>
             Add day
@@ -361,10 +414,9 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
         {activeDayId && (
           <button
             type="button"
-            className="btn btn--secondary btn--sm"
-            style={{ marginTop: '0.5rem' }}
+            className="btn btn--secondary btn--sm program-edit__delete-day"
             disabled={busy}
-            onClick={() => void removeDay(activeDayId)}
+            onClick={() => setConfirmDeleteDay({ open: true, dayId: activeDayId })}
           >
             Delete selected day
           </button>
@@ -372,15 +424,16 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
       </section>
 
       {activeDay && (
-        <section className="app__card" style={{ marginTop: '1rem' }}>
-          <h3 className="app__card-title">{activeDay.name} — exercises</h3>
-          <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+        <section className="app__card program-edit__day" aria-label="Program day">
+          <div className="program-edit__day-head">
+            <h2 className="app__card-title">{activeDay.name}</h2>
             <Link
               to={`/exercises?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`}
+              className="btn btn--secondary btn--sm"
             >
-              Open full catalog…
+              Open catalog
             </Link>
-          </p>
+          </div>
           <ExerciseCreateInline
             userId={userId}
             onCreated={(ex) => void addExercise(ex.id)}
@@ -391,10 +444,10 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
           <input
             type="search"
             className="form-input"
-            style={{ marginBottom: '0.75rem', marginTop: '0.75rem' }}
             placeholder="Search exercise to add…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            disabled={busy}
           />
           {hitsLoading && <p className="progress-text">Loading…</p>}
           {!hitsLoading && hitsError && (
@@ -410,7 +463,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
             <EmptyState message="No exercises match your search." actionLabel="Clear search" onAction={() => setSearch('')} />
           )}
           {!hitsLoading && !hitsError && hits.length > 0 && (
-            <ul className="workout-exercise-list" style={{ listStyle: 'none', padding: 0, marginBottom: '1rem' }}>
+            <ul className="workout-exercise-list program-edit__search-list">
               {hits.map((ex) => (
                 <li key={ex.id} className="workout-exercise-list__item">
                   <button
@@ -435,8 +488,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
                 <div className="program-exercise-block__head">
                   <strong>{pde.exercise.name}</strong>
                   <select
-                    className="form-input"
-                    style={{ maxWidth: '16rem' }}
+                  className="form-input program-edit__variant"
                     value={pde.progression_variant}
                     disabled={busy}
                     onChange={(e) => void setVariant(pde, e.target.value)}
@@ -510,7 +562,7 @@ export default function ProgramEditPage({ userId, onError, onSuccess }: ProgramE
           )}
         </section>
       )}
-    </div>
+    </Page>
   );
 }
 

@@ -4,6 +4,8 @@ import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
 import InlineStatusCard from './ui/InlineStatusCard';
+import Page from './layout/Page';
+import PageHeader from './layout/PageHeader';
 
 export interface OptionalBodyFatSubmit {
   date: string;
@@ -119,7 +121,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
     progress.latest_entry_date === todayISO();
 
   return (
-    <>
+    <Page>
+      <PageHeader
+        title="Log"
+        description={<>Log today’s weight to keep your trend and weekly summary up to date.</>}
+      />
+
       {progress !== null && !hasEntryToday && (
         <section className="app__card retention-banner" role="status" aria-live="polite">
           <p className="retention-banner__text">
@@ -129,7 +136,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
       )}
       {progress !== null && (
         <section className="app__card" aria-label="Progress summary">
-          <h2 className="app__card-title">Progress</h2>
+          <h2 className="app__card-title">Summary</h2>
           <p className="progress-text">
             Current: {formatWeight(progress.current_weight_kg, progress.units)} · Goal: {formatWeight(progress.goal_weight_kg, progress.units)} ·{' '}
             {progress.entries_count} entries
@@ -144,12 +151,12 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             />
           </div>
           {(progress.recommended_calories_min != null && progress.recommended_calories_max != null) && (
-            <p className="progress-text" style={{ marginTop: '0.75rem' }}>
+            <p className="progress-text progress-text--mt-md">
               Aim for {progress.recommended_calories_min}–{progress.recommended_calories_max} kcal/day
             </p>
           )}
           {progress.weekly_summary && (
-            <p className="progress-text" style={{ marginTop: '0.5rem' }}>
+            <p className="progress-text progress-text--mt-sm">
               {progress.weekly_summary.weight_change_kg != null
                 ? `This week: ${formatWeightChange(progress.weekly_summary.weight_change_kg, progress.units)}. ${progress.weekly_summary.on_track ? 'On track.' : 'Consider adjusting.'}`
                 : progress.weekly_summary.message}
@@ -307,11 +314,11 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             </div>
           </div>
 
-          <button type="submit" className="btn btn--primary" style={{ marginTop: '1rem' }} disabled={submitting}>
+          <button type="submit" className="btn btn--primary btn--block form-submit-mt" disabled={submitting}>
             {submitting ? 'Saving…' : 'Save entry'}
           </button>
         </form>
       </section>
-    </>
+    </Page>
   );
 }

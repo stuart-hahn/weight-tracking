@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, Link, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { createUser, login, createEntry, upsertOptionalMetric, getUser, setToken, hasToken, clearToken } from './api/client';
 import type { CreateUserRequest, CreateEntryRequest, LoginRequest } from './types/api';
 import type { OptionalBodyFatSubmit } from './components/DailyLogForm';
@@ -243,16 +243,12 @@ function AppContent({
 
   return (
     <div className="app">
-      <header className="app__header">
-        <h1 className="app__title">
-          {userId ? (
-            <Link to="/log" className="app__title-link">Body Fat Tracker</Link>
-          ) : (
-            'Body Fat Tracker'
-          )}
-        </h1>
-        <p className="app__subtitle">Track weight and body fat toward your goal</p>
-      </header>
+      {!userId && (
+        <header className="app__header">
+          <h1 className="app__title">Body Fat Tracker</h1>
+          <p className="app__subtitle">Track weight and body fat toward your goal</p>
+        </header>
+      )}
 
       <main className="app__main">
         {error && <div className="app__error" role="alert">{error}</div>}
