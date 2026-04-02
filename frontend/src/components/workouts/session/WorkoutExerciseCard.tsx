@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { UnitsPreference, WorkoutExerciseNested } from '../../../types/api';
 import WorkoutSetRow from '../WorkoutSetRow';
@@ -98,6 +98,12 @@ export default function WorkoutExerciseCard({
   const kind = line.exercise.kind;
   const showKindCol = kind !== 'time';
 
+  const nextIncompleteSetId = useMemo(() => {
+    if (completed) return null;
+    const s = line.sets.find((x) => x.completed_at == null);
+    return s?.id ?? null;
+  }, [completed, line.sets]);
+
   return (
     <section
       key={line.id}
@@ -195,7 +201,7 @@ export default function WorkoutExerciseCard({
           }
           aria-hidden
         >
-          <span className="workout-set-row__set-num">#</span>
+          <span className="workout-set-row__set-num">Set</span>
           <span className="workout-set-row__th">{kind === 'time' ? 'Sec' : kind === 'bodyweight_reps' ? '—' : units === 'imperial' ? 'lb' : 'kg'}</span>
           {kind !== 'time' && <span className="workout-set-row__th">Reps</span>}
           {kind === 'weight_reps' && <span className="workout-set-row__th">RIR</span>}
@@ -238,6 +244,7 @@ export default function WorkoutExerciseCard({
               focusReps={focusRepsSetId === set.id}
               onDoneCommitted={(setId) => onDoneCommitted(line.id, setId)}
               onRestAfterSetDone={onRestAfterSetDone}
+              isNextIncomplete={nextIncompleteSetId === set.id}
               {...(deleteHandler ? { onDelete: deleteHandler } : {})}
             />
           );

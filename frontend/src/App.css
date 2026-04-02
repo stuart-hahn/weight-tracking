@@ -712,15 +712,15 @@
 }
 
 .workout-set-row__table-grid--weight {
-  grid-template-columns: 1.75rem minmax(4.5rem, 1fr) minmax(4rem, 1fr) minmax(3.5rem, 1fr) minmax(5.5rem, 1fr) auto minmax(7rem, 1.2fr);
+  grid-template-columns: minmax(2.85rem, max-content) minmax(4.5rem, 1fr) minmax(4rem, 1fr) minmax(3.5rem, 1fr) minmax(5.5rem, 1fr) auto minmax(7rem, 1.2fr);
 }
 
 .workout-set-row__table-grid--bw {
-  grid-template-columns: 1.75rem 2rem minmax(4rem, 1fr) minmax(5.5rem, 1fr) auto minmax(7rem, 1.2fr);
+  grid-template-columns: minmax(2.85rem, max-content) 2rem minmax(4rem, 1fr) minmax(5.5rem, 1fr) auto minmax(7rem, 1.2fr);
 }
 
 .workout-set-row__table-grid--time {
-  grid-template-columns: 1.75rem minmax(5rem, 1fr) auto minmax(7rem, 1.2fr);
+  grid-template-columns: minmax(2.85rem, max-content) minmax(5rem, 1fr) auto minmax(7rem, 1.2fr);
 }
 
 /* Narrow viewports: one column "set card" — full-width steppers, # + Done top bar */
@@ -766,6 +766,13 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--workout-label-muted, var(--muted));
+  }
+
+  .workout-set-row__table-grid--weight .workout-set-row__cell-load .form-label,
+  .workout-set-row__table-grid--weight .workout-set-row__cell-reps .form-label,
+  .workout-set-row__table-grid--bw .workout-set-row__cell-reps .form-label {
+    font-weight: 600;
+    color: var(--text);
   }
 
   .workout-set-actions__rest-hint {
@@ -1017,6 +1024,34 @@
   padding-bottom: 0.15rem;
 }
 
+.workout-set-row__set-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  line-height: 1.2;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.workout-set-row__set-pill-index {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.workout-session .workout-set-row--next-incomplete:not(.workout-set-row--set-done) {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.workout-session .workout-stepper .workout-set-input[type='number'],
+.workout-session .workout-set-field--table .form-input.workout-set-input[type='number'] {
+  font-variant-numeric: tabular-nums;
+}
+
 .workout-set-field--table {
   min-width: 0;
 }
@@ -1142,27 +1177,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-}
-
-@media (max-width: 639px) {
-  .workout-set-row__table-grid--weight {
-    grid-template-columns: 1.5rem 1fr 1fr;
-    grid-auto-flow: dense;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-field--table:nth-child(4) {
-    grid-column: 1 / -1;
-  }
-
-  .workout-set-row__table-grid--weight .workout-set-field--table:nth-child(5),
-  .workout-set-row__table-grid--weight .workout-set-field--done,
-  .workout-set-row__table-grid--weight .workout-set-actions--table {
-    grid-column: 1 / -1;
-  }
-
-  .workout-set-row__table-head.workout-set-row__table-grid--weight {
-    display: none;
-  }
 }
 
 .program-day-tabs {
@@ -2517,6 +2531,11 @@ button.workout-history-list__link {
 
 .workout-set-row__status {
   margin-bottom: 0.25rem;
+  min-height: 1.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .workout-set-row__saving {

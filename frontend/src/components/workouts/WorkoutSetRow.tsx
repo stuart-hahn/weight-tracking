@@ -65,6 +65,8 @@ interface WorkoutSetRowProps {
   focusReps?: boolean;
   onDoneCommitted?: (setId: string) => void;
   onRestAfterSetDone?: (seconds: number) => void;
+  /** First incomplete set in the line — subtle highlight for scan speed */
+  isNextIncomplete?: boolean;
 }
 
 export default function WorkoutSetRow({
@@ -85,6 +87,7 @@ export default function WorkoutSetRow({
   focusReps = false,
   onDoneCommitted,
   onRestAfterSetDone,
+  isNextIncomplete = false,
 }: WorkoutSetRowProps) {
   const targetBits: string[] = [];
   if (set.target_reps_min != null || set.target_reps_max != null) {
@@ -309,24 +312,22 @@ export default function WorkoutSetRow({
 
   return (
     <div
-      className={`workout-set-row workout-set-row--table${isDone ? ' workout-set-row--set-done' : ''}`}
+      className={`workout-set-row workout-set-row--table${isDone ? ' workout-set-row--set-done' : ''}${isNextIncomplete && !completed ? ' workout-set-row--next-incomplete' : ''}`}
       aria-busy={isPatching || undefined}
     >
-      {(isPatching || patchError) && (
-        <div className="workout-set-row__status">
-          {isPatching && <span className="workout-set-row__saving">Saving…</span>}
-          {patchError && (
-            <p className="workout-set-row__error" role="alert">
-              {patchError}
-              {onDismissPatchError && (
-                <button type="button" className="workout-set-row__error-dismiss" onClick={onDismissPatchError}>
-                  Dismiss
-                </button>
-              )}
-            </p>
-          )}
-        </div>
-      )}
+      <div className="workout-set-row__status" aria-live="polite">
+        {isPatching && <span className="workout-set-row__saving">Saving…</span>}
+        {patchError && (
+          <p className="workout-set-row__error" role="alert">
+            {patchError}
+            {onDismissPatchError && (
+              <button type="button" className="workout-set-row__error-dismiss" onClick={onDismissPatchError}>
+                Dismiss
+              </button>
+            )}
+          </p>
+        )}
+      </div>
       {targetBits.length > 0 && (
         <p className="workout-set-row__targets">{targetBits.join(' · ')}</p>
       )}
@@ -346,8 +347,8 @@ export default function WorkoutSetRow({
               : 'workout-set-row__table-grid workout-set-row__table-grid--weight'
         }
       >
-        <span className="workout-set-row__set-num workout-set-row__cell-num" aria-hidden>
-          {set.set_index + 1}
+        <span className="workout-set-row__set-pill workout-set-row__cell-num">
+          Set <span className="workout-set-row__set-pill-index">{set.set_index + 1}</span>
         </span>
 
         {line.exercise.kind === 'time' ? (
