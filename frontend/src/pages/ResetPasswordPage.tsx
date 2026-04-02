@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
         title="Reset password"
         description={<>Use the link from your email to set a new password.</>}
         footer={
-          <p className="progress-text" style={{ marginTop: '1rem' }}>
+          <p className="progress-text">
             <Link to="/">Back to log in</Link>
           </p>
         }
@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
         title="Password reset"
         description={<>Your password has been reset. You can log in with your new password.</>}
         footer={
-          <p className="progress-text" style={{ marginTop: '1rem' }}>
+          <p className="progress-text">
             <Link to="/">Log in</Link>
           </p>
         }
@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
       title="Set new password"
       description={<>Choose a password with at least 8 characters.</>}
       footer={
-        <p className="progress-text" style={{ marginTop: '1rem' }}>
+        <p className="progress-text">
           <Link to="/">Back to log in</Link>
         </p>
       }

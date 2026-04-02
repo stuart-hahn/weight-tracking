@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
       title="Forgot password"
       description={<>Enter your email and we&apos;ll send you a link to reset your password.</>}
       footer={
-        <p className="progress-text" style={{ marginTop: '1rem' }}>
+        <p className="progress-text">
           <Link to="/">Back to log in</Link>
         </p>
       }
@@ -45,10 +45,10 @@ export default function ForgotPasswordPage() {
           <p className="app__success" role="status">
             If an account exists with that email, you will receive a reset link. Check your inbox and spam folder.
           </p>
-          <p className="progress-text" style={{ marginTop: '0.75rem' }}>
+          <p className="progress-text progress-text--mt-md">
             Didn&apos;t get it? Check spam or try again with your email.
           </p>
-          <button type="button" className="btn btn--secondary btn--block" style={{ marginTop: '1rem' }} onClick={() => setSubmitted(false)}>
+          <button type="button" className="btn btn--secondary btn--block form-submit-mt" onClick={() => setSubmitted(false)}>
             Try again
           </button>
         </>

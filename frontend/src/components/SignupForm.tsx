@@ -57,7 +57,7 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
 
   return (
     <>
-      <h2 id="signup-heading" className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 id="signup-heading" className="app__card-title app__card-title--flush">
         Create account
       </h2>
       <form onSubmit={handleSubmit} noValidate>
@@ -205,7 +205,7 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
           <InlineFieldError id="signup-target-bf-error" message={fieldErrors.targetBf} />
           <p className="form-hint">e.g. 15 for 15%</p>
         </div>
-        <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: '1rem' }}>
+        <button type="submit" className="btn btn--primary btn--block form-submit-mt">
           Create account
         </button>
       </form>

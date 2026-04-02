@@ -2377,6 +2377,41 @@ button.workout-history-list__link {
   font-size: 1rem;
 }
 
+.app__card-title--flush {
+  margin-top: 0;
+}
+
+.fieldset--plain {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.centered-card-page__footer {
+  margin-top: 1rem;
+}
+
+.progress-text--mt-lg {
+  margin-top: 1rem;
+}
+
+.progress-text--mt-md {
+  margin-top: 0.75rem;
+}
+
+.progress-text--mt-sm {
+  margin-top: 0.5rem;
+}
+
+.progress-text--success {
+  color: var(--success);
+}
+
+.progress-text--warn {
+  color: var(--warn);
+}
+
 .progress-text--mb-lg {
   margin-bottom: 1rem;
 }

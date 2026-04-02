@@ -17,7 +17,7 @@ export default function CenteredCardPage({
     <Page>
       <PageHeader title={title} description={description} />
       <section className="app__card">{children}</section>
-      {footer != null && <div>{footer}</div>}
+      {footer != null && <div className="centered-card-page__footer">{footer}</div>}
     </Page>
   );
 }

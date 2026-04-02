@@ -28,7 +28,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
 
   return (
     <>
-      <h2 id="login-heading" className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 id="login-heading" className="app__card-title app__card-title--flush">
         Log in
       </h2>
       <form onSubmit={handleSubmit} noValidate>
@@ -66,11 +66,11 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
             aria-describedby={passwordMissing ? 'login-password-error' : undefined}
           />
           <InlineFieldError id="login-password-error" message={passwordMissing ? 'Password is required.' : null} />
-          <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+          <p className="progress-text progress-text--fine progress-text--mt-sm">
             <Link to="/forgot-password">Forgot password?</Link>
           </p>
         </div>
-        <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: '1rem' }} disabled={!canSubmit}>
+        <button type="submit" className="btn btn--primary btn--block form-submit-mt" disabled={!canSubmit}>
           Log in
         </button>
       </form>

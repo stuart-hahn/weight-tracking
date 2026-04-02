@@ -466,7 +466,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                   />
 
                   {editError && (
-                    <div className="app__error" role="alert" style={{ marginBottom: '0.75rem' }}>
+                    <div className="app__error progress-text--mb-md" role="alert">
                       {editError}
                     </div>
                   )}

@@ -82,7 +82,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         title="Onboarding"
         description={<>Quick setup so your Log and Progress are meaningful from day one.</>}
       >
-        <h2 className="app__card-title" style={{ marginTop: 0 }}>
+        <h2 className="app__card-title app__card-title--flush">
           Set your first goal
         </h2>
         <p className="progress-text progress-text--mb-md">
@@ -96,29 +96,30 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         <button type="button" className="btn btn--primary btn--block" onClick={() => setStep(1)}>
           Continue
         </button>
-        <button
-          type="button"
-          className="btn btn--secondary btn--block"
-          style={{ marginTop: '0.75rem' }}
-          onClick={async () => {
-            try {
-              await updateUser(userId, { onboarding_complete: true });
-              onComplete();
-              navigate('/log');
-            } catch (err) {
-              onError(err instanceof Error ? err.message : 'Failed to skip');
-            }
-          }}
-        >
-          Skip for now
-        </button>
+        <div className="progress-text--mt-md">
+          <button
+            type="button"
+            className="btn btn--secondary btn--block"
+            onClick={async () => {
+              try {
+                await updateUser(userId, { onboarding_complete: true });
+                onComplete();
+                navigate('/log');
+              } catch (err) {
+                onError(err instanceof Error ? err.message : 'Failed to skip');
+              }
+            }}
+          >
+            Skip for now
+          </button>
+        </div>
       </CenteredCardPage>
     );
   }
 
   return (
     <CenteredCardPage title="Onboarding" description={<>Log your first entry to establish your baseline.</>}>
-      <h2 className="app__card-title" style={{ marginTop: 0 }}>
+      <h2 className="app__card-title app__card-title--flush">
         Log your first entry
       </h2>
       <p className="progress-text progress-text--mb-md">

@@ -392,7 +392,7 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
           <strong>{effectiveTimeZone}</strong>
           {preference === 'auto' ? ' (from this device)' : ' (fixed choice)'}.
         </p>
-        <fieldset className="form-group" style={{ border: 'none', margin: 0, padding: 0 }}>
+        <fieldset className="form-group fieldset--plain">
           <legend className="form-label">Calendar day source</legend>
           <label className="settings-radio-line">
             <input

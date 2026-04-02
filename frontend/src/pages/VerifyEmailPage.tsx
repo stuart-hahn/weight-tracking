@@ -28,13 +28,13 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
 
   return (
     <section className="app__card" aria-label="Verify email">
-      <h2 className="app__card-title">Verify email</h2>
+      <h2 className="app__card-title app__card-title--flush">Verify email</h2>
       {status === 'loading' && <p className="progress-text">Verifying…</p>}
       {status === 'success' && (
         <>
-          <p className="progress-text" style={{ color: 'var(--success)' }}>{message}</p>
-          <p style={{ marginTop: '1rem' }}>
-            <Link to="/log" className="btn btn--primary" style={{ display: 'inline-block', width: 'auto', padding: '0.75rem 1.5rem' }}>
+          <p className="progress-text progress-text--success">{message}</p>
+          <p className="progress-text progress-text--mt-lg">
+            <Link to="/log" className="btn btn--primary btn--block">
               Go to Log
             </Link>
           </p>
@@ -42,8 +42,8 @@ export default function VerifyEmailPage({ onVerified }: { onVerified?: () => voi
       )}
       {status === 'error' && (
         <>
-          <p className="progress-text" style={{ color: 'var(--warn)' }}>{message}</p>
-          <p style={{ marginTop: '1rem' }}>
+          <p className="progress-text progress-text--warn">{message}</p>
+          <p className="progress-text progress-text--mt-lg">
             <Link to="/">Back to log in</Link>
           </p>
         </>
