@@ -1,4 +1,16 @@
 /* App layout – single column, mobile-first */
+:root {
+  /* Sticky offsets for signed-in shell (below `.shell__topbar`). */
+  --shell-sticky-offset: 3rem;
+  --shell-sticky-offset-lg: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  :root {
+    --shell-sticky-offset: var(--shell-sticky-offset-lg);
+  }
+}
+
 .app {
   min-height: 100vh;
   min-height: 100dvh;
@@ -330,7 +342,7 @@
 }
 
 .app__main--signed-in .app__feedback {
-  top: 3rem;
+  top: var(--shell-sticky-offset);
 }
 
 .app__feedback--dismissible {
@@ -510,7 +522,7 @@
 
 .workout-session__sticky-stack {
   position: sticky;
-  top: 0;
+  top: var(--shell-sticky-offset);
   z-index: 20;
   margin: 0 -0.5rem 1rem;
   padding: 0.45rem 0.5rem 0.55rem;
@@ -1262,7 +1274,7 @@
 
 .program-edit__days-sticky {
   position: sticky;
-  top: 3.25rem;
+  top: var(--shell-sticky-offset);
   z-index: 12;
   margin: 0 0 0.75rem;
   padding: 0.25rem 0 0.75rem;
@@ -1273,7 +1285,7 @@
 
 @media (min-width: 900px) {
   .program-edit__days-sticky {
-    top: 0.75rem;
+    top: var(--shell-sticky-offset);
   }
 }
 

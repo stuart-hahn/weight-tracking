@@ -1,5 +1,6 @@
 interface WorkoutSessionChromeProps {
   workoutName: string;
+  statusLine?: string | null;
   completed: boolean;
   saving: boolean;
   onFinish: () => void;
@@ -9,6 +10,7 @@ interface WorkoutSessionChromeProps {
 
 export default function WorkoutSessionChrome({
   workoutName,
+  statusLine,
   completed,
   saving,
   onFinish,
@@ -19,6 +21,7 @@ export default function WorkoutSessionChrome({
       <div className="workout-session-chrome__inner">
         <div className="workout-session-chrome__title-wrap">
           <h2 className="workout-session-chrome__title">{workoutName}</h2>
+          {statusLine ? <span className="workout-session-chrome__progress">{statusLine}</span> : null}
         </div>
         <div className="workout-session-chrome__actions">
           {completed ? (

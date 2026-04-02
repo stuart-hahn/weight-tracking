@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getExerciseHistory, getExercise, getUser } from '../api/client';
 import { queryKeys } from '../api/queryKeys';
@@ -10,6 +10,7 @@ import Page from '../components/layout/Page';
 import PageHeader from '../components/layout/PageHeader';
 import PageLoading from '../components/PageLoading';
 import InlineStatusCard from '../components/ui/InlineStatusCard';
+import EmptyState from '../components/ui/EmptyState';
 
 const CHART_H = 160;
 const PAD = { t: 8, r: 12, b: 28, l: 40 };
@@ -42,6 +43,7 @@ interface ExerciseHistoryPageProps {
 }
 
 export default function ExerciseHistoryPage({ userId }: ExerciseHistoryPageProps) {
+  const navigate = useNavigate();
   const { exerciseId } = useParams<{ exerciseId: string }>();
   const { data: profile } = useQuery({
     queryKey: queryKeys.user(userId),
@@ -152,13 +154,21 @@ export default function ExerciseHistoryPage({ userId }: ExerciseHistoryPageProps
   }
 
   if (isLoading) {
-    return <PageLoading />;
+    return <PageLoading title="Exercise history" />;
   }
 
   if (isError || !data) {
     return (
       <Page>
-        <PageHeader title={`${exerciseName} — history`} description={<>Could not load history.</>} />
+        <PageHeader
+          title={`${exerciseName} — history`}
+          description={<>Could not load history.</>}
+          actions={
+            <Link to="/exercises" className="btn btn--secondary btn--sm">
+              ← Exercises
+            </Link>
+          }
+        />
         <InlineStatusCard
           variant="error"
           title="History"
@@ -166,18 +176,12 @@ export default function ExerciseHistoryPage({ userId }: ExerciseHistoryPageProps
           actionLabel="Retry"
           onAction={() => void refetch()}
         />
-        <p className="progress-text">
-          <Link to="/exercises">← Exercises</Link>
-        </p>
       </Page>
     );
   }
 
   return (
     <Page>
-      <p className="progress-text">
-        <Link to="/exercises">← Exercises</Link>
-      </p>
       <PageHeader
         title={`${exerciseName} — history`}
         description={
@@ -185,6 +189,11 @@ export default function ExerciseHistoryPage({ userId }: ExerciseHistoryPageProps
             Completed sessions (newest first in the table). Charts are chronological (oldest → newest). Est. 1RM uses the Epley
             formula from the logged top set.
           </>
+        }
+        actions={
+          <Link to="/exercises" className="btn btn--secondary btn--sm">
+            ← Exercises
+          </Link>
         }
       />
 
@@ -293,7 +302,14 @@ export default function ExerciseHistoryPage({ userId }: ExerciseHistoryPageProps
             </tbody>
           </table>
         </div>
-        {data.rows.length === 0 && <p className="progress-text">No completed workouts with this exercise yet.</p>}
+        {data.rows.length === 0 && (
+          <EmptyState
+            title="No sessions yet"
+            message="Complete a workout that includes this exercise to see your history here."
+            actionLabel="Go to Workouts"
+            onAction={() => navigate('/workouts')}
+          />
+        )}
       </section>
     </Page>
   );

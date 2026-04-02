@@ -170,6 +170,15 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
   const lines = workout?.exercises ?? [];
   const completed = workout?.completed_at != null;
   const fromProgram = Boolean(workout?.program_day_id);
+
+  useEffect(() => {
+    if (!workout?.name) return;
+    const prev = document.title;
+    document.title = `${workout.name} — Workout`;
+    return () => {
+      document.title = prev;
+    };
+  }, [workout?.name]);
   const exerciseIdsFingerprint = useMemo(
     () => lines.map((e) => e.exercise_id).join('\0'),
     [lines]
@@ -464,6 +473,17 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
     return units === 'imperial' ? lbToKg(n) : n;
   };
 
+  const totalSets = useMemo(() => lines.reduce((n, line) => n + line.sets.length, 0), [lines]);
+  const incompleteSets = useMemo(() => (workout ? countIncompleteSets(workout) : 0), [workout]);
+  const chromeStatusLine =
+    completed || !workout
+      ? null
+      : totalSets === 0
+        ? 'No sets yet'
+        : incompleteSets <= 0
+          ? `${totalSets}/${totalSets} sets complete`
+          : `${totalSets - incompleteSets}/${totalSets} sets complete`;
+
   if (!workoutId) {
     return <p className="progress-text">Missing workout.</p>;
   }
@@ -505,6 +525,7 @@ export default function WorkoutSessionPage({ userId, onError, onSuccess }: Worko
       <div className="workout-session__sticky-stack">
         <WorkoutSessionChrome
           workoutName={workout.name || 'Workout'}
+          statusLine={chromeStatusLine}
           completed={completed}
           saving={saving}
           onFinish={() => void handleComplete()}
