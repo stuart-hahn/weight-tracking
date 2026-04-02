@@ -28,21 +28,10 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       return (
         <section className="app__card" role="alert" aria-label="Page error">
           <h2 className="app__card-title">{this.props.title ?? 'Something went wrong'}</h2>
-          <p className="progress-text" style={{ marginBottom: '0.5rem' }}>
+          <p className="progress-text error-boundary__lead">
             The page crashed while rendering. Try reloading. If it persists, copy the error below.
           </p>
-          <pre
-            className="progress-text"
-            style={{
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              margin: 0,
-              padding: '0.75rem',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              background: 'var(--bg)',
-            }}
-          >
+          <pre className="progress-text error-boundary__detail">
             {this.state.error.message}
           </pre>
         </section>
