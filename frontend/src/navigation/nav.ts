@@ -22,10 +22,14 @@ export const moreNavItems: NavItem[] = [
 ];
 
 const EXERCISE_HISTORY_PATH = /^\/exercises\/[^/]+\/history\/?$/;
+const PROGRAM_EDIT_PATH = /^\/workouts\/programs\/[^/]+\/edit\/?$/;
 
 export function getPageTitle(pathname: string): string {
   if (EXERCISE_HISTORY_PATH.test(pathname)) {
     return 'Exercise history';
+  }
+  if (PROGRAM_EDIT_PATH.test(pathname)) {
+    return 'Edit program';
   }
   for (const item of [...primaryNavItems, ...moreNavItems]) {
     if (item.to === pathname) return item.title;

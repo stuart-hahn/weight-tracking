@@ -370,6 +370,15 @@
   margin-top: 0.35rem;
 }
 
+.form-error--with-action {
+  margin-top: 0.5rem;
+}
+
+.form-error--with-action a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Buttons – large touch targets */
 .btn {
   display: inline-flex;
@@ -1526,6 +1535,16 @@ button.workout-history-list__link {
   color: var(--muted);
 }
 
+.workout-history-list__link--continue {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.workout-history-list__link--continue:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
 .workout-rest-timer {
   position: static;
   margin-bottom: 0;
@@ -2030,6 +2049,30 @@ button.workout-history-list__link {
   border-radius: var(--radius);
 }
 
+@media (max-width: 639px) {
+  .entry-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    min-height: var(--touch-target-min);
+    padding: 0.65rem 0;
+  }
+
+  .entry-row > span:first-child {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .entry-row > span:nth-child(2) {
+    font-size: 1.05rem;
+  }
+
+  .entry-row > span:nth-child(n + 3) {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+}
+
 .progress-chart {
   width: 100%;
   max-width: 720px;
@@ -2208,6 +2251,17 @@ button.workout-history-list__link {
 
 .form-submit-mt {
   margin-top: 1rem;
+}
+
+.daily-log-form input[type='number'] {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 639px) {
+  .log-page .daily-log-form .btn--primary.form-submit-mt {
+    min-height: var(--touch-min);
+    font-size: 1.05rem;
+  }
 }
 
 .form-hint--tight {

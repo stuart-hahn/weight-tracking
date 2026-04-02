@@ -144,6 +144,29 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
         }
       />
 
+      {inProgress.length > 0 && (
+        <section className="app__card workouts-page__continue" aria-label="Continue workout">
+          <h2 className="app__card-title">Continue workout</h2>
+          {fixedProgramDetail && sortedFixedDays.length > 0 && (
+            <p className="progress-text progress-text--mb-md">
+              You have a session in progress — open it below or start a new one when you&apos;re ready.
+            </p>
+          )}
+          <ul className="workout-history-list">
+            {inProgress.map((w) => (
+              <li key={w.id}>
+                <Link to={`/workouts/${w.id}`} className="workout-history-list__link workout-history-list__link--continue">
+                  <span>{w.name || 'Workout'}</span>
+                  <span className="workout-history-list__meta">
+                    {formatWhen(w.started_at)} · {w.exercise_count} exercises
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="app__card">
 
         {fixedProgramDetail && sortedFixedDays.length > 0 && (
@@ -289,22 +312,6 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
           </button>
         </Dialog>
       </section>
-
-      {inProgress.length > 0 && (
-        <section className="app__card">
-          <h2 className="app__card-title">In progress</h2>
-          <ul className="workout-history-list">
-            {inProgress.map((w) => (
-              <li key={w.id}>
-                <Link to={`/workouts/${w.id}`} className="workout-history-list__link">
-                  <span>{w.name || 'Workout'}</span>
-                  <span className="workout-history-list__meta">{formatWhen(w.started_at)} · {w.exercise_count} exercises</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <section className="app__card">
         <h2 className="app__card-title">History</h2>

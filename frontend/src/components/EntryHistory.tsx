@@ -5,6 +5,7 @@ import type { DailyEntryResponse, ProgressResponse } from '../types/api';
 import { formatWeight, kgToLb, lbToKg, cmToIn, inToCm } from '../utils/units';
 import PageLoading from './PageLoading';
 import InlineStatusCard from './ui/InlineStatusCard';
+import RetentionBanner from './ui/RetentionBanner';
 import Page from './layout/Page';
 import PageHeader from './layout/PageHeader';
 import Dialog from './ui/Dialog';
@@ -341,11 +342,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
             />
           )}
           {progress != null && !hasEntryToday && (
-            <section className="app__card retention-banner" role="status" aria-live="polite">
-              <p className="retention-banner__text">
-                Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
-              </p>
-            </section>
+            <RetentionBanner>
+              Haven&apos;t logged today? <Link to="/log">Log your weight</Link> to update your trend and weekly summary.
+            </RetentionBanner>
           )}
 
           <section className="app__card" aria-label="Progress">

@@ -4,6 +4,7 @@ import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
 import { formatWeight, formatTrend, formatWeightChange, lbToKg, inToCm } from '../utils/units';
 import InlineStatusCard from './ui/InlineStatusCard';
+import RetentionBanner from './ui/RetentionBanner';
 import Page from './layout/Page';
 import PageHeader from './layout/PageHeader';
 
@@ -121,18 +122,16 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
     progress.latest_entry_date === todayISO();
 
   return (
-    <Page>
+    <Page className="log-page">
       <PageHeader
         title="Log"
         description={<>Log today’s weight to keep your trend and weekly summary up to date.</>}
       />
 
       {progress !== null && !hasEntryToday && (
-        <section className="app__card retention-banner" role="status" aria-live="polite">
-          <p className="retention-banner__text">
-            You haven&apos;t logged today. Log your weight below to stay on track and see your weekly summary.
-          </p>
-        </section>
+        <RetentionBanner>
+          You haven&apos;t logged today. Log your weight below to stay on track and see your weekly summary.
+        </RetentionBanner>
       )}
       {progress !== null && (
         <section className="app__card" aria-label="Progress summary">
@@ -178,7 +177,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
         <h2 id="log-heading" className="app__card-title">
           Log today
         </h2>
-        <form onSubmit={handleSubmit} noValidate>
+        <form className="daily-log-form" onSubmit={handleSubmit} noValidate>
           <div className="form-group">
             <label className="form-label" htmlFor="log-date">
               Date
@@ -211,7 +210,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
             />
             {weightError && <p className="form-error" role="alert">{weightError}</p>}
             {duplicateDate && (
-              <p className="form-error" role="alert" style={{ marginTop: '0.5rem' }}>
+              <p className="form-error form-error--with-action" role="alert">
                 You already have an entry for this date.{' '}
                 <Link to="/progress" state={{ editDate: duplicateDate }}>Edit it</Link>.
               </p>
