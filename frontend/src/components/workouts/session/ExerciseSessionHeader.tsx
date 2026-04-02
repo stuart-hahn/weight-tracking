@@ -56,15 +56,20 @@ export interface ExerciseSessionHeaderProps {
 export default function ExerciseSessionHeader({ line, lastSessionLine, showSubstituted }: ExerciseSessionHeaderProps) {
   return (
     <div className="exercise-session-header">
-      <p className="exercise-session-header__target progress-text">
-        <span className="exercise-session-header__label">Target</span> {formatTargetLine(line)}
-      </p>
-      <p className="exercise-session-header__last progress-text">
-        <span className="exercise-session-header__label">Last</span> {lastSessionLine}
-      </p>
-      {showSubstituted && line.substituted_from_exercise_id != null && (
-        <p className="exercise-session-header__sub progress-text">Substitute session (tracked for history)</p>
-      )}
+      <details className="exercise-session-header__collapsible" open aria-label="Targets and last session">
+        <summary className="exercise-session-header__summary">Targets and last session</summary>
+        <div className="exercise-session-header__panel">
+          <p className="exercise-session-header__target progress-text">
+            <span className="exercise-session-header__label">Target</span> {formatTargetLine(line)}
+          </p>
+          <p className="exercise-session-header__last progress-text">
+            <span className="exercise-session-header__label">Last</span> {lastSessionLine}
+          </p>
+          {showSubstituted && line.substituted_from_exercise_id != null && (
+            <p className="exercise-session-header__sub progress-text">Substitute session (tracked for history)</p>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

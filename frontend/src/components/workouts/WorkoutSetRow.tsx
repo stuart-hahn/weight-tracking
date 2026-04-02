@@ -308,7 +308,10 @@ export default function WorkoutSetRow({
   const gridKind = line.exercise.kind;
 
   return (
-    <div className="workout-set-row workout-set-row--table" aria-busy={isPatching || undefined}>
+    <div
+      className={`workout-set-row workout-set-row--table${isDone ? ' workout-set-row--set-done' : ''}`}
+      aria-busy={isPatching || undefined}
+    >
       {(isPatching || patchError) && (
         <div className="workout-set-row__status">
           {isPatching && <span className="workout-set-row__saving">Saving…</span>}
