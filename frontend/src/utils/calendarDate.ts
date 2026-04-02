@@ -92,3 +92,60 @@ export function listSelectableTimeZones(): string[] {
   }
   return [...FALLBACK_TIME_ZONES];
 }
+
+/**
+ * UTC milliseconds for chart geometry only: calendar YYYY-MM-DD at ~12:00 wall time in `timeZone`.
+ * Avoids interpreting date-only strings as UTC midnight (which shifts the X axis vs user calendar days).
+ */
+export function calendarDateToChartTime(isoDate: string, timeZone: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!match) {
+    const t = Date.parse(isoDate);
+    return Number.isNaN(t) ? 0 : t;
+  }
+  const y = Number(match[1]);
+  const mo = Number(match[2]);
+  const d = Number(match[3]);
+  if (!isValidIanaTimeZone(timeZone)) {
+    return Date.UTC(y, mo - 1, d, 12, 0, 0);
+  }
+
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  function wallParts(utcMs: number): { y: number; m: number; d: number; h: number; min: number } {
+    const o = { y: 0, m: 0, d: 0, h: 0, min: 0 };
+    for (const p of dtf.formatToParts(new Date(utcMs))) {
+      if (p.type === 'year') o.y = Number(p.value);
+      if (p.type === 'month') o.m = Number(p.value);
+      if (p.type === 'day') o.d = Number(p.value);
+      if (p.type === 'hour') o.h = Number(p.value);
+      if (p.type === 'minute') o.min = Number(p.value);
+    }
+    return o;
+  }
+
+  let ms = Date.UTC(y, mo - 1, d, 12, 0, 0);
+  for (let i = 0; i < 56; i++) {
+    const w = wallParts(ms);
+    if (w.y === y && w.m === mo && w.d === d && w.h === 12 && w.min === 0) {
+      return ms;
+    }
+    // Spring-forward: 12:00 may not exist; accept adjacent hour on same calendar day
+    if (w.y === y && w.m === mo && w.d === d && (w.h === 11 || w.h === 13) && w.min === 0) {
+      return ms;
+    }
+    const deltaDays = (Date.UTC(y, mo - 1, d) - Date.UTC(w.y, w.m - 1, w.d)) / 86400000;
+    ms += Math.round(deltaDays) * 86400000;
+    ms += (12 - w.h) * 3600000 + (0 - w.min) * 60000;
+  }
+
+  return Date.UTC(y, mo - 1, d, 12, 0, 0);
+}

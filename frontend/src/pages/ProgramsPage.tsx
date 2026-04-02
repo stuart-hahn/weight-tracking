@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { listWorkoutPrograms, createWorkoutProgram } from '../api/client';
 import type { WorkoutProgramListItem } from '../types/api';
 import PageLoading from '../components/PageLoading';
+import EmptyState from '../components/ui/EmptyState';
 import Page from '../components/layout/Page';
 import PageHeader from '../components/layout/PageHeader';
 
@@ -51,7 +52,7 @@ export default function ProgramsPage({ userId, onError }: ProgramsPageProps) {
   };
 
   if (loading) {
-    return <PageLoading />;
+    return <PageLoading title="Programs" />;
   }
 
   return (
@@ -73,6 +74,7 @@ export default function ProgramsPage({ userId, onError }: ProgramsPageProps) {
       <section className="app__card">
         <form onSubmit={(e) => void onCreate(e)} className="workout-inline programs-page__create">
           <input
+            id="programs-new-name"
             className="form-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -85,7 +87,12 @@ export default function ProgramsPage({ userId, onError }: ProgramsPageProps) {
           </button>
         </form>
         {programs.length === 0 ? (
-          <p className="progress-text">No programs yet. Create one to add training days.</p>
+          <EmptyState
+            title="No programs yet"
+            message="Name a program above, then add training days and exercises. You can start sessions from the Workouts page."
+            actionLabel="Focus name field"
+            onAction={() => document.getElementById('programs-new-name')?.focus()}
+          />
         ) : (
           <ul className="workout-history-list">
             {programs.map((p) => (

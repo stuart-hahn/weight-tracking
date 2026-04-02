@@ -19,6 +19,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import AuthenticatedLayout from './layouts/AuthenticatedLayout';
 import PublicLayout from './layouts/PublicLayout';
+import RetentionBanner from './components/ui/RetentionBanner';
 import './App.css';
 
 type AuthMode = 'login' | 'signup';
@@ -251,15 +252,24 @@ function AppContent({
         </header>
       )}
 
-      <main className="app__main">
-        {error && <div className="app__error" role="alert">{error}</div>}
-        {success && <div className="app__success" role="status">{success}</div>}
+      <main className={`app__main${userId ? ' app__main--signed-in' : ''}`}>
+        {error && (
+          <div className="app__error app__feedback" role="alert">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="app__success app__feedback app__feedback--dismissible" role="status">
+            <span className="app__feedback-message">{success}</span>
+            <button type="button" className="app__feedback-dismiss" onClick={() => setSuccess(null)} aria-label="Dismiss message">
+              Dismiss
+            </button>
+          </div>
+        )}
         {userId && !emailVerifiedAt && (
-          <section className="app__card retention-banner" role="status">
-            <p className="retention-banner__text">
-              Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
-            </p>
-          </section>
+          <RetentionBanner>
+            Verify your email. Check your inbox for the link we sent, or open the app in a new device and use the link there.
+          </RetentionBanner>
         )}
 
         <Routes>

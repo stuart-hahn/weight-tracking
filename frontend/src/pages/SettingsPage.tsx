@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, FormEvent, useMemo } from 'react';
+import { useState, useEffect, useCallback, FormEvent, useMemo, useId } from 'react';
 import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
@@ -39,6 +39,15 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     if (selectableZones.includes(preference)) return selectableZones;
     return [preference, ...selectableZones];
   }, [selectableZones, preference]);
+
+  const tzSearchId = useId();
+  const tzListId = useId();
+  const [tzFilter, setTzFilter] = useState('');
+  const filteredZones = useMemo(() => {
+    const q = tzFilter.trim().toLowerCase();
+    if (!q) return zonesForSelect;
+    return zonesForSelect.filter((z) => z.toLowerCase().includes(q));
+  }, [zonesForSelect, tzFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -406,21 +415,46 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
         </fieldset>
         {preference !== 'auto' && (
           <div className="form-group">
-            <label className="form-label" htmlFor="settings-tz">
-              Zone
+            <label className="form-label" htmlFor={tzSearchId}>
+              Search time zones
             </label>
-            <select
-              id="settings-tz"
+            <input
+              id={tzSearchId}
+              type="search"
               className="form-input"
-              value={preference}
-              onChange={(e) => setPreference(e.target.value)}
+              value={tzFilter}
+              onChange={(e) => setTzFilter(e.target.value)}
+              placeholder="e.g. Tokyo, New_York"
+              autoComplete="off"
+              aria-controls={tzListId}
+            />
+            <div className="form-hint form-hint--tight">Type to filter, then tap a zone. Current: {preference}</div>
+            <div
+              id={tzListId}
+              className="settings-tz-list"
+              role="listbox"
+              aria-label="Matching IANA time zones"
             >
-              {zonesForSelect.map((z) => (
-                <option key={z} value={z}>
-                  {z}
-                </option>
-              ))}
-            </select>
+              {filteredZones.length === 0 ? (
+                <p className="progress-text settings-tz-list__empty">No matches. Try a shorter search.</p>
+              ) : (
+                <ul className="settings-tz-list__ul">
+                  {filteredZones.map((z) => (
+                    <li key={z}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={preference === z}
+                        className={`settings-tz-list__btn${preference === z ? ' settings-tz-list__btn--active' : ''}`}
+                        onClick={() => setPreference(z)}
+                      >
+                        {z}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
         <button

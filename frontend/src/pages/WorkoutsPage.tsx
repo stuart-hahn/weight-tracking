@@ -130,7 +130,7 @@ export default function WorkoutsPage({ userId, onError }: WorkoutsPageProps) {
   };
 
   if (isLoading) {
-    return <PageLoading />;
+    return <PageLoading title="Workouts" />;
   }
 
   return (

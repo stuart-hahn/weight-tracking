@@ -11,6 +11,7 @@ import PageHeader from './layout/PageHeader';
 import Dialog from './ui/Dialog';
 import ConfirmDialog from './ui/ConfirmDialog';
 import { useTimeZone } from '../context/TimeZonePreference';
+import { calendarDateToChartTime } from '../utils/calendarDate';
 
 interface EntryHistoryProps {
   userId: string;
@@ -24,7 +25,7 @@ const CHART_MIN_WIDTH = 280;
 const CHART_MAX_WIDTH = 720;
 
 export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdated }: EntryHistoryProps) {
-  const { todayISO } = useTimeZone();
+  const { todayISO, effectiveTimeZone } = useTimeZone();
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [bodyFatByDate, setBodyFatByDate] = useState<Record<string, number>>({});
@@ -238,8 +239,9 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     }
   }, [editingEntry, userId, onEntryUpdated, bodyFatByDate]);
 
-  const sortedEntries = [...entries].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  const sortedEntries = useMemo(
+    () => [...entries].sort((a, b) => a.date.localeCompare(b.date)),
+    [entries]
   );
 
   const chartModel = useMemo(() => {
@@ -251,12 +253,12 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
     const minY = goalKg != null && goalKg < minW ? goalKg : minW;
     const maxY = goalKg != null && goalKg > maxW ? goalKg : maxW;
     const range = maxY - minY || 1;
-    const dates = sortedEntries.map((e) => new Date(e.date).getTime());
+    const dates = sortedEntries.map((e) => calendarDateToChartTime(e.date, effectiveTimeZone));
     const minD = Math.min(...dates);
     const maxD = Math.max(...dates);
     const dateRange = maxD - minD || 1;
     return { weights, minW, maxW, goalKg, minY, maxY, range, minD, maxD, dateRange };
-  }, [sortedEntries, progress?.goal_weight_kg]);
+  }, [sortedEntries, progress?.goal_weight_kg, effectiveTimeZone]);
 
   const minW = chartModel?.minW ?? 0;
   const maxW = chartModel?.maxW ?? 0;
@@ -271,14 +273,22 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const innerW = width - CHART_PADDING.left - CHART_PADDING.right;
   const innerH = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
 
-  const toX = (date: Date) =>
-    CHART_PADDING.left + (innerW * (date.getTime() - minD)) / dateRange;
+  const toX = (chartTimeMs: number) =>
+    CHART_PADDING.left + (innerW * (chartTimeMs - minD)) / dateRange;
   const toY = (kg: number) =>
     CHART_PADDING.top + innerH - (innerH * (kg - minY)) / range;
 
   const points = useMemo(
-    () => (chartModel ? sortedEntries.map((e) => `${toX(new Date(e.date))},${toY(e.weight_kg)}`).join(' ') : ''),
-    [sortedEntries, chartModel, minD, dateRange, minY, range]
+    () =>
+      chartModel
+        ? sortedEntries
+            .map((e) => {
+              const cx = calendarDateToChartTime(e.date, effectiveTimeZone);
+              return `${toX(cx)},${toY(e.weight_kg)}`;
+            })
+            .join(' ')
+        : '',
+    [sortedEntries, chartModel, effectiveTimeZone, minD, dateRange, minY, range, width]
   );
   const goalY = goalKg != null ? toY(goalKg) : null;
   const hasEntryToday =
@@ -376,7 +386,14 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                   </text>
                 ))}
                 {xTicks.map((d) => (
-                  <text key={d} x={toX(new Date(d))} y={CHART_HEIGHT - 4} textAnchor="middle" fontSize="10" fill="var(--muted)">
+                  <text
+                    key={d}
+                    x={toX(calendarDateToChartTime(d, effectiveTimeZone))}
+                    y={CHART_HEIGHT - 4}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill="var(--muted)"
+                  >
                     {d}
                   </text>
                 ))}
@@ -393,7 +410,13 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                 )}
                 <polyline fill="none" stroke="var(--accent)" strokeWidth="2" points={points} />
                 {sortedEntries.map((e) => (
-                  <circle key={e.id} cx={toX(new Date(e.date))} cy={toY(e.weight_kg)} r="3" fill="var(--accent)" />
+                  <circle
+                    key={e.id}
+                    cx={toX(calendarDateToChartTime(e.date, effectiveTimeZone))}
+                    cy={toY(e.weight_kg)}
+                    r="3"
+                    fill="var(--accent)"
+                  />
                 ))}
               </svg>
               <figcaption className="progress-text progress-chart__caption">
