@@ -10,10 +10,7 @@ import Page from './layout/Page';
 import PageHeader from './layout/PageHeader';
 import Dialog from './ui/Dialog';
 import ConfirmDialog from './ui/ConfirmDialog';
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { useTimeZone } from '../context/TimeZonePreference';
 
 interface EntryHistoryProps {
   userId: string;
@@ -27,6 +24,7 @@ const CHART_MIN_WIDTH = 280;
 const CHART_MAX_WIDTH = 720;
 
 export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdated }: EntryHistoryProps) {
+  const { todayISO } = useTimeZone();
   const [entries, setEntries] = useState<DailyEntryResponse[]>([]);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [bodyFatByDate, setBodyFatByDate] = useState<Record<string, number>>({});
@@ -285,7 +283,7 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
   const goalY = goalKg != null ? toY(goalKg) : null;
   const hasEntryToday =
     progress?.latest_entry_date != null &&
-    progress.latest_entry_date === todayISO();
+    progress.latest_entry_date === todayISO;
 
   const yTicks = [minY, minY + range * 0.5, maxY].filter((v, i, a) => a.indexOf(v) === i);
   const xTicks = [sortedEntries[0]?.date, sortedEntries[Math.floor(sortedEntries.length / 2)]?.date, sortedEntries[sortedEntries.length - 1]?.date].filter(Boolean) as string[];
@@ -568,12 +566,26 @@ export default function EntryHistory({ userId, refreshTrigger = 0, onEntryUpdate
                       setEditingEntry(e);
                     }}
                   >
-                    <span>{e.date}</span>
-                    <span>
+                    <span className="entry-row__date">{e.date}</span>
+                    <span className="entry-row__weight">
                       <strong>{progress ? formatWeight(e.weight_kg, progress.units) : `${e.weight_kg} kg`}</strong>
                     </span>
-                    {e.calories != null && <span>{e.calories} kcal</span>}
-                    {bodyFatByDate[e.date] != null && <span>{bodyFatByDate[e.date]}% BF</span>}
+                    <span
+                      className={
+                        e.calories != null ? 'entry-row__calories' : 'entry-row__calories entry-row__calories--empty'
+                      }
+                    >
+                      {e.calories != null ? `${e.calories} kcal` : '—'}
+                    </span>
+                    <span
+                      className={
+                        bodyFatByDate[e.date] != null
+                          ? 'entry-row__extra'
+                          : 'entry-row__extra entry-row__extra--empty'
+                      }
+                    >
+                      {bodyFatByDate[e.date] != null ? `${bodyFatByDate[e.date]}% BF` : '—'}
+                    </span>
                   </button>
                 </li>
               ))}

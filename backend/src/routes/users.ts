@@ -87,6 +87,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       updatedAt: true,
       trainingBlockStartedAt: true,
       lastCalibrationWeekIndex: true,
+      timezone: true,
     },
   });
   if (!user) {
@@ -162,6 +163,7 @@ router.get('/:id/export', requireAuth, async (req: AuthRequest, res: Response): 
       updated_at: user.updatedAt.toISOString(),
       training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
       last_calibration_week_index: user.lastCalibrationWeekIndex,
+      timezone: user.timezone ?? null,
     },
     entries: entries.map((e: { id: string; date: Date; weightKg: number; calories: number | null; waistCm: number | null; hipCm: number | null; createdAt: Date }) => ({
       id: e.id,
@@ -284,6 +286,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
       updatedAt: true,
       trainingBlockStartedAt: true,
       lastCalibrationWeekIndex: true,
+      timezone: true,
     },
   });
   if (!user) {
@@ -306,6 +309,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
     plan: user.plan,
     training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
     last_calibration_week_index: user.lastCalibrationWeekIndex,
+    timezone: user.timezone ?? null,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
   };
@@ -333,6 +337,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     plan?: string | null;
     trainingBlockStartedAt?: Date | null;
     lastCalibrationWeekIndex?: number | null;
+    timezone?: string | null;
   } = {};
   if (body.age !== undefined) data.age = body.age;
   if (body.sex !== undefined) data.sex = body.sex;
@@ -350,6 +355,9 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
   }
   if (body.last_calibration_week_index !== undefined) {
     data.lastCalibrationWeekIndex = body.last_calibration_week_index;
+  }
+  if (body.timezone !== undefined) {
+    data.timezone = body.timezone ?? null;
   }
   const selectFields = {
     id: true,
@@ -369,6 +377,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     updatedAt: true,
     trainingBlockStartedAt: true,
     lastCalibrationWeekIndex: true,
+    timezone: true,
   };
   if (Object.keys(data).length === 0) {
     const user = await prisma.user.findUnique({
@@ -395,6 +404,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
       plan: user.plan,
       training_block_started_at: user.trainingBlockStartedAt?.toISOString() ?? null,
       last_calibration_week_index: user.lastCalibrationWeekIndex,
+      timezone: user.timezone ?? null,
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString(),
     };
@@ -422,6 +432,7 @@ router.patch('/:id', requireAuth, validateUpdateUser, async (req: AuthRequest, r
     plan: updatedUser.plan,
     training_block_started_at: updatedUser.trainingBlockStartedAt?.toISOString() ?? null,
     last_calibration_week_index: updatedUser.lastCalibrationWeekIndex,
+    timezone: updatedUser.timezone ?? null,
     created_at: updatedUser.createdAt.toISOString(),
     updated_at: updatedUser.updatedAt.toISOString(),
   };

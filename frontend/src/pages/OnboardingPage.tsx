@@ -6,6 +6,7 @@ import { formatWeight, kgToLb, lbToKg } from '../utils/units';
 import PageLoading from '../components/PageLoading';
 import InlineFieldError from '../components/ui/InlineFieldError';
 import CenteredCardPage from '../components/layout/CenteredCardPage';
+import { useTimeZone } from '../context/TimeZonePreference';
 
 interface OnboardingPageProps {
   userId: string;
@@ -13,11 +14,8 @@ interface OnboardingPageProps {
   onError: (message: string) => void;
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function OnboardingPage({ userId, onComplete, onError }: OnboardingPageProps) {
+  const { todayISO } = useTimeZone();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
@@ -53,7 +51,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         setFieldError('Please enter a valid weight.');
         return;
       }
-      const date = todayISO();
+      const date = todayISO;
       try {
         await createEntry(userId, {
           date,
@@ -69,7 +67,7 @@ export default function OnboardingPage({ userId, onComplete, onError }: Onboardi
         onError(err instanceof Error ? err.message : 'Failed to save entry');
       }
     },
-    [userId, weight, calories, progress, onComplete, onError, navigate]
+    [userId, weight, calories, progress, onComplete, onError, navigate, todayISO]
   );
 
   if (progress === null) {

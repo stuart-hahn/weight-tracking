@@ -2026,13 +2026,13 @@ button.workout-history-list__link {
 
 .entry-row {
   width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, auto);
   align-items: baseline;
+  column-gap: 1rem;
+  row-gap: 0.25rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border);
-  gap: 0.5rem 1rem;
   background: transparent;
   border-left: none;
   border-right: none;
@@ -2043,6 +2043,31 @@ button.workout-history-list__link {
   cursor: pointer;
 }
 
+.entry-row__date {
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-row__weight strong {
+  font-weight: 600;
+}
+
+.entry-row__calories {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.entry-row__calories--empty,
+.entry-row__extra--empty {
+  color: var(--muted);
+}
+
+.entry-row__extra {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .entry-row:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
@@ -2051,24 +2076,30 @@ button.workout-history-list__link {
 
 @media (max-width: 639px) {
   .entry-row {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: stretch;
     gap: 0.35rem;
     min-height: var(--touch-target-min);
     padding: 0.65rem 0;
   }
 
-  .entry-row > span:first-child {
+  .entry-row__date {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
 
-  .entry-row > span:nth-child(2) {
+  .entry-row__weight {
     font-size: 1.05rem;
   }
 
-  .entry-row > span:nth-child(n + 3) {
+  .entry-row__calories,
+  .entry-row__extra {
     font-size: 0.85rem;
+    text-align: left;
+  }
+
+  .entry-row__calories--empty,
+  .entry-row__extra--empty {
     color: var(--muted);
   }
 }
@@ -2223,6 +2254,19 @@ button.workout-history-list__link {
 }
 
 /* Settings / shared section spacing */
+.settings-radio-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.settings-radio-line input {
+  margin-top: 0.2rem;
+}
+
 .settings-section {
   margin-top: 0;
   padding-top: 0;

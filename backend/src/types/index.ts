@@ -50,6 +50,8 @@ export interface UserUpdateInput {
   /** ISO date (YYYY-MM-DD) or datetime; null clears block start */
   training_block_started_at?: string | null;
   last_calibration_week_index?: number | null;
+  /** IANA time zone or null to use device default on clients */
+  timezone?: string | null;
 }
 
 /** User without sensitive fields for API responses */
@@ -69,6 +71,8 @@ export interface UserProfile {
   plan: string | null;
   training_block_started_at: string | null;
   last_calibration_week_index: number | null;
+  /** IANA time zone; null = use device */
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }

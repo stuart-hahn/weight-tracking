@@ -300,13 +300,13 @@ function AppContent({
           <Route path="/verify-email" element={<VerifyEmailPage onVerified={onEmailVerified} />} />
 
           <Route element={<RequireAuth userId={userId} onboardingComplete={onboardingComplete} requireOnboarded={false} />}>
-            <Route element={<AuthenticatedLayout onLogout={handleLogout} email={userEmail} />}>
+            <Route element={<AuthenticatedLayout userId={userId!} onLogout={handleLogout} email={userEmail} />}>
               <Route path="/onboarding" element={<OnboardingPage userId={userId!} onComplete={onOnboardingComplete} onError={setError} />} />
             </Route>
           </Route>
 
           <Route element={<RequireAuth userId={userId} onboardingComplete={onboardingComplete} requireOnboarded />}>
-            <Route element={<AuthenticatedLayout onLogout={handleLogout} email={userEmail} />}>
+            <Route element={<AuthenticatedLayout userId={userId!} onLogout={handleLogout} email={userEmail} />}>
               <Route
                 path="/log"
                 element={

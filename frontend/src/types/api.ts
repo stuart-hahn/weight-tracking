@@ -20,6 +20,8 @@ export interface UserProfile {
   plan: string | null;
   training_block_started_at: string | null;
   last_calibration_week_index: number | null;
+  /** null = use device time zone */
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +62,8 @@ export interface UpdateUserRequest {
   plan?: string | null;
   training_block_started_at?: string | null;
   last_calibration_week_index?: number | null;
+  /** null clears server override (use device zone) */
+  timezone?: string | null;
 }
 
 export interface DailyEntryResponse {

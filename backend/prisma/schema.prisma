@@ -39,6 +39,8 @@ model User {
   workoutPrograms WorkoutProgram[]
   trainingBlockStartedAt DateTime? @map("training_block_started_at")
   lastCalibrationWeekIndex Int? @map("last_calibration_week_index")
+  /// IANA time zone for calendar "today" (e.g. America/New_York); null = client uses device
+  timezone              String?  @map("timezone")
 }
 
 /// Global catalog (userId null) or user-created custom exercise

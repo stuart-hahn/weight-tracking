@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent, useMemo } from 'react';
 import { getUser, updateUser, exportUserData } from '../api/client';
 import type { UserProfile, UpdateUserRequest, ActivityLevel, UnitsPreference } from '../types/api';
 import { cmToIn, inToCm, kgToLb, lbToKg } from '../utils/units';
+import { getDeviceTimeZone, listSelectableTimeZones } from '../utils/calendarDate';
+import { useTimeZone } from '../context/TimeZonePreference';
 import PageLoading from '../components/PageLoading';
 import InlineFieldError from '../components/ui/InlineFieldError';
 import Page from '../components/layout/Page';
@@ -29,6 +31,14 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   const [exporting, setExporting] = useState(false);
   const [blockStart, setBlockStart] = useState('');
   const [savingBlock, setSavingBlock] = useState(false);
+  const [savingTz, setSavingTz] = useState(false);
+  const { preference, effectiveTimeZone, setPreference } = useTimeZone();
+  const selectableZones = useMemo(() => listSelectableTimeZones(), []);
+  const zonesForSelect = useMemo(() => {
+    if (preference === 'auto') return selectableZones;
+    if (selectableZones.includes(preference)) return selectableZones;
+    return [preference, ...selectableZones];
+  }, [selectableZones, preference]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +155,23 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
     }
   }, [userId, blockStart, onError, onSuccess]);
 
+  const saveTimeZoneToAccount = useCallback(async () => {
+    onError(null);
+    onSuccess(null);
+    setSavingTz(true);
+    try {
+      const body: UpdateUserRequest =
+        preference === 'auto' ? { timezone: null } : { timezone: preference };
+      const updated = await updateUser(userId, body);
+      setProfile(updated);
+      onSuccess('Time zone saved to your account.');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to save time zone');
+    } finally {
+      setSavingTz(false);
+    }
+  }, [userId, preference, onError, onSuccess]);
+
   const handleExport = useCallback(async () => {
     onError(null);
     setExporting(true);
@@ -163,6 +190,11 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
   }
 
   if (!profile) return null;
+
+  const timeZoneSynced =
+    preference === 'auto'
+      ? profile.timezone == null
+      : profile.timezone === preference;
 
   return (
     <Page>
@@ -342,6 +374,66 @@ export default function SettingsPage({ userId, onError, onSuccess }: SettingsPag
             {saving ? 'Saving…' : 'Save'}
           </button>
         </form>
+      </section>
+
+      <section className="app__card settings-section" aria-label="Time zone">
+        <h2 className="app__card-title">Time zone</h2>
+        <p className="progress-text progress-text--mb-md progress-text--fine">
+          Log date, “today” reminders, and the date picker max use your effective zone:{' '}
+          <strong>{effectiveTimeZone}</strong>
+          {preference === 'auto' ? ' (from this device)' : ' (fixed choice)'}.
+        </p>
+        <fieldset className="form-group" style={{ border: 'none', margin: 0, padding: 0 }}>
+          <legend className="form-label">Calendar day source</legend>
+          <label className="settings-radio-line">
+            <input
+              type="radio"
+              name="tz-mode"
+              checked={preference === 'auto'}
+              onChange={() => setPreference('auto')}
+            />
+            <span>Use device time zone ({getDeviceTimeZone()})</span>
+          </label>
+          <label className="settings-radio-line">
+            <input
+              type="radio"
+              name="tz-mode"
+              checked={preference !== 'auto'}
+              onChange={() => setPreference(getDeviceTimeZone())}
+            />
+            <span>Choose IANA time zone</span>
+          </label>
+        </fieldset>
+        {preference !== 'auto' && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="settings-tz">
+              Zone
+            </label>
+            <select
+              id="settings-tz"
+              className="form-input"
+              value={preference}
+              onChange={(e) => setPreference(e.target.value)}
+            >
+              {zonesForSelect.map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn btn--secondary btn--block"
+          disabled={savingTz || timeZoneSynced}
+          onClick={() => void saveTimeZoneToAccount()}
+        >
+          {savingTz ? 'Saving…' : 'Save time zone to account'}
+        </button>
+        <p className="form-hint form-hint--tight">
+          The choice above applies on this device right away. Use the button to sync it across devices (or clear the override).
+        </p>
       </section>
 
       <section className="app__card settings-section" aria-label="Strength training block">

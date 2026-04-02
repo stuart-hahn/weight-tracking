@@ -156,6 +156,17 @@ export function validateUpdateUser(
   ) {
     errors.push('last_calibration_week_index must be a non-negative integer or null');
   }
+  if (body.timezone !== undefined && body.timezone !== null) {
+    if (typeof body.timezone !== 'string' || body.timezone.length > 120) {
+      errors.push('timezone must be a string or null');
+    } else {
+      try {
+        Intl.DateTimeFormat('en-US', { timeZone: body.timezone });
+      } catch {
+        errors.push('timezone must be a valid IANA time zone or null');
+      }
+    }
+  }
   if (errors.length > 0) {
     res.status(400).json({ error: errors.join('; ') });
     return;

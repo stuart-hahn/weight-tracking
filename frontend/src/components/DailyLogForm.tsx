@@ -1,4 +1,4 @@
-import { useState, useCallback, FormEvent, useEffect } from 'react';
+import { useState, useCallback, FormEvent, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getProgress } from '../api/client';
 import type { CreateEntryRequest, ProgressResponse } from '../types/api';
@@ -7,6 +7,7 @@ import InlineStatusCard from './ui/InlineStatusCard';
 import RetentionBanner from './ui/RetentionBanner';
 import Page from './layout/Page';
 import PageHeader from './layout/PageHeader';
+import { useTimeZone } from '../context/TimeZonePreference';
 
 export interface OptionalBodyFatSubmit {
   date: string;
@@ -21,12 +22,21 @@ interface DailyLogFormProps {
   refreshTrigger?: number;
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger = 0 }: DailyLogFormProps) {
+  const { todayISO } = useTimeZone();
+  const prevTodayRef = useRef(todayISO);
   const [date, setDate] = useState(todayISO);
+
+  useEffect(() => {
+    const prev = prevTodayRef.current;
+    if (prev === todayISO) return;
+    setDate((d) => {
+      if (d === prev) return todayISO;
+      if (d > todayISO) return todayISO;
+      return d;
+    });
+    prevTodayRef.current = todayISO;
+  }, [todayISO]);
   const [weightKg, setWeightKg] = useState('');
   const [calories, setCalories] = useState('');
   const [optionalOpen, setOptionalOpen] = useState(false);
@@ -119,7 +129,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
 
   const hasEntryToday =
     progress?.latest_entry_date != null &&
-    progress.latest_entry_date === todayISO();
+    progress.latest_entry_date === todayISO;
 
   return (
     <Page className="log-page">
@@ -188,7 +198,7 @@ export default function DailyLogForm({ onSubmit, onError, userId, refreshTrigger
               className="form-input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              max={todayISO()}
+              max={todayISO}
               required
             />
           </div>
